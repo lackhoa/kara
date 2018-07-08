@@ -1,18 +1,17 @@
-(define
-  (eval exp env)
+(define (eval exp env)
   (cond
     ((self-eval? exp) exp)
     ((quoted? exp) (quoted-text exp))
-    ((var? exp) (lookup-var exp env))
+    ((var? exp) (env-lookup exp env))
     ((asgn? exp) (eval-asgn exp env))
     ((if? exp) (eval-if exp env))
     ((cond? exp) (eval (cond->if exp) env))
+    ((seq? exp) (eval-seq (seq-actions exp) env))
     (
       (lambda? exp)
-      (make-proc (lambda-body exp) env)  ; No lambda parameters
+      (lambda () (eval-seq (lambda-body exp) env))  ; No lambda parameters
     )
-    ((seq? exp) (eval-seq (begin-actions exp) env))
-    ((pair? exp) (eval-apply exp))
+    ((pair? exp) (eval-apply exp env))
     (else (error "eval" "Unknown expression type" exp))
   )
 )
@@ -21,9 +20,8 @@
 (define (tagged? exp tag) (and  (pair? exp)
                                 (eq? (car exp) tag)))
 
-(define
-  (self-eval? exp)
-  (or (number? exp) (string? exp) (eq? exp '#t) (eq? exp '#f))
+(define (self-eval? exp)
+  (or (number? exp) (string? exp) (eq? exp #t) (eq? exp #f))
 )
 
 (define (var? exp) (symbol? exp))
@@ -37,8 +35,7 @@
 (define (if? exp) (tagged? exp 'if))
 (define (if-pred exp) (cadr exp))
 (define (if-conse exp) (caddr exp))
-(define
-  (if-alt exp)
+(define (if-alt exp)
   (if (not (null? (cdddr exp)))
     (cadddr exp)
     'false
@@ -52,12 +49,13 @@
 (define (cond-actions clause) (cadr clause))
 
 (define (seq? exp) (tagged? exp 'seq))
-(define (seq-body exp) (cdr exp))
+(define (seq-actions exp) (cdr exp))
 
 (define (application-proc exp) (car exp))
-(define (application-frame-init exp) (car exp))
+(define (application-frame-init exp) (cdr exp))
 
-(define (keyword? exp) (tagged? exp '**))
+(define (lambda? exp) (tagged? exp 'lambda))
+(define (lambda-body exp) (cdr exp))  ;Note that lambda's body is a sequence of instructions
 
 
 ; The environment
@@ -68,50 +66,81 @@
 ; Frame: a hash table to store bindings
 (define (make-frame) (make-eq-hashtable))
 
-(define
-  (update-frame! frame binding)
+(define (update-frame! frame binding)
   (hashtable-set! frame (binding-var binding) (binding-val binding))
 )
 
-(define
-  (bound-in-frame? frame var)
-  (hashtable-contains? frame var)
+(define (bound-in-frame? frame var)
+  (if (unnamed-var? var)
+      (and
+        (hashtable-contains? frame '$)
+        (> (length (frame-lookup frame '$)) (unnamed-var->int var))
+      )
+      (hashtable-contains? frame var)
+  )
 )
 
-(define
-  (frame-lookup frame var)
-  (if
-    (bound-in-frame? frame var)
-    (hashtable-ref frame var '())
-    (error "frame-lookup" "Binding not in frame" binding)
+(define (unnamed-var? var)
+        (eq? (string-ref (symbol->string var) 0) '#\$)
+)
+
+(define (unnamed-var->int var)
+  (cond
+    ((eq var '$0) 0) ((eq var '$1) 1) ((eq var '$2) 2)
+    ((eq var '$3) 3) ((eq var '$4) 4) ((eq var '$5) 5)
+    ((eq var '$6) 6) ((eq var '$7) 7) ((eq var '$8) 8)
+    ((eq var '$9) 9)
+    (else (error "unnamed-var->int" "Invalid unnamed variable" var))
+  )
+)
+
+(define (frame-lookup frame var)
+  (if (bound-in-frame? frame var)
+      (if (unnamed-var? var)
+          (list-ref (frame-lookup '$) (unnamed-var->int var))
+          (hashtable-ref frame var '())
+      )
+      (error "frame-lookup" "Binding not in frame" binding)
+  )
+)
+
+;Add an anonymous variable to a frame
+(define (add-unnamed-to-frame! frame value)
+  (let
+    ((unnamed-vars (hashtable-ref frame $ '())))
+    (hashtable-set! frame '$ (append unnamed-vars '(value)))
   )
 )
 
 ; Environment: a list of frames
-; binginning with the inner most frame to the outermost
+; binginning with the local frame to the outermost
 ; environments are immutable, but frames can change
-(define (inner-frame env) (car env))
+(define (local-frame env) (car env))
 (define (outer-frames env) (cdr env))
 (define empty-env '())
 (define (extended-env env frame) (cons frame env))
 
-; Variable lookup: lookup through the entire environment
-(define
-  (lookup-var var env)
-  (cond ((eq? env empty-env) (error "lookup-var" "Unbound variable" var))
+; Variable lookup through the entire environment
+; Unnamed variables are only looked up in the local frame
+(define (env-lookup var env)
+  (cond ((eq? env empty-env) (error "env-lookup" "Unbound named variable" var))
         (
-          (bound-in-frame? (inner-frame env) var)
-          (frame-lookup (inner-frame env) var)
+          (bound-in-frame? (local-frame env) var)
+          (frame-lookup (local-frame env) var)
         )
-        (lookup-var var (outer-frames env))
+        (else
+          (if (unnamed-var? var)
+              (error "env-lookup" "Unbound unnamed variable" var)
+              (env-lookup var (outer-frames env))
+          )
+        )
   )
 )
 
-; Assignment: can only change the inner frame
-(define
-  (eval-asgn assignment env)
+; Assignment: can only change the local frame
+(define (eval-asgn assignment env)
   (update-frame!
-    (inner-frame env)
+    (local-frame env)
     (asgn-binding assignment)
   )
   'ok
@@ -126,8 +155,7 @@
   )
 )
 
-(define
-  (expand-clauses clauses)
+(define (expand-clauses clauses)
   (let
     ((cur-clause (car clauses)))
     (if (cond-else-clause cur-clause)
@@ -149,61 +177,67 @@
 )
 
 
+; Evaluate a sequence
+(define (eval-seq sequence env)
+  (eval (car sequence) env)
+  (if (not (null? (cdr sequence)))
+      (eval-seq (cdr sequence) env)
+  )
+)
+
+
 ; Function application
 ; The code is evaluated in the enclosing environment
 ; While the execution is done in a new local environment
-(define
-  (eval-apply exp env)
-  (
-    (eval (application-proc exp) env)  
+(define (eval-apply exp env)
+  (  ; This is an application
+    (eval (application-proc exp) env)
     (fork-env (application-frame-init exp) env)
   )
 )
 
-
-(define
-  (frame-init->frame frame-init)
-  (cond
-    ((null? frame-init) '())
-    (
-      (keyword? (binding-exp))
-      (let
-        (
-          (binding-exp (car frame-init))
-          (more-bindings (frame-init->frame (cdr frame-init)))
+(define (frame-init->frame frame-init frame)
+  (if
+    (null? frame-init)
+    '()
+    (begin
+      (let ((first (car frame-init)) (rest (cdr frame-init)))
+        (if
+          (tagged? first '**)
+          (update-frame! frame (cdr first))
+          (add-unnamed-to-frame! frame first)
         )
-        ( (cons (binding-exp-binding (binding-exp)) more-bindings) )
       )
-    )
-    (
-      else
-      (let
-        (
-          (more-bindings (frame-init->frame (cdr frame-init)))
-        )
-        ( (cons  more-bindings) )
-      )
+      (frame-init->frame rest frame)
     )
   )
 )
 
-(define
-  (fork-env frame-init base-env)
-  (extend-env (frame-init->frame frame-init) base-env)
+(define (fork-env frame-init base-env)
+  (extended-env base-env (frame-init->frame frame-init (make-eq-hashtable)))
 )
 
 
 ; The Repl
-(define global-env (list (make-eq-hashtable)))
+(define (make-the-frame)
+  (set! the-frame (make-eq-hashtable))
+  (update-frame! the-frame (list 'car car))
+  (update-frame! the-frame (list 'cdr cdr))
+  (update-frame! the-frame (list 'cons cons))
+  (update-frame! the-frame (list '+ +))
+  the-frame
+)
+(define global-env (list (make-the-frame)))
 
 (define input-prompt "K>>> ")
 
 (define output-prompt "; ; ;  M-Eval value:")
 
-(define
-  (driver-loop)
+(define (driver-loop)
   (prompt-for-input)
-  (print-output (eval input global-env))
+  (let ((input (read)))
+    (print-output (eval input global-env))
+  )
   (driver-loop)
 )
 
@@ -214,7 +248,7 @@
 )
 
 ; The program to run
-(trace eval expand-clauses)
+(trace eval eval-apply)
 (display "Setting a variable\n\n")
 (eval '(set! a 5) global-env)
 (display "Retrieving a variable\n\n")
