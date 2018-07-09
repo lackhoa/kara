@@ -8,11 +8,7 @@
     ((if? exp) (eval-if exp env))
     ((cond? exp) (eval (cond->if exp) env))
     ((seq? exp) (eval-seq (seq-actions exp) env))
-    (
-      (lambda? exp)
-      (lambda () (eval-seq (lambda-body exp) env))  ; No lambda parameters
-    )
-    ((pair? exp) (eval-apply exp env))
+    ((pair? exp) (eval-exec exp env))
     (else (error "eval" "Unknown expression type" exp))
   )
 )
@@ -28,7 +24,8 @@
 (define (var? exp) (symbol? exp))
 
 (define (asgn? exp) (tagged? exp 'set!))
-(define (asgn-binding exp) (cdr exp))
+(define (asgn-var exp) (cadr exp))
+(define (asgn-val exp) (caddr exp))
 
 (define (quoted? exp) (tagged? exp 'quote))
 (define (quoted-text exp) (cadr exp))
@@ -60,9 +57,6 @@
 (define (application-proc exp) (car exp))
 (define (application-args exp) (cdr exp))
 
-(define (lambda? exp) (tagged? exp 'lambda))
-(define (lambda-body exp) (cadr exp))  ;Note that lambda's body is NOT an implicit sequence
-
 
 ; The environment
 ; Binding: a pair of variable and value
@@ -78,14 +72,14 @@
   )
 )
 
-(define (update-frame! frame binding)
-  (hashtable-set! frame (binding-var binding) (binding-val binding))
+(define (update-frame! frame var val)
+  (hashtable-set! frame var val)
 )
 
 (define (bound-in-frame? frame var)
   (if (unnamed-var? var)
       (if (hashtable-contains? frame '$)
-          (> (length (frame-lookup frame '$)) (unnamed-var->int var))
+          (> (length (hashtable-ref frame '$ (void))) (unnamed-var->int var))
           (error "bound-in-frame?"
                  "Frame does not contained unnamed slots"
                  frame
@@ -112,8 +106,10 @@
 (define (frame-lookup frame var)
   (if (bound-in-frame? frame var)
       (if (unnamed-var? var)
-          (list-ref (frame-lookup '$) (unnamed-var->int var))
-          (hashtable-ref frame var '())
+          (list-ref (hashtable-ref frame '$ (void))
+                    (unnamed-var->int var)
+          )
+          (hashtable-ref frame var (void))
       )
       (error "frame-lookup" "Binding not in frame" binding)
   )
@@ -121,9 +117,12 @@
 
 ;Add an anonymous variable to a frame
 (define (add-unnamed-to-frame! frame value)
-  (let
-    ((unnamed-vars (hashtable-ref frame $ '())))
-    (hashtable-set! frame '$ (append unnamed-vars '(value)))
+  (if (hashtable-contains? frame '$)
+      (let
+        ((unnamed-vars (hashtable-ref frame '$ (void))))
+        (hashtable-set! frame '$ (append unnamed-vars (list value)))
+      )
+      (error "add-unnamed-to-frame" "Frame has no slots for unnamed variables" frame)
   )
 )
 
@@ -138,14 +137,14 @@
 ; Variable lookup through the entire environment
 ; Unnamed variables are only looked up in the local frame
 (define (env-lookup var env)
-  (cond ((eq? env empty-env) (error "env-lookup" "Unbound named variable" var))
+  (cond ((eq? env empty-env) (error "env-lookup" "Unbound variable" var))
         (
           (bound-in-frame? (local-frame env) var)
           (frame-lookup (local-frame env) var)
         )
         (else
           (if (unnamed-var? var)
-              (error "env-lookup" "Unbound unnamed variable" var)
+              (error "env-lookup" "Unbound variable" var)
               (env-lookup var (outer-frames env))
           )
         )
@@ -153,10 +152,12 @@
 )
 
 ; Assignment: can only change the local frame
+; The value must be immediately evaluated in the current environment
 (define (eval-asgn assignment env)
   (update-frame!
     (local-frame env)
-    (asgn-binding assignment)
+    (asgn-var assignment)
+    (eval (asgn-val assignment) env)
   )
   'ok
 )
@@ -212,7 +213,7 @@
 ; Function application
 ; The code is evaluated in the enclosing environment
 ; While the execution is done in a new local environment
-(define (eval-apply exp env)
+(define (eval-exec exp env)
   (if
     (prim-proc? (car exp))
     ; Primitive
@@ -220,22 +221,24 @@
                      (eval-many (application-args exp) env)
     )
     ; Compound
-    (eval (call-proc exp)
-          (fork-env (call-frame-init exp) env)
+    (eval
+      (eval (call-proc exp) env)
+      (fork-env (call-frame-init exp) env)
     )
   )
 )
 
-(define (frame-init->frame frame-init frame)
+(define (frame-init->frame frame-init env)
   (define (build-frame frame-init frame)
-    (if (not (null? frame-init))
+    (if (null? frame-init)
+        frame
         (begin
           (let ((first (car frame-init)) (rest (cdr frame-init)))
             (if (tagged? first '**)
-                ; Bindings
-                (update-frame! frame (cdr first))
+                ; Named variable
+                (update-frame! frame (cadr first) (eval (caddr first) env))
                 ; Unnamed variable
-                (add-unnamed-to-frame! frame first)
+                (add-unnamed-to-frame! frame (eval first env))
             )
             (build-frame rest frame)
           )
@@ -247,7 +250,7 @@
 )
 
 (define (fork-env frame-init base-env)
-  (extend-env base-env (frame-init->frame frame-init))
+  (extend-env base-env (frame-init->frame frame-init base-env))
 )
 
 
@@ -256,6 +259,7 @@
   (let ((result (make-eq-hashtable)))
     (hashtable-set! result 'car car)
     (hashtable-set! result 'cdr cdr)
+    (hashtable-set! result 'cons cons)
     (hashtable-set! result 'list list)
     (hashtable-set! result 'null? null?)
     (hashtable-set! result 'pair? pair?)
@@ -278,15 +282,8 @@
   )
 )
 
-(define (make-the-frame)
-  (set! the-frame (make-frame))
-  (update-frame! the-frame (list 'car car))
-  (update-frame! the-frame (list 'cdr cdr))
-  (update-frame! the-frame (list 'cons cons))
-  (update-frame! the-frame (list '+ +))
-  the-frame
-)
-(define global-env (list (make-the-frame)))
+; The global environment with an (almost) empty frame
+(define global-env (list (make-frame)))
 
 (define input-prompt "K>>> ")
 
@@ -307,25 +304,67 @@
 )
 
 ; The program to run
-(trace eval eval-apply)
-(display "Setting a variable\n\n")
-(eval '(set! a 5) global-env)
-(display "Retrieving a variable\n\n")
-(eval 'a global-env)
-(display "If true\n\n")
-(eval '(if #t 1 2) global-env)
-(display "If false\n\n")
-(eval '(if #f 1 2) global-env)
-(display "Conditional first\n\n")
-(eval '(cond (#t 1) (#f 2) (else 3)) global-env)
-(display "Conditional second\n\n")
-(eval '(cond (#f 1) (#t 2) (else 3)) global-env)
-(display "Conditional else\n\n")
-(eval '(cond (#f 1) (#f 2) (else 3)) global-env)
-(display "Apply complex primitive procedure\n\n")
-(eval '(+ (+ 2 8) 2) global-env)
-(display "Apply compound procedure unnamed variables\n\n")
-(eval '((lambda ($1)) 2) global-env)
+(trace eval eval-exec)
+; (display "\n\nSetting a variable\n\n")
+; (eval '(set! a 5) global-env)
+
+; (display "\n\nRetrieving a variable\n\n")
+; (eval 'a global-env)
+
+; (display "\n\nIf true\n\n")
+; (eval '(if #t 1 2) global-env)
+
+; (display "\n\nIf false\n\n")
+; (eval '(if #f 1 2) global-env)
+
+; (display "\n\nConditional first\n\n")
+; (eval '(cond (#t 1) (#f 2) (else 3)) global-env)
+
+; (display "\n\nConditional second\n\n")
+; (eval '(cond (#f 1) (#t 2) (else 3)) global-env)
+
+; (display "\n\nConditional else\n\n")
+; (eval '(cond (#f 1) (#f 2) (else 3)) global-env)
+
+; (display "\n\nApply complex primitive procedure\n\n")
+; (eval '(+ (+ 2 8) 2) global-env)
+
+; (display "\n\nApply compound procedure 1\n\n")
+; (eval '('z) global-env)
+
+; (display "\n\nApply compound procedure 2\n\n")
+; (eval '(z (** z 6)) global-env)
+
+; (display "\n\nApply compound procedure 3\n\n")
+; (eval '((+ x y) (** x 7) (** y 8)) global-env)
+
+; (display "\n\nApply compound procedure 4\n\n")
+; (eval '($0 7) global-env)
+
+; (display "\n\nApply compound procedure 5\n\n")
+; (eval '((+ $0 $1) 7 13) global-env)
+
+; (display "\n\nBoth keyword and non-keyword\n\n")
+; (eval '((* mult $0) 7 (** mult 7)) global-env)
+
+(display "\n\nStore procedure\n\n")
+(eval '(set! add3 '(+ 3 $0)) global-env)
+
+(display "\n\nUse stored procedure\n\n")
+(eval '(add3 7) global-env)
+
+(newline)(newline)
+(eval
+  '(set! map '(if (null? L) '() (cons (func (car L)) (map (** L (cdr L)) (** func func)))))
+  global-env)
+
+(display "\n\nmap procedure\n\n")
+(eval '(map (** func add3) (** L (list 0 1 2 3 4 5))) global-env)
+
+
+
+
+
 
 
 
