@@ -8,7 +8,7 @@
     ((if? exp) (eval-if exp env))
     ((cond? exp) (eval (cond->if exp) env))
     ((seq? exp) (eval-seq (seq-actions exp) env))
-    ((pair? exp) (eval-exec exp env))
+    ((pair? exp) (eval-exec exp env))                   ; Code execution is last
     (else (error "eval" "Unknown expression type" exp))
   )
 )
@@ -153,6 +153,8 @@
 
 ; Assignment: can only change the local frame
 ; The value must be immediately evaluated in the current environment
+; Note that the variable is not evaluated, this is one of the rare cases...
+; ...where we do not evaluate something before acting on it
 (define (eval-asgn assignment env)
   (update-frame!
     (local-frame env)
@@ -211,8 +213,10 @@
 )
 
 ; Function application
-; The code is evaluated in the enclosing environment
+; The code body is evaluated in the enclosing environment
 ; While the execution is done in a new local environment
+; It's not strange that `eval` is called twice, since each call...
+; ...bears a different meaning
 (define (eval-exec exp env)
   (if
     (prim-proc? (car exp))
