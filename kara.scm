@@ -1,3 +1,4 @@
+; The main switch block
 (define (eval exp env)
   (cond
     ((self-eval? exp) exp)
@@ -51,11 +52,16 @@
 (define (seq? exp) (tagged? exp 'seq))
 (define (seq-actions exp) (cdr exp))
 
+; Code execution is split in categories:
+; Primitive procedure _application_, and
+; Compound procedure _call_
+(define (call-proc exp) (car exp))
+(define (call-frame-init exp) (cdr exp))
 (define (application-proc exp) (car exp))
-(define (application-frame-init exp) (cdr exp))
+(define (application-args exp) (cdr exp))
 
 (define (lambda? exp) (tagged? exp 'lambda))
-(define (lambda-body exp) (cdr exp))  ;Note that lambda's body is a sequence of instructions
+(define (lambda-body exp) (cadr exp))  ;Note that lambda's body is NOT an implicit sequence
 
 
 ; The environment
@@ -64,7 +70,13 @@
 (define (binding-val binding) (cadr binding))
 
 ; Frame: a hash table to store bindings
-(define (make-frame) (make-eq-hashtable))
+; with an additional cell to store unnamed variables
+(define (make-frame)
+  (let ((result (make-eq-hashtable)))
+    (hashtable-set! result '$ '())
+    result
+  )
+)
 
 (define (update-frame! frame binding)
   (hashtable-set! frame (binding-var binding) (binding-val binding))
@@ -72,11 +84,14 @@
 
 (define (bound-in-frame? frame var)
   (if (unnamed-var? var)
-      (and
-        (hashtable-contains? frame '$)
-        (> (length (frame-lookup frame '$)) (unnamed-var->int var))
+      (if (hashtable-contains? frame '$)
+          (> (length (frame-lookup frame '$)) (unnamed-var->int var))
+          (error "bound-in-frame?"
+                 "Frame does not contained unnamed slots"
+                 frame
+          )
       )
-      (hashtable-contains? frame var)
+      (hashtable-contains? frame var)  ; Named variable
   )
 )
 
@@ -86,10 +101,10 @@
 
 (define (unnamed-var->int var)
   (cond
-    ((eq var '$0) 0) ((eq var '$1) 1) ((eq var '$2) 2)
-    ((eq var '$3) 3) ((eq var '$4) 4) ((eq var '$5) 5)
-    ((eq var '$6) 6) ((eq var '$7) 7) ((eq var '$8) 8)
-    ((eq var '$9) 9)
+    ((eq? var '$0) 0) ((eq? var '$1) 1) ((eq? var '$2) 2)
+    ((eq? var '$3) 3) ((eq? var '$4) 4) ((eq? var '$5) 5)
+    ((eq? var '$6) 6) ((eq? var '$7) 7) ((eq? var '$8) 8)
+    ((eq? var '$9) 9)
     (else (error "unnamed-var->int" "Invalid unnamed variable" var))
   )
 )
@@ -118,7 +133,7 @@
 (define (local-frame env) (car env))
 (define (outer-frames env) (cdr env))
 (define empty-env '())
-(define (extended-env env frame) (cons frame env))
+(define (extend-env env frame) (cons frame env))
 
 ; Variable lookup through the entire environment
 ; Unnamed variables are only looked up in the local frame
@@ -185,42 +200,86 @@
   )
 )
 
+(define (eval-many exps env)
+  (if (null? exps)
+      '()
+      (cons (eval (car exps) env)
+            (eval-many (cdr exps) env)
+      )
+  )
+)
 
 ; Function application
 ; The code is evaluated in the enclosing environment
 ; While the execution is done in a new local environment
 (define (eval-apply exp env)
-  (  ; This is an application
-    (eval (application-proc exp) env)
-    (fork-env (application-frame-init exp) env)
-  )
-)
-
-(define (frame-init->frame frame-init frame)
   (if
-    (null? frame-init)
-    '()
-    (begin
-      (let ((first (car frame-init)) (rest (cdr frame-init)))
-        (if
-          (tagged? first '**)
-          (update-frame! frame (cdr first))
-          (add-unnamed-to-frame! frame first)
-        )
-      )
-      (frame-init->frame rest frame)
+    (prim-proc? (car exp))
+    ; Primitive
+    (apply-prim-proc (application-proc exp)
+                     (eval-many (application-args exp) env)
+    )
+    ; Compound
+    (eval (call-proc exp)
+          (fork-env (call-frame-init exp) env)
     )
   )
 )
 
+(define (frame-init->frame frame-init frame)
+  (define (build-frame frame-init frame)
+    (if (not (null? frame-init))
+        (begin
+          (let ((first (car frame-init)) (rest (cdr frame-init)))
+            (if (tagged? first '**)
+                ; Bindings
+                (update-frame! frame (cdr first))
+                ; Unnamed variable
+                (add-unnamed-to-frame! frame first)
+            )
+            (build-frame rest frame)
+          )
+        )
+    )
+  )
+
+  (build-frame frame-init (make-frame))
+)
+
 (define (fork-env frame-init base-env)
-  (extended-env base-env (frame-init->frame frame-init (make-eq-hashtable)))
+  (extend-env base-env (frame-init->frame frame-init))
 )
 
 
 ; The Repl
+(define prim-procs
+  (let ((result (make-eq-hashtable)))
+    (hashtable-set! result 'car car)
+    (hashtable-set! result 'cdr cdr)
+    (hashtable-set! result 'list list)
+    (hashtable-set! result 'null? null?)
+    (hashtable-set! result 'pair? pair?)
+    (hashtable-set! result '+ +)
+    (hashtable-set! result '- -)
+    (hashtable-set! result '* *)
+    (hashtable-set! result '> >)
+    (hashtable-set! result '< <)
+
+    result
+  )
+)
+
+(define (prim-proc? proc) (hashtable-contains? prim-procs proc))
+
+; Vanilla, primitive Scheme application
+(define (apply-prim-proc proc args)
+  (apply (hashtable-ref prim-procs proc (void))
+         args
+  )
+)
+
 (define (make-the-frame)
-  (set! the-frame (make-eq-hashtable))
+  (set! the-frame (make-frame))
   (update-frame! the-frame (list 'car car))
   (update-frame! the-frame (list 'cdr cdr))
   (update-frame! the-frame (list 'cons cons))
@@ -263,6 +322,13 @@
 (eval '(cond (#f 1) (#t 2) (else 3)) global-env)
 (display "Conditional else\n\n")
 (eval '(cond (#f 1) (#f 2) (else 3)) global-env)
+(display "Apply complex primitive procedure\n\n")
+(eval '(+ (+ 2 8) 2) global-env)
+(display "Apply compound procedure unnamed variables\n\n")
+(eval '((lambda ($1)) 2) global-env)
+
+
+
 
 
 
