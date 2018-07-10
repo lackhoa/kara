@@ -1,52 +1,55 @@
 (load "kara.scm")
 
-(trace eval eval-exec env-lookup frame-lookup)
-; (display "\n\nSetting a variable\n\n")
+(define (my-display str)
+  (newline) (newline) (display str) (newline) (newline))
+
+(trace eval eval-exec env-lookup frame-lookup eval-seq)
+; (my-display "Setting a variable")
 ; (eval '(set! a 5) global-env)
 
-; (display "\n\nRetrieving a variable\n\n")
+; (my-display "Retrieving a variable")
 ; (eval 'a global-env)
 
-; (display "\n\nIf true\n\n")
+; (my-display "If true")
 ; (eval '(if #t 1 2) global-env)
 
-; (display "\n\nIf false\n\n")
+; (my-display "If false")
 ; (eval '(if #f 1 2) global-env)
 
-; (display "\n\nConditional first\n\n")
+; (my-display "Conditional first")
 ; (eval '(cond (#t 1) (#f 2) (else 3)) global-env)
 
-; (display "\n\nConditional second\n\n")
+; (my-display "Conditional second")
 ; (eval '(cond (#f 1) (#t 2) (else 3)) global-env)
 
-; (display "\n\nConditional else\n\n")
+; (my-display "Conditional else")
 ; (eval '(cond (#f 1) (#f 2) (else 3)) global-env)
 
-; (display "\n\nApply complex primitive procedure\n\n")
+; (my-display "Apply complex primitive procedure")
 ; (eval '(+ (+ 2 8) 2) global-env)
 
-; (display "\n\nApply compound procedure 1\n\n")
+; (my-display "Apply compound procedure 1")
 ; (eval '(''z) global-env)
 
-; (display "\n\nApply compound procedure 2\n\n")
+; (my-display "Apply compound procedure 2")
 ; (eval '('z (** z 6)) global-env)
 
-; (display "\n\nApply compound procedure 3\n\n")
+; (my-display "Apply compound procedure 3")
 ; (eval '('(+ x y) (** x 7) (** y 8)) global-env)
 
-; (display "\n\nApply compound procedure 4\n\n")
+; (my-display "Apply compound procedure 4")
 ; (eval '('$0 7) global-env)
 
-; (display "\n\nApply compound procedure 5\n\n")
+; (my-display "Apply compound procedure 5")
 ; (eval '('(+ $0 $1) 7 13) global-env)
 
-; (display "\n\nBoth keyword and non-keyword\n\n")
+; (my-display "Both keyword and non-keyword")
 ; (eval '('(* mult $0) 7 (** mult 7)) global-env)
 
-; (display "\n\nStore procedure\n\n")
+; (my-display "Store procedure")
 ; (eval '(set! add3 '(+ 3 $0)) global-env)
 
-; (display "\n\nUse stored procedure\n\n")
+; (my-display "Use stored procedure")
 ; (eval '(add3 7) global-env)
 
 ; (newline)(newline)
@@ -54,18 +57,18 @@
 ;   '(set! map '(if (null? L) '() (cons (func (car L)) (map (** L (cdr L)) (** func func)))))
 ;   global-env)
 
-; (display "\n\nmap procedure\n\n")
+; (my-display "map procedure")
 ; (eval '(map (** func add3) (** L (list 0 1 2 3 4 5))) global-env)
 
-(display "\n\nCurrying\n\n")
-(eval '(set! partial (quote (subtract (** $0 9)))) global-env)
-(eval '(partial (** $1 27)) global-env)
+; (my-display "Currying")
+; (eval '(set! partial (quote (subtract (** $0 9)))) global-env)
+; (eval '(partial (** $1 27)) global-env)
 
-(display "\n\nOver-evaluation behavior\n\n")
-(eval '((+ 3 4)) global-env)
+; (my-display "Over-evaluation behavior")
+; (eval '((+ 3 4)) global-env)
 
-(display "\n\nSequencing\n\n")
-(eval '(seq (set! x 9) (* x 4)) global-env)
+; (my-display "Sequencing")
+; (eval '(seq (set! x 9) (* x 4)) global-env)
 
 
 
