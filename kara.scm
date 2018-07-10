@@ -78,14 +78,15 @@
 
 (define (bound-in-frame? frame var)
   (if (unnamed-var? var)
-      (if (hashtable-contains? frame '$)
-          (> (length (hashtable-ref frame '$ (void))) (unnamed-var->int var))
-          (error "bound-in-frame?"
-                 "Frame does not contained unnamed slots"
-                 frame
-          )
+    (if (hashtable-contains? frame '$)
+      (> (length (hashtable-ref frame '$ (void))) (unnamed-var->int var))
+      (error "bound-in-frame?"
+             "Frame does not contained unnamed slots"
+             frame
       )
-      (hashtable-contains? frame var)  ; Named variable
+    )
+      ; Named variable
+      (hashtable-contains? frame var)
   )
 )
 
@@ -103,26 +104,24 @@
   )
 )
 
+; Require that the frame actually contains the variable
 (define (frame-lookup frame var)
-  (if (bound-in-frame? frame var)
-      (if (unnamed-var? var)
-          (list-ref (hashtable-ref frame '$ (void))
-                    (unnamed-var->int var)
-          )
-          (hashtable-ref frame var (void))
-      )
-      (error "frame-lookup" "Binding not in frame" binding)
+  (if (unnamed-var? var)
+    (list-ref (hashtable-ref frame '$ (void))
+              (unnamed-var->int var)
+    )
+    (hashtable-ref frame var (void))
   )
 )
 
-;Add an anonymous variable to a frame
+; Add an anonymous variable to a frame
 (define (add-unnamed-to-frame! frame value)
   (if (hashtable-contains? frame '$)
-      (let
-        ((unnamed-vars (hashtable-ref frame '$ (void))))
-        (hashtable-set! frame '$ (append unnamed-vars (list value)))
-      )
-      (error "add-unnamed-to-frame" "Frame has no slots for unnamed variables" frame)
+    (let
+      ((unnamed-vars (hashtable-ref frame '$ (void))))
+      (hashtable-set! frame '$ (append unnamed-vars (list value)))
+    )
+    (error "add-unnamed-to-frame" "Frame has no slots for unnamed variables" frame)
   )
 )
 
@@ -203,6 +202,7 @@
   )
 )
 
+; Much like map for eval
 (define (eval-many exps env)
   (if (null? exps)
       '()
@@ -213,8 +213,8 @@
 )
 
 ; Function application
-; The code body is evaluated in the enclosing environment
-; While the execution is done in a new local environment
+; The code body is evaluated in the enclosing environment...
+; ...while the execution is done in a new local environment
 ; It's not strange that `eval` is called twice, since each call...
 ; ...bears a different meaning
 (define (eval-exec exp env)
@@ -258,7 +258,7 @@
 )
 
 
-; The Repl
+; Built-in stuff
 (define prim-procs
   (let ((result (make-eq-hashtable)))
     (hashtable-set! result 'car car)
@@ -290,8 +290,6 @@
 (define global-env (list (make-frame)))
 
 (define input-prompt "K>>> ")
-
-(define output-prompt "; ; ;  M-Eval value:")
 
 (define (driver-loop)
   (prompt-for-input)
@@ -364,14 +362,6 @@
 
 (display "\n\nmap procedure\n\n")
 (eval '(map (** func add3) (** L (list 0 1 2 3 4 5))) global-env)
-
-
-
-
-
-
-
-
 
 
 
