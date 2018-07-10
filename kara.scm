@@ -159,9 +159,11 @@
 
 ; Evaluate a sequence
 (define (eval-seq sequence env)
-  (eval (car sequence) env)
-  (if (not (null? (cdr sequence)))
-      (eval-seq (cdr sequence) env)
+  (let [(probably-last-val (eval (car sequence) env))]
+    (if (not (null? (cdr sequence)))
+      (eval-seq (cdr sequence) env)  ; Not last
+      probably-last-val  ; Last
+    )
   )
 )
 

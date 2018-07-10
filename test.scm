@@ -61,5 +61,11 @@
 (eval '(set! partial (quote (subtract (** $0 9)))) global-env)
 (eval '(partial (** $1 27)) global-env)
 
+(display "\n\nOver-evaluation behavior\n\n")
+(eval '((+ 3 4)) global-env)
+
+(display "\n\nSequencing\n\n")
+(eval '(seq (set! x 9) (* x 4)) global-env)
+
 
 
