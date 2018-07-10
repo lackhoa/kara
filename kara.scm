@@ -66,65 +66,29 @@
 (define (binding-val binding) (cadr binding))
 
 ; Frame: a hash table to store bindings
-; with an additional cell to store unnamed variables
-(define (make-frame)
-  (let ((result (make-eq-hashtable)))
-    (hashtable-set! result '$ '())
-    result
-  )
-)
+(define (make-frame) (make-eq-hashtable))
 
 (define (update-frame! frame var val)
   (hashtable-set! frame var val)
 )
 
 (define (bound-in-frame? frame var)
-  (if (unnamed-var? var)
-    (if (hashtable-contains? frame '$)
-      (> (length (hashtable-ref frame '$ (void))) (unnamed-var->int var))
-      (error "bound-in-frame?"
-             "Frame does not contained unnamed slots"
-             frame
-      )
-    )
-      ; Named variable
-      (hashtable-contains? frame var)
-  )
+  (hashtable-contains? frame var)
 )
 
-(define (unnamed-var? var)
-        (eq? (string-ref (symbol->string var) 0) '#\$)
-)
-
-(define (unnamed-var->int var)
+(define (int->unnamed-var int)
   (cond
-    ((eq? var '$0) 0) ((eq? var '$1) 1) ((eq? var '$2) 2)
-    ((eq? var '$3) 3) ((eq? var '$4) 4) ((eq? var '$5) 5)
-    ((eq? var '$6) 6) ((eq? var '$7) 7) ((eq? var '$8) 8)
-    ((eq? var '$9) 9)
-    (else (error "unnamed-var->int" "Invalid unnamed variable" var))
+    ((eq? int 0) '$0) ((eq? int 1) '$1) ((eq? int 2) '$2)
+    ((eq? int 3) '$3) ((eq? int 4) '$4) ((eq? int 5) '$5)
+    ((eq? int 6) '$6) ((eq? int 7) '$7) ((eq? int 8) '$8)
+    ((eq? int 9) '$9)
+    (else (error "int->unnamed-var" "Invalid number" int))
   )
 )
 
-; Require that the frame actually contains the variable
+; Requirement: `frame` contains `var`
 (define (frame-lookup frame var)
-  (if (unnamed-var? var)
-    (list-ref (hashtable-ref frame '$ (void))
-              (unnamed-var->int var)
-    )
-    (hashtable-ref frame var (void))
-  )
-)
-
-; Add an anonymous variable to a frame
-(define (add-unnamed-to-frame! frame value)
-  (if (hashtable-contains? frame '$)
-    (let
-      ((unnamed-vars (hashtable-ref frame '$ (void))))
-      (hashtable-set! frame '$ (append unnamed-vars (list value)))
-    )
-    (error "add-unnamed-to-frame" "Frame has no slots for unnamed variables" frame)
-  )
+  (hashtable-ref frame var (void))
 )
 
 ; Environment: a list of frames
@@ -136,19 +100,16 @@
 (define (extend-env env frame) (cons frame env))
 
 ; Variable lookup through the entire environment
-; Unnamed variables are only looked up in the local frame
+; Unnamed variables should rarely be inherited from the enclosing...
+; ...environment, unless it's intentionally done (Like in Currying).
 (define (env-lookup var env)
-  (cond ((eq? env empty-env) (error "env-lookup" "Unbound variable" var))
-        (
-          (bound-in-frame? (local-frame env) var)
-          (frame-lookup (local-frame env) var)
-        )
-        (else
-          (if (unnamed-var? var)
-              (error "env-lookup" "Unbound variable" var)
-              (env-lookup var (outer-frames env))
-          )
-        )
+  (cond
+    ((eq? env empty-env) (error "env-lookup" "Unbound variable" var))
+    (
+      (bound-in-frame? (local-frame env) var)
+      (frame-lookup (local-frame env) var)
+    )
+    (else (env-lookup var (outer-frames env)))
   )
 )
 
@@ -234,34 +195,40 @@
   )
 )
 
+; Make sure you don't provide unnamed vars as both named and unnamed
 (define (frame-init->frame frame-init env)
-  (define (build-frame frame-init frame)
+  (define (build-frame frame-init frame unnamed-count)
     (if (null? frame-init)
-        frame
-        (begin
-          (let ((first (car frame-init)) (rest (cdr frame-init)))
-            (if (tagged? first '**)
-                ; Named variable
-                (update-frame! frame (cadr first) (eval (caddr first) env))
-                ; Unnamed variable
-                (add-unnamed-to-frame! frame (eval first env))
+      frame
+      (begin
+        (let ((first (car frame-init)) (rest (cdr frame-init)))
+          (if (tagged? first '**)
+            ; Named variable of the form (** <val> <val>)
+            (update-frame! frame
+              (cadr first)
+              (eval (caddr first) env)
             )
-            (build-frame rest frame)
+            ; Unnamed variable
+            (update-frame! frame
+              (int->unnamed-var unnamed-count)
+              (eval first env)
+            )
           )
+          (build-frame rest frame (+ 1 unnamed-count))
         )
+      )
     )
   )
 
-  (build-frame frame-init (make-frame))
+  (build-frame frame-init (make-frame) 0)
 )
 
 (define (fork-env frame-init base-env)
   (extend-env base-env (frame-init->frame frame-init base-env))
 )
 
-
 ; Built-in stuff
-(define prim-procs
+(define prim-proc-table
   (let ((result (make-eq-hashtable)))
     (hashtable-set! result 'car car)
     (hashtable-set! result 'cdr cdr)
@@ -279,18 +246,33 @@
   )
 )
 
-(define (prim-proc? proc) (hashtable-contains? prim-procs proc))
+(define (prim-proc? proc) (hashtable-contains? prim-proc-table proc))
 
 ; Vanilla, primitive Scheme application
 (define (apply-prim-proc proc args)
-  (apply (hashtable-ref prim-procs proc (void))
+  (apply (hashtable-ref prim-proc-table proc (void))
          args
   )
 )
 
-; The global environment with an (almost) empty frame
-(define global-env (list (make-frame)))
+; The initial frame: contain compound masks for primitive procedures
+(define (make-the-frame)
+  (let ((the-frame (make-frame)))
+    (update-frame! the-frame 'add  '(+ $0 $1))
+    (update-frame! the-frame 'mult '(* $0 $1))
+    (update-frame! the-frame 'subtract '(- $0 $1))
 
+    the-frame
+  )
+)
+
+; The global environment with an (almost) empty frame
+(define global-env (list (make-the-frame)))
+
+
+; ------------------------------------------------------------
+; The Repl
+; ------------------------------------------------------------
 (define input-prompt "K>>> ")
 
 (define (driver-loop)
