@@ -241,13 +241,12 @@
 ; Used solely by `fork-env`
 (define (bindings->frame bindings env)
     (define (loop bindings frame)
-        (let ((first (car bindings)))
-            (if (null? bindings)
-                frame
-                (begin
-                    ; The value provided must be applied to `env`
-                    (hashtable-set! frame (car first) ((cadr first) env))
-                    (loop (cdr bindings) frame)))))
+        (if (null? bindings)
+            frame
+            (let ((first (car bindings)))
+                ; The value provided must be applied to `env`
+                (hashtable-set! frame (car first) ((cadr first) env))
+                (loop (cdr bindings) frame))))
     (loop bindings (new-frame)))
 
 
