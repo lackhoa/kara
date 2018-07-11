@@ -1,6 +1,6 @@
 (load "kara.scm")
 
-(trace analyze analyze-exec)
+(trace eval analyze analyze-exec)
 
 (define (my-display str)
   (newline) (newline) (display str) (newline) (newline))
@@ -24,8 +24,8 @@
 ; (my-display "Conditional else")
 ; (eval '(cond (#f 1) (#f 2) (else 3)) global-env)
 
-(my-display "Apply complex primitive procedure")
-(eval '(+ (+ 2 8) 2) global-env)
+; (my-display "Apply complex primitive procedure")
+; (eval '(+ (+ 2 8) 2) global-env)
 
 ; (my-display "Apply compound procedure 1")
 ; (eval '(''z) global-env)

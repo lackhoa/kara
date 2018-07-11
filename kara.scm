@@ -193,18 +193,17 @@
         (let ((analyzed-operands (map analyze (operands exp))))
             (lambda (env)
                 (apply (hashtable-ref prim-proc-table (operator exp) (void))
-                       (map (lambda (x) (x env)) analyzed-operands)))))
+                       (map (lambda (x) (x env)) analyzed-operands))))
         ; Compound: analyze both the operator and binding expressions.
-        (lambda (env)
-            (let
-                (
-                    (analyzed-operator (analyze (call-operator exp)))
-                    (bindings (binding-exps->bindings (call-binding-exps exp))))
-                
+        (let
+            (
+                (analyzed-operator (analyze (call-operator exp)))
+                (bindings (binding-exps->bindings (call-binding-exps exp))))
+            (lambda (env)
                 (eval
                     (analyzed-operator env)
                     ; The new environment "forked" from the current one
-                    (extend-env env (bindings->frame bindings env))))))
+                    (extend-env env (bindings->frame bindings env)))))))
 
 ; -----------------------------------------------------------
 ; Code Execution
@@ -254,8 +253,9 @@
 
 (define (prim-proc? proc) (hashtable-contains? prim-proc-table proc))
 
-
+; -----------------------------------------------------------
 ; Built-in stuff
+; -----------------------------------------------------------
 (define prim-proc-table
     (let ((result (make-eq-hashtable)))
         (hashtable-set! result 'car car)
@@ -272,19 +272,15 @@
 
         result))
 
-
 ; The initial frame: contain compound masks for primitive procedures...
 ; so that we can supply keyword bindings.
-(define make-The-frame
-    (let ((The-frame (new-frame)))
-        (update-frame! The-frame 'add '(+ $0 $1))
-        (update-frame! The-frame 'mult '(* $0 $1))
-        (update-frame! The-frame 'subtract '(- $0 $1))
-
-        The-frame))
+(define The-frame (new-frame))
+(update-frame! The-frame 'add '(+ $0 $1))
+(update-frame! The-frame 'mult '(* $0 $1))
+(update-frame! The-frame 'subtract '(- $0 $1))
 
 ; The global environment with The frame
-(define global-env (list make-The-frame))
+(define global-env (list The-frame))
 
 
 ; ------------------------------------------------------------
