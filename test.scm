@@ -3,7 +3,7 @@
 (define (my-display str)
   (newline) (newline) (display str) (newline) (newline))
 
-(trace eval eval-exec env-lookup frame-lookup eval-seq)
+(trace eval)
 ; (my-display "Setting a variable")
 ; (eval '(set! a 5) global-env)
 
