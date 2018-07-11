@@ -45,18 +45,14 @@
 ; (my-display "Both keyword and non-keyword")
 ; (eval '('(* mult $0) 7 (** mult 8)) global-env)
 
-; (my-display "Store procedure")
+; (my-display "Store procedure and use them later")
 ; (eval '(set! add3 '(+ 3 $0)) global-env)
-
-; (my-display "Use stored procedure")
 ; (eval '(add3 7) global-env)
 
-; (newline)(newline)
+; (my-display "map procedure")
 ; (eval
 ;   '(set! map '(if (null? L) '() (cons (func (car L)) (map (** L (cdr L)) (** func func)))))
 ;   global-env)
-
-; (my-display "map procedure")
 ; (eval '(map (** func add3) (** L (list 0 1 2 3 4 5))) global-env)
 
 ; (my-display "Currying")
@@ -68,6 +64,4 @@
 
 ; (my-display "Sequencing")
 ; (eval '(seq (set! x 9) (* x 4)) global-env)
-
-
 
