@@ -1,20 +1,25 @@
-;;; The main switch block
-(define (eval exp env)
+; Evaluation = Analysis[Environment]
+(define (eval exp env) ((analyze exp) env))
+
+; The main switch block: the syntax analyzer.
+; It returns a function which take an environment...
+; to return the final evaluation.
+(define (analyze exp)
     (cond
-        ((self-eval? exp) exp)
-        ((quoted? exp) (quoted-text exp))
-        ((var? exp) (env-lookup exp env))
-        ((asgn? exp) (eval-asgn exp env))
-        ((if? exp) (eval-if exp env))
-        ((cond? exp) (eval (cond->if exp) env))
-        ((seq? exp) (eval-seq (seq-actions exp) env))
-        ((pair? exp) (eval-exec exp env))    ; Code execution is last
-        (else (error "eval" "Unknown expression type" exp))))
+        ((self-eval? exp) (lambda (env) exp))
+        ((quoted? exp) (lambda (env) (quoted-text exp)))
+        ((var? exp) (lambda (env) (env-lookup exp env)))
+        ((asgn? exp) (analyze-asgn exp))
+        ((if? exp) (analyze-if exp))
+        ((cond? exp) (analyze-if (cond->if exp)))
+        ((seq? exp) (analyze-seq exp))
+        ; Code execution is last
+        ((pair? exp) (analyze-exec exp))))
 
 
 ; -------------------------------------------------------------
 ; Arbitrary Constants
-; (If you hate my choices of notation, go ahead and change them)
+; If you hate my choices of notation, go ahead and change them
 ; -------------------------------------------------------------
 (define KEYWORD_TAG '**)
 (define UNNAMED_PREFIX '$)    ; Doesn't actually work
@@ -61,16 +66,17 @@
 ; Code execution is divided into two categories:
 ; Primitive procedure _application_, and
 ; Compound procedure _call_
-(define (application-proc exp) (car exp))
-(define (application-args exp) (cdr exp))
-(define (call-proc exp) (car exp))
-(define (call-frame-init exp) (cdr exp))
+(define (operator exp) (car exp))
+(define (operands exp) (cdr exp))
+(define (call-operator exp) (car exp))
+(define (call-binding-exps exp) (cdr exp))
 
 
+; -----------------------------------------------------------
+; Analysis and execution
 ; -----------------------------------------------------------
 ; The Environment
-; -----------------------------------------------------------
-; Bindings: Variable-Value pairs
+; Bindings: Variable-Value pairs (or something similar)
 (define (binding-var binding) (car binding))
 (define (binding-val binding) (cadr binding))
 
@@ -96,44 +102,50 @@
     (hashtable-ref frame var (void)))
 
 ; Environment: a list of frames starting with the local...
-; frame and ending with the outermost frame
+; frame and ending with the outermost frame.
 ; Environments are immutable, but frames can change
 (define (local-frame env) (car env))
 (define (outer-frames env) (cdr env))
 (define empty-env '())
 
-; Extending the act of prepending an environment...
+; Extending is the act of prepending an environment...
 ; with a new local frame
 (define (extend-env env frame) (cons frame env))
 
 ; Variable lookup through the entire environment.
 ; Unnamed variables should NOT be inherited from the enclosing...
-; environment, except when it's intentionally done (e.g. Currying).
+; environment, for a few intentional cases (e.g. Currying).
+; Requirement: The variable must be bound in the environment
 (define (env-lookup var env)
-    (cond
-        ((eq? env empty-env) (error "env-lookup" "Unbound variable" var))
-        (
-            (bound-in-frame? (local-frame env) var)
-            (frame-lookup (local-frame env) var)
-        )
-        (else (env-lookup var (outer-frames env)))))
+    (if (bound-in-frame? (local-frame env) var)
+        (frame-lookup (local-frame env) var)
+        (env-lookup var (outer-frames env))))
 
-; Assignment statements can only change the local frame.
+; Assignment statements can only affect the local frame.
 ; The value is immediately evaluated in the current environment.
 ; Note that the variable on the left is not evaluated, this is one...
 ; of the rare cases where we do not evaluate something before acting on it
-(define (eval-asgn assignment env)
-    (update-frame! (local-frame env)
-        (asgn-var assignment)
-        (eval (asgn-val assignment) env))
-    'ok)
-
+(define (analyze-asgn assignment)
+    ; Using `let` since we want to analyze before...
+    ; returning the lambda.
+    (let ((vproc (analyze (asgn-val assignment))))
+        (lambda (env)
+            (update-frame! (local-frame env)
+                (asgn-var assignment)
+                (vproc env))
+            'ok)))
 
 ; The conditionals
-(define (eval-if exp env)
-    (if (eval (if-pred exp) env)
-        (eval (if-conse exp) env)
-        (eval (if-alt exp) env)))
+(define (analyze-if exp)
+    (let
+        (
+            (pproc (analyze (if-pred exp)))
+            (cproc (analyze (if-conse exp)))
+            (aproc (analyze (if-alt exp))))
+        (lambda (env)
+            (if (pproc env)
+                (cproc env)
+                (aproc env)))))
 
 ; The heart of `cond->if`
 (define (expand-clauses clauses)
@@ -150,63 +162,98 @@
 (define (cond->if exp)
     (expand-clauses (cond-clauses exp)))
 
+; Analyze a sequence
+; Requirement: unempty sequence
+(define (analyze-seq seq-exp)
+    ; Function executing two analyzed expressions...
+    ; returning the latter result.
+    (define (chain proc1 proc2)
+        (lambda (env) (proc1 env) (proc2 env)))
 
-; Evaluate a sequence
-(define (eval-seq sequence env)
-    (let ([probably-last-eval (eval (car sequence) env)]
-                [last? (null? (cdr sequence))])
-        (if last?
-                probably-last-eval
-                (eval-seq (cdr sequence) env))))
+    (define (core things-to-do things-left)
+        (if (null? things-left)
+            things-to-do
+            (core
+                (chain things-to-do (car things-left))
+                (cdr things-left))))
 
-; Much like map for eval, used by `eval-seq`
-(define (eval-many exps env)
-    (if (null? exps)
-            '()
-            (cons (eval (car exps) env)
-                (eval-many (cdr exps) env))))
+    (let ((analyzed-actions (map analyze (seq-actions seq-exp))))
+        (core (car analyzed-actions) (cdr analyzed-actions))))
 
-; Function application
+
+; Analyze a function execution
 ; The code expression is evaluated in the enclosing environment...
-; while the execution is done by evaluating in a new environment.
+; while the execution is done by evaluating in a forked environment.
 ; It's not strange that `eval` is called twice, since each call...
 ; bears a distinct meaning.
-(define (eval-exec exp env)
-    (if (prim-proc? (car exp))
-            ; Primitive
-            (apply-prim-proc (application-proc exp)
-                             (eval-many (application-args exp) env))
-            ; Compound
-            (eval
-                (eval (call-proc exp) env)
-                (fork-env (call-frame-init exp) env))))
+; Also, primitive procedures are not quoted.
+(define (analyze-exec exp)
+    (if (prim-proc? (operator exp))
+        ; Primitive: analyze the operands only.
+        (let ((analyzed-operands (map analyze (operands exp))))
+            (lambda (env)
+                (apply (hashtable-ref prim-proc-table (operator exp) (void))
+                       (map (lambda (x) (x env)) analyzed-operands)))))
+        ; Compound: analyze both the operator and binding expressions.
+        (lambda (env)
+            (let
+                (
+                    (analyzed-operator (analyze (call-operator exp)))
+                    (bindings (binding-exps->bindings (call-binding-exps exp))))
+                
+                (eval
+                    (analyzed-operator env)
+                    ; The new environment "forked" from the current one
+                    (extend-env env (bindings->frame bindings env))))))
 
-; Make sure you don't provide unnamed vars as both named and unnamed.
-; Note: the variables in keyword expressions are NOT evaluated!
-(define (frame-init->frame frame-init env)
-    (define (build-frame frame-init frame unnamed-count)
-        (if (null? frame-init)
-            ; No more binding left
-            frame
-            ; More bindings to add
-            (begin
-                (let ((first (car frame-init)) (rest (cdr frame-init)))
-                    (if (tagged? first KEYWORD_TAG)
-                        ; Named variable of the form (<KEYWORD_TAG> <val> <val>)
-                        (update-frame! frame
-                            (cadr first)
-                            (eval (caddr first) env))
-                        ; Unnamed variable
-                        (update-frame! frame
-                            (int->unnamed-var unnamed-count)
-                            (eval first env)))
-                    (build-frame rest frame (+ 1 unnamed-count))))))
+; -----------------------------------------------------------
+; Code Execution
+; -----------------------------------------------------------
 
-    (build-frame frame-init (new-frame) 0)
-)
+; Turn binding expressions to bindings, done in analysis.
+; Note that the bindings' values must be applied to an environment.
+; The variables in keyword expressions are NOT evaluated.
+; Note: Make sure you don't provide unnamed vars as named ones...
+; unless you know what you're doing.
+(define (binding-exps->bindings binding-exp)
+    (binding-exps->bindings-core binding-exp 0))
 
-(define (fork-env frame-init base-env)
-    (extend-env base-env (frame-init->frame frame-init base-env)))
+(define (binding-exps->bindings-core binding-exps unnamed-count)
+    (if (null? binding-exps)
+        ; No more binding left
+        (quote ())
+        ; More bindings to add
+        (let ((first (car binding-exps)) (rest (cdr binding-exps)))
+            (if (tagged? first KEYWORD_TAG)
+                ; Named variable of the form "<KEYWORD_TAG> <var> <val>"
+                (let ((analyzed-val (analyze (caddr first))))
+                    (cons
+                        (list (cadr first) analyzed-val)
+                        (binding-exps->bindings-core rest unnamed-count)))
+                ; Unnamed variable
+                (let
+                    (
+                        (analyzed-val (analyze first))
+                        (unnamed-var (int->unnamed-var unnamed-count)))
+                    (cons
+                        (list unnamed-var analyzed-val)
+                        (binding-exps->bindings-core rest (+ 1 unnamed-count))))))))
+
+; Used solely by `fork-env`
+(define (bindings->frame bindings env)
+    (define (loop bindings frame)
+        (let ((first (car bindings)))
+            (if (null? bindings)
+                frame
+                (begin
+                    ; The value provided must be applied to `env`
+                    (hashtable-set! frame (car first) ((cadr first) env))
+                    (loop (cdr bindings) frame)))))
+    (loop bindings (new-frame)))
+
+
+(define (prim-proc? proc) (hashtable-contains? prim-proc-table proc))
+
 
 ; Built-in stuff
 (define prim-proc-table
@@ -225,13 +272,6 @@
 
         result))
 
-(define (prim-proc? proc) (hashtable-contains? prim-proc-table proc))
-
-; Vanilla, primitive Scheme application
-; Requirement: the procedure must be primitive (listed in the table)
-(define (apply-prim-proc proc args)
-    (apply (hashtable-ref prim-proc-table proc (void))
-           args))
 
 ; The initial frame: contain compound masks for primitive procedures...
 ; so that we can supply keyword bindings.
