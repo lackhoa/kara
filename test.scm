@@ -1,67 +1,70 @@
 (load "kara.scm")
 
-(trace eval analyze analyze-exec)
+(trace interpret analyze analyze-exec)
 
 (define (my-display str)
   (newline) (newline) (display str) (newline) (newline))
 
 ; (my-display "Setting and retrieving a variable")
-; (eval '(set! a 5) global-env)
-; (eval 'a global-env)
+; (interpret '(set! a 5))
+; (interpret 'a)
 
 ; (my-display "If true")
-; (eval '(if #t 1 2) global-env)
+; (interpret '(if #t 1 2))
 
 ; (my-display "If false")
-; (eval '(if #f 1 2) global-env)
+; (interpret '(if #f 1 2))
 
 ; (my-display "Conditional first")
-; (eval '(cond (#t 1) (#f 2) (else 3)) global-env)
+; (interpret '(cond (#t 1) (#f 2) (else 3)))
 
 ; (my-display "Conditional second")
-; (eval '(cond (#f 1) (#t 2) (else 3)) global-env)
+; (interpret '(cond (#f 1) (#t 2) (else 3)))
 
 ; (my-display "Conditional else")
-; (eval '(cond (#f 1) (#f 2) (else 3)) global-env)
+; (interpret '(cond (#f 1) (#f 2) (else 3)))
 
 ; (my-display "Apply complex primitive procedure")
-; (eval '(+ (+ 2 8) 2) global-env)
+; (interpret '(+ (+ 2 8) 2))
 
 ; (my-display "Apply compound procedure 1")
-; (eval '(''z) global-env)
+; (interpret '(''z))
 
 ; (my-display "Apply compound procedure 2")
-; (eval '('z (** z 6)) global-env)
+; (interpret '('z (** z 6)))
 
 ; (my-display "Apply compound procedure 3")
-; (eval '('(+ x y) (** x 7) (** y 8)) global-env)
+; (interpret '('(+ x y) (** x 7) (** y 8)))
 
 ; (my-display "Apply compound procedure 4")
-; (eval '('$0 7) global-env)
+; (interpret '('$0 7))
 
 ; (my-display "Apply compound procedure 5")
-; (eval '('(+ $0 $1) 7 13) global-env)
+; (interpret '('(+ $0 $1) 7 13))
 
 ; (my-display "Both keyword and non-keyword")
-; (eval '('(* mult $0) 7 (** mult 8)) global-env)
+; (interpret '('(* mult $0) 7 (** mult 8)))
 
 ; (my-display "Store procedure and use them later")
-; (eval '(set! add3 '(+ 3 $0)) global-env)
-; (eval '(add3 7) global-env)
+; (interpret '(set! add3 '(+ 3 $0)))
+; (interpret '(add3 7))
 
 ; (my-display "map procedure")
-; (eval
+; (interpret
 ;   '(set! map '(if (null? L) '() (cons (func (car L)) (map (** L (cdr L)) (** func func)))))
-;   global-env)
-; (eval '(map (** func add3) (** L (list 0 1 2 3 4 5))) global-env)
+;  )
+; (interpret '(map (** func add3) (** L (list 0 1 2 3 4 5))))
 
 ; (my-display "Currying")
-; (eval '(set! partial (quote (subtract (** $0 9)))) global-env)
-; (eval '(partial (** $1 27)) global-env)
+; (interpret '(set! partial (quote (subtract (** $0 9)))))
+; (interpret '(partial (** $1 27)))
 
-; (my-display "Over-evaluation behavior")
-; (eval '((+ 3 4)) global-env)
+; (my-display "Over-interpretuation behavior")
+; (interpret '((+ 3 4)))
 
 ; (my-display "Sequencing")
-; (eval '(seq (set! x 9) (* x 4)) global-env)
+; (interpret '(seq (set! x 9) (* x 4)))
 
+(my-display "Factorial")
+(interpret '(set! fact '(if (= $0 1) 1 (* (fact (- $0 1)) $0))))
+(interpret '(fact 3))

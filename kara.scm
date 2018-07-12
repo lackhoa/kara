@@ -6,8 +6,10 @@
 ; to return the final evaluation.
 (define (analyze exp)
     (cond
+        ; Don't care about environment
         ((self-eval? exp) (lambda (env) exp))
         ((quoted? exp) (lambda (env) (quoted-text exp)))
+        ; Care about environment
         ((var? exp) (lambda (env) (env-lookup exp env)))
         ((asgn? exp) (analyze-asgn exp))
         ((if? exp) (analyze-if exp))
@@ -208,7 +210,6 @@
 ; -----------------------------------------------------------
 ; Code Execution
 ; -----------------------------------------------------------
-
 ; Turn binding expressions to bindings, done in analysis.
 ; Note that the bindings' values must be applied to an environment.
 ; The variables in keyword expressions are NOT evaluated.
@@ -255,21 +256,20 @@
 ; -----------------------------------------------------------
 ; Built-in stuff
 ; -----------------------------------------------------------
-(define prim-proc-table
-    (let ((result (make-eq-hashtable)))
-        (hashtable-set! result 'car car)
-        (hashtable-set! result 'cdr cdr)
-        (hashtable-set! result 'cons cons)
-        (hashtable-set! result 'list list)
-        (hashtable-set! result 'null? null?)
-        (hashtable-set! result 'pair? pair?)
-        (hashtable-set! result '+ +)
-        (hashtable-set! result '- -)
-        (hashtable-set! result '* *)
-        (hashtable-set! result '> >)
-        (hashtable-set! result '< <)
-
-        result))
+; The primitive procedures and their representation
+(define prim-proc-table (make-eq-hashtable))
+(hashtable-set! prim-proc-table 'car car)
+(hashtable-set! prim-proc-table 'cdr cdr)
+(hashtable-set! prim-proc-table 'cons cons)
+(hashtable-set! prim-proc-table 'list list)
+(hashtable-set! prim-proc-table 'null? null?)
+(hashtable-set! prim-proc-table 'pair? pair?)
+(hashtable-set! prim-proc-table '+ +)
+(hashtable-set! prim-proc-table '- -)
+(hashtable-set! prim-proc-table '* *)
+(hashtable-set! prim-proc-table '> >)
+(hashtable-set! prim-proc-table '< <)
+(hashtable-set! prim-proc-table '= =)
 
 ; The initial frame: contain compound masks for primitive procedures...
 ; so that we can supply keyword bindings.
@@ -285,12 +285,14 @@
 ; ------------------------------------------------------------
 ; The Repl
 ; ------------------------------------------------------------
+(define (interpret exp) (eval exp global-env))
+
 (define input-prompt "K>>> ")
 
 (define (driver-loop)
     (display input-prompt)
     (let ((input (read)))
-        (display (eval input global-env)))
+        (display (interpret input)))
     (newline)
     (driver-loop))
 
