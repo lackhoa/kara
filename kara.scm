@@ -18,6 +18,11 @@
         ; Code execution is last
         ((pair? exp) (analyze-exec exp))))
 
+; This hashtable remembers the analyzation of functions, because...
+; we functions can be analyzed many times, and we can't distinguish them...
+; from expressions
+(set! analyze-table (make-eq-hashtable))
+
 
 ; -------------------------------------------------------------
 ; Arbitrary Constants
@@ -101,7 +106,7 @@
 
 ; Requirement: `frame` contains `var`
 (define (frame-lookup frame var)
-    (hashtable-ref frame var (void)))
+    (hashtable-ref frame var '()))
 
 ; Environment: a list of frames starting with the local...
 ; frame and ending with the outermost frame.
@@ -139,11 +144,9 @@
 
 ; The conditionals
 (define (analyze-if exp)
-    (let
-        (
-            (pproc (analyze (if-pred exp)))
-            (cproc (analyze (if-conse exp)))
-            (aproc (analyze (if-alt exp))))
+    (let((pproc (analyze (if-pred exp)))
+         (cproc (analyze (if-conse exp)))
+         (aproc (analyze (if-alt exp))))
         (lambda (env)
             (if (pproc env)
                 (cproc env)
@@ -194,18 +197,21 @@
         ; Primitive: analyze the operands only.
         (let ((analyzed-operands (map analyze (operands exp))))
             (lambda (env)
-                (apply (hashtable-ref prim-proc-table (operator exp) (void))
+                (apply (hashtable-ref prim-proc-table (operator exp) '())
                        (map (lambda (x) (x env)) analyzed-operands))))
         ; Compound: analyze both the operator and binding expressions.
-        (let
-            (
-                (analyzed-operator (analyze (call-operator exp)))
-                (bindings (binding-exps->bindings (call-binding-exps exp))))
+        (let ((analyzed-operator (analyze (call-operator exp)))
+              (bindings (binding-exps->bindings (call-binding-exps exp))))
             (lambda (env)
-                (eval
-                    (analyzed-operator env)
-                    ; The new environment "forked" from the current one
-                    (extend-env env (bindings->frame bindings env)))))))
+                (let((eval-analyzed (analyzed-operator env))
+                     (forked-env (extend-env env (bindings->frame bindings env))))
+                    (if (hashtable-contains? analyze-table eval-analyzed)
+                        ((hashtable-ref analyze-table eval-analyzed '()) forked-env)
+                        (let ((doubly-analyzed (analyze eval-analyzed)))
+                            (begin
+                            (hashtable-set! analyze-table eval-analyzed doubly-analyzed)
+                            ; This is basically `eval`
+                            (doubly-analyzed forked-env)))))))))
 
 ; -----------------------------------------------------------
 ; Code Execution
@@ -231,10 +237,8 @@
                         (list (cadr first) analyzed-val)
                         (binding-exps->bindings-core rest unnamed-count)))
                 ; Unnamed variable
-                (let
-                    (
-                        (analyzed-val (analyze first))
-                        (unnamed-var (int->unnamed-var unnamed-count)))
+                (let((analyzed-val (analyze first))
+                     (unnamed-var (int->unnamed-var unnamed-count)))
                     (cons
                         (list unnamed-var analyzed-val)
                         (binding-exps->bindings-core rest (+ 1 unnamed-count))))))))
