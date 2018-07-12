@@ -1,7 +1,5 @@
 (load "kara_eval.scm")
 
-(trace analyze eval)
-
 ; ------------------------------------------------------------
 ; The interpreter
 ; ------------------------------------------------------------
@@ -26,9 +24,9 @@
 
 (define input-prompt "K>>> ")
 
-(define (driver-loop)
+(define (repl)
     (display input-prompt)
     (let ((input (read)))
         (display (interpret input)))
     (newline)
-    (driver-loop))
+    (repl))
