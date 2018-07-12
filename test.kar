@@ -62,3 +62,6 @@ a
 (my-display "Factorial")
 (set! fact '(if (= $0 1) 1 (* (fact (- $0 1)) $0)))
 (fact 3)
+
+(my-display "Environment request: print all keys")
+(hashtable-keys (car meta-env))

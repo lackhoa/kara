@@ -10,6 +10,7 @@
         ((self-eval? exp) (lambda (env) exp))
         ((quoted? exp) (lambda (env) (quoted-text exp)))
         ; Care about environment
+        ((env-request? exp) (lambda (env) env))
         ((var? exp) (lambda (env) (env-lookup exp env)))
         ((asgn? exp) (analyze-asgn exp))
         ((if? exp) (analyze-if exp))
@@ -34,7 +35,7 @@
 (define SEQUENCE_TAG 'seq)
 (define ASGN_TAG 'set!)
 (define COND_TAG 'cond)
-
+(define ENV_REQUEST_TAG 'meta-env)
 
 ; -------------------------------------------------------------
 ; Types of expressions and their structures
@@ -53,6 +54,8 @@
 
 (define (quoted? exp) (tagged? exp 'quote))
 (define (quoted-text exp) (cadr exp))
+
+(define (env-request? exp) (eq? exp ENV_REQUEST_TAG))
 
 (define (if? exp) (tagged? exp 'if))
 (define (if-pred exp) (cadr exp))
@@ -278,6 +281,13 @@
 (hashtable-set! prim-proc-table 'meta-env (lambda () env))
 (hashtable-set! prim-proc-table 'newline newline)
 (hashtable-set! prim-proc-table 'display display)
+(hashtable-set! prim-proc-table 'make-eq-hashtable make-eq-hashtable)
+(hashtable-set! prim-proc-table 'hashtable-contains? hashtable-contains?)
+(hashtable-set! prim-proc-table 'hashtable-set! hashtable-set!)
+(hashtable-set! prim-proc-table 'hashtable-ref hashtable-ref)
+(hashtable-set! prim-proc-table 'hashtable-keys hashtable-keys)
+(hashtable-set! prim-proc-table 'raise raise)
+(hashtable-set! prim-proc-table 'error error)
 
 ; The initial frame: contain compound masks for primitive procedures...
 ; so that we can supply keyword bindings.
