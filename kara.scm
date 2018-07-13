@@ -21,51 +21,42 @@
 ; -----------------------------------------------------------
 ; Built-in stuff
 ; -----------------------------------------------------------
-; The primitive procedures and their representation
-(define prim-proc-table (make-eq-hashtable))
-; List
-(hashtable-set! prim-proc-table 'car car)
-(hashtable-set! prim-proc-table 'cdr cdr)
-(hashtable-set! prim-proc-table 'set-car! set-car!)
-(hashtable-set! prim-proc-table 'cons cons)
-(hashtable-set! prim-proc-table 'list list)
-(hashtable-set! prim-proc-table 'null? null?)
-; Arithmetic
-(hashtable-set! prim-proc-table '+ +)
-(hashtable-set! prim-proc-table '- -)
-(hashtable-set! prim-proc-table '* *)
-(hashtable-set! prim-proc-table '/ /)
-(hashtable-set! prim-proc-table '> >)
-(hashtable-set! prim-proc-table '< <)
-(hashtable-set! prim-proc-table '= =)
-(hashtable-set! prim-proc-table 'even? even?)
-(hashtable-set! prim-proc-table 'odd? odd?)
-(hashtable-set! prim-proc-table 'remainder remainder)
-(hashtable-set! prim-proc-table 'random random)
-; Hashtable
-(hashtable-set! prim-proc-table 'make-eq-hashtable make-eq-hashtable)
-(hashtable-set! prim-proc-table 'hashtable-contains? hashtable-contains?)
-(hashtable-set! prim-proc-table 'hashtable-set! hashtable-set!)
-(hashtable-set! prim-proc-table 'hashtable-ref hashtable-ref)
-(hashtable-set! prim-proc-table 'hashtable-keys hashtable-keys)
-; System
-(hashtable-set! prim-proc-table 'raise raise)
-(hashtable-set! prim-proc-table 'error error)
-(hashtable-set! prim-proc-table 'void void)
-; I/O
-(hashtable-set! prim-proc-table 'newline newline)
-(hashtable-set! prim-proc-table 'display display)
-(hashtable-set! prim-proc-table 'open-file-output-port open-file-output-port)
-(hashtable-set! prim-proc-table 'load kload)  ; Written right below
-
-; The initial frame: contain compound masks for primitive procedures...
-; so that we can supply keyword bindings.
+; The initial frame: contain compound masks for primitive...
+; procedures so that we can have fun with keyword bindings.
+; Not actually needed since we already have PRIMITIVE_TAG,...
+; but it doesn't hurt to populate the initial frame with useful things.
 (define The-frame (new-frame))
-(update-frame! The-frame 'add '(+ $0 $1))
-(update-frame! The-frame 'mult '(* $0 $1))
-(update-frame! The-frame 'subtract '(- $0 $1))
-(update-frame! The-frame 'and '(and $0 $1))
-(update-frame! The-frame 'or '(or $0 $1))
+; List
+(update-frame! The-frame 'car '`(!p (car ,$0)))
+(update-frame! The-frame 'cdr '`(!p (cdr ,$0)))
+(update-frame! The-frame 'set-car! '`(!p (set-car! ,$0 ,$1)))
+(update-frame! The-frame 'cons '`(!p (cons ,$0 ,$1)))
+(update-frame! The-frame 'cons '`(!p (null? ,$0)))
+; Arithmetic
+(update-frame! The-frame '+ '`(!p (+ ,$0 ,$1)))
+(update-frame! The-frame '- '`(!p (- ,$0 ,$1)))
+(update-frame! The-frame '* '`(!p (* ,$0 ,$1)))
+(update-frame! The-frame '/ '`(!p (/ ,$0 ,$1)))
+(update-frame! The-frame '< '`(!p (< ,$0 ,$1)))
+(update-frame! The-frame '= '`(!p (= ,$0 ,$1)))
+(update-frame! The-frame 'remainder '`(!p (remainder ,$0 ,$1)))
+(update-frame! The-frame 'even? '`(!p (even? ,$0 ,$1)))
+(update-frame! The-frame 'random '`(!p (random)))
+; Hashtable
+(update-frame! The-frame 'make-eq-hashtable '`(!p (make-eq-hashtable)))
+(update-frame! The-frame 'hashtable-contains? '`(!p (hashtable-contains? ,$0 ,$1)))
+(update-frame! The-frame 'hashtable-ref '`(!p (hashtable-ref ,$0 ,$1 ,$2)))
+(update-frame! The-frame 'hashtable-set! '`(!p (hashtable-set! ,$0 ,$1 ,$2)))
+(update-frame! The-frame 'hashtable-keys '`(!p (hashtable-keys ,$0)))
+; System
+(update-frame! The-frame 'raise '`(!p (raise ,$0)))
+(update-frame! The-frame 'error '`(!p (error ,$0 ,$1 ,$2)))
+(update-frame! The-frame 'void '`(!p (void)))
+; I/O
+(update-frame! The-frame 'newline '`(!p (newline)))
+(update-frame! The-frame 'display '`(!p (display ,$0 ,$1)))
+(update-frame! The-frame 'load '`(!p (kload ,$0)))
+
 
 ; The global environment with The frame
 (define global-env (list The-frame))
@@ -88,3 +79,5 @@
         (display (interpret input)))
     (newline)
     (repl))
+
+(trace keval analyze analyze-quasiquoted)

@@ -14,6 +14,7 @@
         ((quoted? exp) (lambda (env) (quoted-text exp)))
         ((primitive? exp) (lambda (env) (eval (primitive-body exp))))
         ; Care about environment
+        ((quasiquoted? exp) (analyze-quasiquoted (quasiquoted-text exp)))
         ((env-request? exp) (lambda (env) env))
         ((var? exp) (lambda (env) (env-lookup exp env)))
         ((asgn? exp) (analyze-asgn exp))
@@ -23,6 +24,7 @@
         ; Code execution is last
         ((pair? exp) (analyze-exec exp))
         (else (error "analyze" "Invalid expression" exp))))
+
 
 ; This hashtable remembers the analyzation of functions, because...
 ; we functions can be analyzed many times, and we can't distinguish them...
@@ -59,6 +61,19 @@
 
 (define (quoted? exp) (tagged? exp 'quote))
 (define (quoted-text exp) (cadr exp))
+
+(define (quasiquoted? exp) (tagged? exp 'quasiquote))
+(define (quasiquoted-text exp) (cadr exp))
+(define (unquoted? exp) (tagged? exp 'unquote))
+(define (unquoted-text exp) (cadr exp))
+(define (analyze-quasiquoted exp)
+    (cond ((null? exp) (lambda (env) '()))
+          ((atom? exp)
+           (if (unquoted? exp) (analyze (unquoted-text exp)) (lambda (env) exp)))
+          ; Unempty list
+          (else (let ((first (analyze-quasiquoted (car exp)))
+                      (rest (analyze-quasiquoted (cdr exp))))
+                     (lambda (env) (cons (first env) (rest env)))))))
 
 (define (env-request? exp) (eq? exp ENV_REQUEST_TAG))
 

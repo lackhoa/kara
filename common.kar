@@ -1,3 +1,4 @@
+
 (set! cadr '(car (cdr)))
 (set! cddr '(cdr (cdr)))
 (set! caddr '(car (cddr)))
@@ -11,3 +12,6 @@
 ; params: $0 (list), $1 (index)
 (set! list-ref
     '(if (= $1 0) (car $0) (list-ref (cdr $0) (- $1 1))))
+
+(set! list-clone
+    '(if (null? $0) '() (cons (car $0) (list-clone (cdr $0)))))
