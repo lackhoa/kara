@@ -14,4 +14,4 @@
     '(if (= $1 0) (car $0) (list-ref (cdr $0) (- $1 1))))
 
 (set! list-clone
-    '(if (null? $0) '() (cons (car $0) (list-clone (cdr $0)))))
+    '(if (null?) '() (cons (car) (list-clone (cdr)))))

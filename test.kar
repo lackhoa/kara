@@ -1,61 +1,61 @@
 (load "io.kar")
 
-(stdisplay-n "Setting and retrieving a variable: 5")
+(stdisplay-n "Setting and retrieving a variable => 5")
 (set! a 5)
 a
 
-(stdisplay-n "If true: 1")
+(stdisplay-n "If true => 1")
 (if #t 1 2)
 
-(stdisplay-n "If false: 2")
+(stdisplay-n "If false => 2")
 (if #f 1 2)
 
-(stdisplay-n "If no else: 5")
+(stdisplay-n "If no else => 5")
 (seq (set! const 5) (if #f (set! const 6) const))
 
-(stdisplay-n "Conditional first: 1")
+(stdisplay-n "Conditional first => 1")
 (cond (#t 1) (#f 2) (else 3))
 
-(stdisplay-n "Conditional second: 2")
+(stdisplay-n "Conditional second => 2")
 (cond (#f 1) (#t 2) (else 3))
 
-(stdisplay-n "Conditional else: 3")
+(stdisplay-n "Conditional else => 3")
 (cond (#f 1) (#f 2) (else 3))
 
-(stdisplay-n "Conditional without else: (void)")
+(stdisplay-n "Conditional without else => (void)")
 (cond (#f 1) (#f 2))
 
-(stdisplay-n "Apply complex primitive procedure: 12")
+(stdisplay-n "Apply complex primitive procedure => 12")
 (+ (+ 2 8) 2)
 
-(stdisplay-n "Apply compound procedure 1: z")
+(stdisplay-n "Apply compound procedure 1 => z")
 (''z)
 
-(stdisplay-n "Apply compound procedure 2: 6")
+(stdisplay-n "Apply compound procedure 2 => 6")
 ('z (** z 6))
 
-(stdisplay-n "Apply compound procedure: 15")
+(stdisplay-n "Apply compound procedure => 15")
 ('(+ x y) (** x 7) (** y 8))
 
-(stdisplay-n "Apply compound procedure 4: 7")
+(stdisplay-n "Apply compound procedure 4 => 7")
 ('$0 7)
 
-(stdisplay-n "Apply compound procedure 5: 20")
+(stdisplay-n "Apply compound procedure 5 => 20")
 ('(+ $0 $1) 7 13)
 
-(stdisplay-n "Both keyword and non-keyword: 56")
+(stdisplay-n "Both keyword and non-keyword => 56")
 ('(* mult $0) 7 (** mult 8))
 
-(stdisplay-n "Store procedure and use them later: 10")
+(stdisplay-n "Store procedure and use them later => 10")
 (set! add3 '(+ 3 $0))
 (add3 7)
 
-(stdisplay-n "map procedure: (3...8)")
+(stdisplay-n "map procedure => (3...8)")
 (set! map '(if (null? L) '() (cons (func (car L)) (map (** L (cdr L)) (** func func)))))
-(map (** func add3) (** L (list 0 1 2 3 4 5)))
+(map (** func add3) (** L '(0 1 2 3 4 5)))
 
-(stdisplay-n "Currying: -18")
-(set! partial (quote (subtract (** $0 9))))
+(stdisplay-n "Currying => -18")
+(set! partial '(- (** $0 9)))
 (partial (** $1 27))
 
 (stdisplay-n "Product => 30")
@@ -63,19 +63,21 @@ a
 (set! prod '(mult3 (add3)))
 (prod 7)
 
-(stdisplay-n "Over-interpretuation behavior: 7")
+(stdisplay-n "Over-interpretuation behavior => 7")
 ((+ 3 4))
 
-(stdisplay-n "Sequencing: 36")
+(stdisplay-n "Sequencing => 36")
 (seq (set! x 9) (* x 4))
 
-(stdisplay-n "Factorial: 6")
+(stdisplay-n "Factorial => 6")
 (set! fact '(if (= $0 1) 1 (* (fact (- $0 1)) $0)))
 (fact 3)
 
-(stdisplay-n "Environment request: all keys")
+(stdisplay-n "Environment request => all keys")
 (hashtable-keys (car meta-env))
 
 (stdisplay-n "Primitive => 8")
-(!p (let ((x 5)) (+ 3 x)))
+(!p '(let ((x 5)) (+ 3 x)))
 
+(stdisplay-n "Quasiquote => (10 (18 18) 72)")
+`(10 (18 ,(+ 9 9)) ,(+ (* 8 8) 8))

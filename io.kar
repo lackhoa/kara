@@ -1,10 +1,10 @@
 ; params: the file path
 (set! my-file-output-port
-    '(open-file-output-port
-        $0
-       (!p (file-options append))
-       (!p (buffer-mode none))
-       (!p (native-transcoder))))
+    '(!p `(open-file-output-port
+               ,$0
+               (file-options append)
+               (buffer-mode none)
+               (native-transcoder))))
 
 ; params: $0 (string), out-port
 (set! display-n
@@ -15,7 +15,7 @@
   '(seq (display $0 out-port) (newline out-port) (newline out-port)))
 
 ; params: $0 (string), out-port
-(set! stdisplay-n '(display-n (** out-port (!p (console-output-port)))))
+(set! stdisplay-n '(display-n (** out-port (!p '(console-output-port)))))
 
 ; params: $0 (string), out-port
-(set! stdisplay-nn '(display-nn (** out-port (!p (console-output-port)))))
+(set! stdisplay-nn '(display-nn (** out-port (!p '(console-output-port)))))

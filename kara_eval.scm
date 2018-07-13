@@ -12,9 +12,11 @@
         ; Don't care about environment
         ((self-eval? exp) (lambda (env) exp))
         ((quoted? exp) (lambda (env) (quoted-text exp)))
-        ((primitive? exp) (lambda (env) (eval (primitive-body exp))))
         ; Care about environment
-        ((quasiquoted? exp) (analyze-quasiquoted (quasiquoted-text exp)))
+        ((primitive? exp)
+         (let ((analyzed-body (analyze (primitive-body exp))))
+              (lambda (env) (eval (analyzed-body env)))))
+        ((quasiquoted? exp) (analyze-quasiquoted exp))
         ((env-request? exp) (lambda (env) env))
         ((var? exp) (lambda (env) (env-lookup exp env)))
         ((asgn? exp) (analyze-asgn exp))
@@ -66,14 +68,17 @@
 (define (quasiquoted-text exp) (cadr exp))
 (define (unquoted? exp) (tagged? exp 'unquote))
 (define (unquoted-text exp) (cadr exp))
-(define (analyze-quasiquoted exp)
-    (cond ((null? exp) (lambda (env) '()))
-          ((atom? exp)
-           (if (unquoted? exp) (analyze (unquoted-text exp)) (lambda (env) exp)))
-          ; Unempty list
-          (else (let ((first (analyze-quasiquoted (car exp)))
-                      (rest (analyze-quasiquoted (cdr exp))))
+
+(define (analyze-quasiquoted-core exp)
+    (cond ((atom? exp) (lambda (env) exp))
+          ((null? exp) (lambda (env) (list)))
+          ((unquoted? exp) (analyze (unquoted-text exp)))
+          ; Unempty list, not quoted
+          (else (let ((first (analyze-quasiquoted-core (car exp)))
+                      (rest (analyze-quasiquoted-core (cdr exp))))
                      (lambda (env) (cons (first env) (rest env)))))))
+
+(define (analyze-quasiquoted exp) (analyze-quasiquoted-core (quasiquoted-text exp)))
 
 (define (env-request? exp) (eq? exp ENV_REQUEST_TAG))
 
@@ -97,12 +102,8 @@
 (define (seq? exp) (tagged? exp SEQUENCE_TAG))
 (define (seq-actions seq) (cdr seq))
 
-; Code execution is divided into two categories:
-; Primitive procedure _application_, and
-; Compound procedure _call_
+; Compound procedure _call_, not _application_.
 (define (operator exp) (car exp))
-(define (operands exp) (cdr exp))
-(define (call-operator exp) (car exp))
 (define (call-binding-exps exp) (cdr exp))
 
 
@@ -218,28 +219,19 @@
 ; while the execution is done by evaluating in a forked environment.
 ; It's not strange that `analyze` is called twice, since each call...
 ; bears a distinct meaning.
-; Also, primitive procedures are not quoted.
 (define (analyze-exec exp)
-    (if (prim-proc? (operator exp))
-        ; Primitive: analyze the operands only.
-        (let ((analyzed-operands (map analyze (operands exp))))
-            (lambda (env)
-                (apply
-                    (hashtable-ref prim-proc-table (operator exp) null-record)
-                    (map (lambda (x) (x env)) analyzed-operands))))
-        ; Compound: analyze both the operator and binding expressions.
-        (let ((analyzed-operator (analyze (call-operator exp)))
-              (bindings (binding-exps->bindings (call-binding-exps exp))))
-            (lambda (env)
-                (let*((eval-analyzed (analyzed-operator env))
-                      (forked-env (extend-env env (bindings->frame bindings env)))
-                      (lookup (hashtable-ref analysis-table eval-analyzed null-record)))
-                    (if (not (eq? lookup null-record))
-                        (lookup forked-env)
-                        (let ((doubly-analyzed (analyze eval-analyzed)))
-                            (begin (hashtable-set! analysis-table eval-analyzed doubly-analyzed)
-                                   ; This is basically `keval`
-                                   (doubly-analyzed forked-env)))))))))
+    (let ((analyzed-operator (analyze (operator exp)))
+          (bindings (binding-exps->bindings (call-binding-exps exp))))
+        (lambda (env)
+            (let*((eval-analyzed (analyzed-operator env))
+                  (forked-env (extend-env env (bindings->frame bindings env)))
+                  (lookup (hashtable-ref analysis-table eval-analyzed null-record)))
+                (if (not (eq? lookup null-record))
+                    (lookup forked-env)
+                    (let ((doubly-analyzed (analyze eval-analyzed)))
+                        (begin (hashtable-set! analysis-table eval-analyzed doubly-analyzed)
+                               ; This is basically `keval`
+                               (doubly-analyzed forked-env))))))))
 
 ; -----------------------------------------------------------
 ; Code Execution
@@ -281,5 +273,3 @@
                 (hashtable-set! frame (car first) ((cadr first) env))
                 (loop (cdr bindings) frame))))
     (loop bindings (new-frame)))
-
-(define (prim-proc? proc) (hashtable-contains? prim-proc-table proc))
