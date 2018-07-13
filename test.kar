@@ -58,6 +58,11 @@ a
 (set! partial (quote (subtract (** $0 9))))
 (partial (** $1 27))
 
+(stdisplay-n "Product => 30")
+(set! mult3 '(* 3 $0))
+(set! prod '(mult3 (add3)))
+(prod 7)
+
 (stdisplay-n "Over-interpretuation behavior: 7")
 ((+ 3 4))
 
@@ -73,3 +78,4 @@ a
 
 (stdisplay-n "Primitive => 8")
 (!p (let ((x 5)) (+ 3 x)))
+

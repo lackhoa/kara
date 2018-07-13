@@ -12,7 +12,7 @@
             (if (eof-object? next)
                 (begin
                     (close-port input)
-                    (display "Parsing all done."))
+                    (display "Loading all done.") (newline))
                 (begin
                     (let ((in (interpret next)))
                         (if (not (eq? in (void))) (begin (display in) (newline))))
@@ -26,13 +26,10 @@
 ; List
 (hashtable-set! prim-proc-table 'car car)
 (hashtable-set! prim-proc-table 'cdr cdr)
-(hashtable-set! prim-proc-table 'cadr cadr)
-(hashtable-set! prim-proc-table 'caddr caddr)
-(hashtable-set! prim-proc-table 'cadddr cadddr)
+(hashtable-set! prim-proc-table 'set-car! set-car!)
 (hashtable-set! prim-proc-table 'cons cons)
 (hashtable-set! prim-proc-table 'list list)
 (hashtable-set! prim-proc-table 'null? null?)
-(hashtable-set! prim-proc-table 'pair? pair?)
 ; Arithmetic
 (hashtable-set! prim-proc-table '+ +)
 (hashtable-set! prim-proc-table '- -)
@@ -72,6 +69,12 @@
 
 ; The global environment with The frame
 (define global-env (list The-frame))
+
+; ------------------------------------------------------------
+; The Common Library written in Kara
+; ------------------------------------------------------------
+(display "Loading the Common Library...") (newline)
+(kload "common.kar")
 
 ; ------------------------------------------------------------
 ; The Repl

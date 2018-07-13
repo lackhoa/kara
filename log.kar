@@ -2,15 +2,19 @@
 
 ; Logger is an object that keeps track of the logging variables...
 ; of the running process.
+; params: $0 (out-port)
+(set! makelogger (list $0 "" 65))
+
 (set! out-port 'car(logger))
 (set! prefix 'cadr(logger))
 (set! choice 'caddr(logger))
+(set! branch! (begin (set-caddr! logger ((caddr logger) + 1)) (list )))
 
 ; params: $0 (message to display), logger
 (set! log
     '(seq
         (set! p (out-port(logger))) (newline p)
-        (display prefix(logger) p) (display ($0) p)))
+        (display-n prefix(logger) p) (display ($0) p)))
 
 ; params: logger
-(set! branch ')
+(set! branch '(set lo))

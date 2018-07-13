@@ -6,8 +6,16 @@
        (!p (buffer-mode none))
        (!p (native-transcoder))))
 
-(set! stdisplay-n
-  '(seq (display $0) (newline)))
+; params: $0 (string), out-port
+(set! display-n
+  '(seq (display $0 out-port) (newline out-port)))
 
-(set! stdisplay-nn
-  '(seq (display $0) (newline) (newline)))
+; params: $0 (string), out-port
+(set! display-nn
+  '(seq (display $0 out-port) (newline out-port) (newline out-port)))
+
+; params: $0 (string), out-port
+(set! stdisplay-n '(display-n (** out-port (!p (console-output-port)))))
+
+; params: $0 (string), out-port
+(set! stdisplay-nn '(display-nn (** out-port (!p (console-output-port)))))
