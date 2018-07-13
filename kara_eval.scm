@@ -1,5 +1,8 @@
+; Represent null record, used in hashtables.
+(define null-record "null-record")
+
 ; Evaluation = Analysis[Environment]
-(define (eval exp env) ((analyze exp) env))
+(define (keval exp env) ((analyze exp) env))
 
 ; The main switch block: the syntax analyzer.
 ; It returns a function which take an environment...
@@ -9,6 +12,7 @@
         ; Don't care about environment
         ((self-eval? exp) (lambda (env) exp))
         ((quoted? exp) (lambda (env) (quoted-text exp)))
+        ((primitive? exp) (lambda (env) (eval (primitive-body exp))))
         ; Care about environment
         ((env-request? exp) (lambda (env) env))
         ((var? exp) (lambda (env) (env-lookup exp env)))
@@ -36,6 +40,7 @@
 (define ASGN_TAG 'set!)
 (define COND_TAG 'cond)
 (define ENV_REQUEST_TAG 'meta-env)
+(define PRIMITIVE_TAG '!p)
 
 ; -------------------------------------------------------------
 ; Types of expressions and their structures
@@ -57,13 +62,16 @@
 
 (define (env-request? exp) (eq? exp ENV_REQUEST_TAG))
 
+(define (primitive? exp) (tagged? exp PRIMITIVE_TAG))
+(define (primitive-body exp) (cadr exp))
+
 (define (if? exp) (tagged? exp 'if))
 (define (if-pred exp) (cadr exp))
 (define (if-conse exp) (caddr exp))
 (define (if-alt exp)
     (if (not (null? (cdddr exp)))
         (cadddr exp)
-        #f))
+        '(void)))
 
 (define (cond? exp) (tagged? exp COND_TAG))
 (define (cond-clauses cond-exp) (cdr cond-exp))
@@ -97,9 +105,6 @@
 (define (update-frame! frame var val)
     (hashtable-set! frame var val))
 
-(define (bound-in-frame? frame var)
-    (hashtable-contains? frame var))
-
 (define (int->unnamed-var int)
     (cond
         ((eq? int 0) '$0) ((eq? int 1) '$1) ((eq? int 2) '$2)
@@ -109,7 +114,7 @@
         (else (error "int->unnamed-var" "Invalid number" int))))
 
 (define (frame-lookup frame var)
-    (hashtable-ref frame var #f))
+    (hashtable-ref frame var null-record))
 
 ; Environment: a list of frames starting with the local...
 ; frame and ending with the outermost frame.
@@ -128,8 +133,10 @@
 (define (env-lookup var env)
     (if (eq? env empty-env)
         (error "env-lookup" "Var not bound in env" var)
-        (or (frame-lookup (local-frame env) var)
-            (env-lookup var (outer-frames env)))))
+        (let ((lookup (frame-lookup (local-frame env) var)))
+            (if (eq? lookup null-record)
+                (env-lookup var (outer-frames env))
+                lookup))))
 
 ; Assignment statements can only affect the local frame.
 ; The value is immediately evaluated in the current environment.
@@ -157,15 +164,17 @@
 
 ; The heart of `cond->if`
 (define (expand-clauses clauses)
-    (let ((cur-clause (car clauses)))
-        (if (cond-else-clause? cur-clause)
-            ; Warning: `else` clause should be the last clause
-            (cond-actions cur-clause)
-            (list
-                'if
-                (cond-pred cur-clause)
+    (if (null? clauses)
+        '(void)
+        (let ((cur-clause (car clauses)))
+            (if (cond-else-clause? cur-clause)
+                ; Warning: `else` clause should be the last clause
                 (cond-actions cur-clause)
-                (expand-clauses (cdr clauses))))))
+                (list
+                    'if
+                    (cond-pred cur-clause)
+                    (cond-actions cur-clause)
+                    (expand-clauses (cdr clauses)))))))
 
 (define (cond->if exp)
     (expand-clauses (cond-clauses exp)))
@@ -192,7 +201,7 @@
 ; Analyze a function execution
 ; The code expression is evaluated in the enclosing environment...
 ; while the execution is done by evaluating in a forked environment.
-; It's not strange that `eval` is called twice, since each call...
+; It's not strange that `analyze` is called twice, since each call...
 ; bears a distinct meaning.
 ; Also, primitive procedures are not quoted.
 (define (analyze-exec exp)
@@ -201,7 +210,7 @@
         (let ((analyzed-operands (map analyze (operands exp))))
             (lambda (env)
                 (apply
-                    (hashtable-ref prim-proc-table (operator exp) #f)
+                    (hashtable-ref prim-proc-table (operator exp) null-record)
                     (map (lambda (x) (x env)) analyzed-operands))))
         ; Compound: analyze both the operator and binding expressions.
         (let ((analyzed-operator (analyze (call-operator exp)))
@@ -209,12 +218,12 @@
             (lambda (env)
                 (let*((eval-analyzed (analyzed-operator env))
                       (forked-env (extend-env env (bindings->frame bindings env)))
-                      (lookup (hashtable-ref analysis-table eval-analyzed #f)))
-                    (if lookup
+                      (lookup (hashtable-ref analysis-table eval-analyzed null-record)))
+                    (if (not (eq? lookup null-record))
                         (lookup forked-env)
                         (let ((doubly-analyzed (analyze eval-analyzed)))
                             (begin (hashtable-set! analysis-table eval-analyzed doubly-analyzed)
-                                   ; This is basically `eval`
+                                   ; This is basically `keval`
                                    (doubly-analyzed forked-env)))))))))
 
 ; -----------------------------------------------------------
@@ -258,7 +267,6 @@
                 (loop (cdr bindings) frame))))
     (loop bindings (new-frame)))
 
-
 (define (prim-proc? proc) (hashtable-contains? prim-proc-table proc))
 
 ; -----------------------------------------------------------
@@ -283,7 +291,6 @@
 (hashtable-set! prim-proc-table 'odd? odd?)
 (hashtable-set! prim-proc-table 'remainder remainder)
 (hashtable-set! prim-proc-table 'random random)
-(hashtable-set! prim-proc-table 'meta-env (lambda () env))
 (hashtable-set! prim-proc-table 'newline newline)
 (hashtable-set! prim-proc-table 'display display)
 (hashtable-set! prim-proc-table 'make-eq-hashtable make-eq-hashtable)
@@ -293,6 +300,7 @@
 (hashtable-set! prim-proc-table 'hashtable-keys hashtable-keys)
 (hashtable-set! prim-proc-table 'raise raise)
 (hashtable-set! prim-proc-table 'error error)
+(hashtable-set! prim-proc-table 'void void)
 
 ; The initial frame: contain compound masks for primitive procedures...
 ; so that we can supply keyword bindings.

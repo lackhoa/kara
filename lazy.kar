@@ -1,6 +1,6 @@
 (set! square '(* $0 $0))
 
-; Args: exp, base, m
+; params: exp, base, m
 (set! expmod
     '(cond ((= exp 0) 1)
            ((even? exp)
@@ -9,14 +9,14 @@
            (else (remainder (* base (expmod (** exp (- exp 1))))
                             m))))
 
-; Args: $0
+; params: $0
 (set! fermat-test
     '(seq
-        ; Args: r
+        ; params: r
         (set! try-it '(= (expmod (** base r) (** exp $0) (** m $0)) r))
         (try-it (** r (+ 1 (random (- $0 1)))))))
 
-; Args: $0, times
+; params: $0, times
 (set! fast-prime?
     '(cond ((= times 0) #t)
            ((fermat-test $0) (fast-prime? (** times (- times 1))))
@@ -24,7 +24,7 @@
 
 (set! prime? '(fast-prime? (** times 10)))
 
-; Args: current, upper, accum
+; params: current, upper, accum
 (set! sum-primes-core
     '(if (> current upper)
          accum
@@ -32,7 +32,7 @@
               (set! current (+ current 1))
               (sum-primes-core))))
 
-; Args: $0-1
+; params: $0-1
 (set! sum-primes '(sum-primes-core (** current $0) (** upper $1) (** accum 0)))
 
 (sum-primes 5 20)

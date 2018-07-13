@@ -3,7 +3,7 @@
 ; ------------------------------------------------------------
 ; The interpreter
 ; ------------------------------------------------------------
-(define (interpret exp) (eval exp global-env))
+(define (interpret exp) (keval exp global-env))
 
 (define (parse input-file-name)
     (let ([input (open-input-file input-file-name)])
@@ -12,10 +12,10 @@
             (if (eof-object? next)
                 (begin
                     (close-port input)
-                    (display "Done!"))
+                    (display "Parsing All Done!"))
                 (begin
-                    (display (interpret next))
-                    (newline)
+                    (let ((in (interpret next)))
+                        (if (not (eq? in (void))) (begin (display in) (newline))))
                     (reader (read input)))))))
 
 ; ------------------------------------------------------------
