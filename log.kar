@@ -1,0 +1,16 @@
+(load "io.kar")
+
+; Logger is an object that keeps track of the logging variables...
+; of the running process.
+(set! out-port 'car(logger))
+(set! prefix 'cadr(logger))
+(set! choice 'caddr(logger))
+
+; params: $0 (message to display), logger
+(set! log
+    '(seq
+        (set! p (out-port(logger))) (newline p)
+        (display prefix(logger) p) (display ($0) p)))
+
+; params: logger
+(set! branch ')

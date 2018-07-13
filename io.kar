@@ -1,0 +1,13 @@
+; params: the file path
+(set! my-file-output-port
+    '(open-file-output-port
+        $0
+       (!p (file-options append))
+       (!p (buffer-mode none))
+       (!p (native-transcoder))))
+
+(set! stdisplay-n
+  '(seq (display $0) (newline)))
+
+(set! stdisplay-nn
+  '(seq (display $0) (newline) (newline)))
