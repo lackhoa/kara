@@ -26,40 +26,40 @@
 ; Not actually needed since we already have PRIMITIVE_TAG,...
 ; but it doesn't hurt to populate the initial frame with useful things.
 ; Let me tell you what's going on: the list to the right of the...
-; `!p` needs to be quasiquoted because we want to evaluate the...
+; `!` needs to be quasiquoted because we want to evaluate the...
 ; variable inside, but before the variable we need to quote because...
 ; we don't want to execute the data to be fed to the primitive function.
 (define The-frame (new-frame))
 ; List
-(update-frame! The-frame 'car '(!p `(car ',$0)))
-(update-frame! The-frame 'cdr '(!p `(cdr ',$0)))
-(update-frame! The-frame 'set-car! '(!p `(set-car! ',$0 ',$1)))
-(update-frame! The-frame 'cons '(!p `(cons ',$0 ',$1)))
-(update-frame! The-frame 'null? '(!p `(null? ',$0)))
+(update-frame! The-frame 'car '(! `(car ',$0)))
+(update-frame! The-frame 'cdr '(! `(cdr ',$0)))
+(update-frame! The-frame 'set-car! '(! `(set-car! ',$0 ',$1)))
+(update-frame! The-frame 'cons '(! `(cons ',$0 ',$1)))
+(update-frame! The-frame 'null? '(! `(null? ',$0)))
 ; Arithmetic
-(update-frame! The-frame '+ '(!p `(+ ',$0 ',$1)))
-(update-frame! The-frame '- '(!p `(- ',$0 ',$1)))
-(update-frame! The-frame '* '(!p `(* ',$0 ',$1)))
-(update-frame! The-frame '/ '(!p `(/ ',$0 ',$1)))
-(update-frame! The-frame '< '(!p `(< ',$0 ',$1)))
-(update-frame! The-frame '= '(!p `(= ',$0 ',$1)))
-(update-frame! The-frame 'remainder '(!p `(remainder ',$0 ',$1)))
-(update-frame! The-frame 'even? '(!p `(even? ',$0 ',$1)))
-(update-frame! The-frame 'random '(!p `(random)))
+(update-frame! The-frame '+ '(! `(+ ',$0 ',$1)))
+(update-frame! The-frame '- '(! `(- ',$0 ',$1)))
+(update-frame! The-frame '* '(! `(* ',$0 ',$1)))
+(update-frame! The-frame '/ '(! `(/ ',$0 ',$1)))
+(update-frame! The-frame '< '(! `(< ',$0 ',$1)))
+(update-frame! The-frame '= '(! `(= ',$0 ',$1)))
+(update-frame! The-frame 'remainder '(! `(remainder ',$0 ',$1)))
+(update-frame! The-frame 'even? '(! `(even? ',$0 ',$1)))
+(update-frame! The-frame 'random '(! `(random)))
 ; Hashtable
-(update-frame! The-frame 'make-eq-hashtable '(!p `(make-eq-hashtable)))
-(update-frame! The-frame 'hashtable-contains? '(!p `(hashtable-contains? ',$0 ',$1)))
-(update-frame! The-frame 'hashtable-ref '(!p `(hashtable-ref ',$0 ',$1 ',$2)))
-(update-frame! The-frame 'hashtable-set! '(!p `(hashtable-set! ',$0 ',$1 ',$2)))
-(update-frame! The-frame 'hashtable-keys '(!p `(hashtable-keys ',$0)))
+(update-frame! The-frame 'make-eq-hashtable '(! `(make-eq-hashtable)))
+(update-frame! The-frame 'hashtable-contains? '(! `(hashtable-contains? ',$0 ',$1)))
+(update-frame! The-frame 'hashtable-ref '(! `(hashtable-ref ',$0 ',$1 ',$2)))
+(update-frame! The-frame 'hashtable-set! '(! `(hashtable-set! ',$0 ',$1 ',$2)))
+(update-frame! The-frame 'hashtable-keys '(! `(hashtable-keys ',$0)))
 ; System
-(update-frame! The-frame 'raise '(!p `(raise ',$0)))
-(update-frame! The-frame 'error '(!p `(error ',$0 ',$1 ',$2)))
-(update-frame! The-frame 'void '(!p `(void)))
+(update-frame! The-frame 'raise '(! `(raise ',$0)))
+(update-frame! The-frame 'error '(! `(error ',$0 ',$1 ',$2)))
+(update-frame! The-frame 'void '(! `(void)))
 ; I/O
-(update-frame! The-frame 'newline '(!p `(newline)))
-(update-frame! The-frame 'display '(!p `(display ',$0 ',$1)))
-(update-frame! The-frame 'load '(!p `(kload ',$0)))
+(update-frame! The-frame 'newline '(! `(newline)))
+(update-frame! The-frame 'display '(! `(display ',$0 ',$1)))
+(update-frame! The-frame 'load '(! `(kload ',$0)))
 
 
 ; The global environment with The frame

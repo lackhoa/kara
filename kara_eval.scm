@@ -37,14 +37,15 @@
 ; -------------------------------------------------------------
 ; Arbitrary Constants
 ; If you hate my choices of notation, go ahead and change them
+; but remember to change them in the code, too.
 ; -------------------------------------------------------------
-(define KEYWORD_TAG '**)
-(define UNNAMED_PREFIX '$)    ; Doesn't actually work
+(define KEYWORD_TAG '~)
+(define UNNAMED_PREFIX '$)
 (define SEQUENCE_TAG 'seq)
 (define ASGN_TAG 'set!)
 (define COND_TAG 'cond)
 (define ENV_REQUEST_TAG 'meta-env)
-(define PRIMITIVE_TAG '!p)
+(define PRIMITIVE_TAG '!)
 
 ; -------------------------------------------------------------
 ; Types of expressions and their structures
