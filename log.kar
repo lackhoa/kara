@@ -41,11 +41,11 @@
                 (display-n msg (out-port logger))))
 
 ; A bit of a test
-(set! test-logger (new-logger (console-output-port)))
-(log test-logger "I really want to die")
-(log (sub! test-logger) "But not now!")
-(log (sub! test-logger) "Because this thing sucks!")
-(log (branch! test-logger) "It truly does!")
-(log (branch! test-logger) "So I have to finish what I started")
-(log (sub! (sub! test-logger)) "Even if it is the last thing I'll do")
+; (set! test-logger (new-logger (console-output-port)))
+; (log test-logger "I really want to die")
+; (log (sub! test-logger) "But not now!")
+; (log (sub! test-logger) "Because this thing sucks!")
+; (log (branch! test-logger) "It truly does!")
+; (log (branch! test-logger) "So I have to finish what I started")
+; (log (sub! (sub! test-logger)) "Even if it is the last thing I'll do")
 

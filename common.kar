@@ -23,13 +23,18 @@
 ; String
 (set! string-append '(! `(string-append ',$0 ',$1)))
 
+; -----------------------------------------------------------
 ; Functional stuff
+; -----------------------------------------------------------
 ; params: $function, $list
 (set! map '(if (null? $1) '() (cons ($0 (car $1)) (map (~ $1 (cdr $1))))))
 
 ; Map for use with side effect (doesn't return anything)
 ; params: $function, $list
 (set! mapfx '(if (pair? $1) (seq ($0 (car $1)) (mapfx (~ $1 (cdr $1))))))
+
+; params: $function, $(how many times to repeat)
+(set! repeat '(if (> $1 0) (seq ($0) (repeat (~ $1 (- $1 1))))))
 
 ; -----------------------------------------------------------
 ; I/O

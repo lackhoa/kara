@@ -46,7 +46,7 @@
 (update-frame! The-frame '< '(! `(< ',$0 ',$1)))
 (update-frame! The-frame '= '(! `(= ',$0 ',$1)))
 (update-frame! The-frame 'remainder '(! `(remainder ',$0 ',$1)))
-(update-frame! The-frame 'even? '(! `(even? ',$0 ',$1)))
+(update-frame! The-frame 'even? '(! `(even? ',$0)))
 (update-frame! The-frame 'random '(! `(random ',$0)))
 ; Hashtable
 (update-frame! The-frame 'make-eq-hashtable '(! `(make-eq-hashtable)))
