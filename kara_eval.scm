@@ -92,7 +92,7 @@
 (define (if-alt exp)
     (if (not (null? (cdddr exp)))
         (cadddr exp)
-        '(void)))
+        #f))
 
 (define (cond? exp) (tagged? exp COND_TAG))
 (define (cond-clauses cond-exp) (cdr cond-exp))
@@ -122,13 +122,13 @@
 (define (update-frame! frame var val)
     (hashtable-set! frame var val))
 
-(define (int->unnamed-var int)
+(define (int->unnamed-para int)
     (cond
         ((eq? int 0) '$0) ((eq? int 1) '$1) ((eq? int 2) '$2)
         ((eq? int 3) '$3) ((eq? int 4) '$4) ((eq? int 5) '$5)
         ((eq? int 6) '$6) ((eq? int 7) '$7) ((eq? int 8) '$8)
         ((eq? int 9) '$9)
-        (else (error "int->unnamed-var" "Invalid number" int))))
+        (else (error "int->unnamed-para" "Invalid number" int))))
 
 (define (frame-lookup frame var)
     (hashtable-ref frame var null-record))
@@ -145,7 +145,7 @@
 (define (extend-env env frame) (cons frame env))
 
 ; Variable lookup through the entire environment.
-; Unnamed variables should NOT be inherited from the enclosing...
+; Unnamed parameters should NOT be inherited from the enclosing...
 ; environment, for a few intentional cases (e.g. Currying).
 (define (env-lookup var env)
     (if (eq? env empty-env)
@@ -182,7 +182,7 @@
 ; The heart of `cond->if`
 (define (expand-clauses clauses)
     (if (null? clauses)
-        '(void)
+        #f
         (let ((cur-clause (car clauses)))
             (if (cond-else-clause? cur-clause)
                 ; Warning: `else` clause should be the last clause
@@ -240,7 +240,7 @@
 ; Turn binding expressions to bindings, done in analysis.
 ; Note that the bindings' values must be applied to an environment.
 ; The variables in keyword expressions are NOT evaluated.
-; Note: Make sure you don't provide unnamed vars as named ones...
+; Note: Make sure you don't provide unnamed parameters as named ones
 ; unless you know what you're doing.
 (define (binding-exps->bindings binding-exp)
     (binding-exps->bindings-core binding-exp 0))
@@ -252,16 +252,16 @@
         ; More bindings to add
         (let ((first (car binding-exps)) (rest (cdr binding-exps)))
             (if (tagged? first KEYWORD_TAG)
-                ; Named variable of the form "<KEYWORD_TAG> <var> <val>"
+                ; Named argument of the form "<KEYWORD_TAG> <var> <val>"
                 (let ((analyzed-val (analyze (caddr first))))
                     (cons
                         (list (cadr first) analyzed-val)
                         (binding-exps->bindings-core rest unnamed-count)))
-                ; Unnamed variable
+                ; Unnamed argument
                 (let((analyzed-val (analyze first))
-                     (unnamed-var (int->unnamed-var unnamed-count)))
+                     (unnamed-para (int->unnamed-para unnamed-count)))
                     (cons
-                        (list unnamed-var analyzed-val)
+                        (list unnamed-para analyzed-val)
                         (binding-exps->bindings-core rest (+ 1 unnamed-count))))))))
 
 ; Used solely by `fork-env`

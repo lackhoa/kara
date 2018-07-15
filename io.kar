@@ -6,16 +6,16 @@
                (buffer-mode none)
                (native-transcoder))))
 
-; params: $0 (string), out-port
+; params: $msg, $out-port
 (set! display-n
-  '(seq (display $0 out-port) (newline out-port)))
-
-; params: $0 (string), out-port
+  '(seq (display $0 $1) (newline $1)))
+; params: $msg , $out-port
 (set! display-nn
-  '(seq (display $0 out-port) (newline out-port) (newline out-port)))
+  '(seq (display $0 $1) (newline $1) (newline $1)))
 
-; params: $0 (string), out-port
-(set! stdisplay-n '(display-n (~ out-port (! '(console-output-port)))))
-
-; params: $0 (string), out-port
-(set! stdisplay-nn '(display-nn (~ out-port (! '(console-output-port)))))
+; params: $msg, $out-port
+(set! stdisplay '(display (~ $1 (console-output-port))))
+; params: $msg
+(set! stdisplay-n '(display-n (~ $1 (console-output-port))))
+; params: $msg
+(set! stdisplay-nn '(display-nn (~ $1 (console-output-port))))

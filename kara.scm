@@ -15,7 +15,8 @@
                     (display "Loading all done.") (newline))
                 (begin
                     (let ((in (interpret next)))
-                        (if (not (eq? in (void))) (begin (display in) (newline))))
+                        (if (not (or (eq? in (void)) (eq? in 'ok)))
+                            (begin (display in) (newline))))
                     (reader (read input)))))))
 
 ; -----------------------------------------------------------
@@ -37,6 +38,7 @@
 (update-frame! The-frame 'cons '(! `(cons ',$0 ',$1)))
 (update-frame! The-frame 'null? '(! `(null? ',$0)))
 ; Arithmetic
+(update-frame! The-frame 'not '(if $0 #f #t))
 (update-frame! The-frame '+ '(! `(+ ',$0 ',$1)))
 (update-frame! The-frame '- '(! `(- ',$0 ',$1)))
 (update-frame! The-frame '* '(! `(* ',$0 ',$1)))
@@ -45,7 +47,7 @@
 (update-frame! The-frame '= '(! `(= ',$0 ',$1)))
 (update-frame! The-frame 'remainder '(! `(remainder ',$0 ',$1)))
 (update-frame! The-frame 'even? '(! `(even? ',$0 ',$1)))
-(update-frame! The-frame 'random '(! `(random)))
+(update-frame! The-frame 'random '(! `(random ',$0)))
 ; Hashtable
 (update-frame! The-frame 'make-eq-hashtable '(! `(make-eq-hashtable)))
 (update-frame! The-frame 'hashtable-contains? '(! `(hashtable-contains? ',$0 ',$1)))
