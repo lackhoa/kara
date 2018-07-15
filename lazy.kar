@@ -1,3 +1,5 @@
+(load "io.kar")
+
 ; params: $stream, $index
 (set! stream-ref
     '(if (= $1 0)
@@ -8,23 +10,26 @@
 (set! stream-map
     '(if (stream-null? $1)
          empty-stream
-         (stream-cons ($0 (stream-car $1))
-                      `(stream-map ',$0 ',(stream-cdr $1)))))
+         (stream-cons `((quote ,$0) (quote ,(stream-car $1)))
+                      `(stream-map (quote ,$0) (quote ,(stream-cdr $1))))))
 
 ; params: $function, $stream
 (set! stream-mapfx
     '(if (stream-null? $1)
-         empty-stream
-         (seq ($0 (stream-car $1))
-              `(stream-mapfx ',$0 ',(stream-cdr $1)))))
+         'done
+         (seq `((quote ,$0) (quote ,(stream-car $1)))
+              `(stream-map (quote ,$0) (quote ,(stream-cdr $1))))))
+
+(set! print-stream '(stream-mapfx stdisplay-n $0))
 
 ; params: $stream
-(set! stream-car '(car $0))
+(set! stream-car '((car $0)))
 
 ; params: $stream
 (set! stream-cdr '((cadr $0)))
 
-; params: $first, $(the function representing the rest of the stream)
+; params: $(the function evaluating to the first item)
+;         $(the function evaluating to the other items)
 (set! stream-cons '`(,$0 ,$1))
 
 (set! empty-stream '())
@@ -35,13 +40,28 @@
 (set! range
     '(if (> $0 $1)
          empty-stream
-         (stream-cons $0 `(range ,(+ 1 $0) ,$1))))
+         (stream-cons `(quote ,$0) `(range ,(+ 1 $0) ,$1))))
+
+; param: $(list of streams)
+(set! stream-product
+    '(seq (set! first (car $0))
+          (set! rest (cdr $0))
+          (if (null? rest)
+              first
+              (seq (set! prod-rest (stream-product rest))
+                   (stream-map
+                       `(seq (set! iter-first ,$0)
+                             (stream-map '(cons iter-first $0) ,prod-rest))
+                       first)))))
 
 ; Testing
-; (set! new-range (range 5 10000000))
-; (stdisplay-n "=> 10")
-; (stream-ref new-range 5)
-; (stdisplay-n "=> 81")
-; (stream-ref (stream-map '(* $0 $0) new-range) 4)
-; (stdisplay-n "=> #t")
-; (stream-car (stream-cdr (stream-map odd? (range 10000 1000000))))
+(set! new-range (range 5 10000000))
+(stdisplay-n "=> 10")
+(stream-ref new-range 5)
+(stdisplay-n "=> 81")
+(stream-map '(* $0 $0) new-range)
+(stdisplay-n "=> #t")
+(stream-car (stream-cdr (stream-map odd? (range 10000 1000000))))
+(stdisplay-n "=> (1 2) (1 3) ... (3 5)")
+(print-stream (range 1 3))
+(print-stream (stream-product `(,(range 1 3) ,(range 2 5))))
