@@ -74,7 +74,7 @@
     (cond ((atom? exp) (lambda (env) exp))
           ((null? exp) (lambda (env) (list)))
           ((unquoted? exp) (analyze (unquoted-text exp)))
-          ; Unempty list, not quoted
+          ; Unempty list, not unquoted
           (else (let ((first (analyze-quasiquoted-core (car exp)))
                       (rest (analyze-quasiquoted-core (cdr exp))))
                      (lambda (env) (cons (first env) (rest env)))))))

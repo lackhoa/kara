@@ -17,10 +17,10 @@
 (set! stream-mapfx
     '(if (stream-null? $1)
          'done
-         (seq `((quote ,$0) (quote ,(stream-car $1)))
-              `(stream-map (quote ,$0) (quote ,(stream-cdr $1))))))
+         (seq ($0 (stream-car $1))
+              (stream-mapfx $0 (stream-cdr $1)))))
 
-(set! print-stream '(stream-mapfx stdisplay-n $0))
+(set! print-stream '(stream-mapfx '(stdisplay-n $0) $0))
 
 ; params: $stream
 (set! stream-car '((car $0)))
@@ -28,8 +28,8 @@
 ; params: $stream
 (set! stream-cdr '((cadr $0)))
 
-; params: $(the function evaluating to the first item)
-;         $(the function evaluating to the other items)
+; params: $(the function evaluating to the first item of the stream)
+;         $(the function evaluating to the rest of the stream (which is itself a stream))
 (set! stream-cons '`(,$0 ,$1))
 
 (set! empty-stream '())
@@ -42,26 +42,29 @@
          empty-stream
          (stream-cons `(quote ,$0) `(range ,(+ 1 $0) ,$1))))
 
-; param: $(list of streams)
+; params: $(a list of streams)
+; returns: a stream of lists
 (set! stream-product
     '(seq (set! first (car $0))
           (set! rest (cdr $0))
           (if (null? rest)
-              first
+              (stream-map (quote `(,$0)) first)  ; Return a stream of lists containing single items in first
               (seq (set! prod-rest (stream-product rest))
                    (stream-map
-                       `(seq (set! iter-first ,$0)
-                             (stream-map '(cons iter-first $0) ,prod-rest))
+                       `(seq (set! iter-first $0)
+                             (stream-map `(cons ,iter-first $0) ,prod-rest))
                        first)))))
 
 ; Testing
-(set! new-range (range 5 10000000))
+(set! new-range (range 5 10))
 (stdisplay-n "=> 10")
 (stream-ref new-range 5)
 (stdisplay-n "=> 81")
-(stream-map '(* $0 $0) new-range)
+(stream-ref (stream-map '(* $0 $0) new-range) 4)
+(stdisplay-n "=> squares")
+(print-stream (stream-map '(* $0 $0) new-range))
 (stdisplay-n "=> #t")
 (stream-car (stream-cdr (stream-map odd? (range 10000 1000000))))
-(stdisplay-n "=> (1 2) (1 3) ... (3 5)")
-(print-stream (range 1 3))
-(print-stream (stream-product `(,(range 1 3) ,(range 2 5))))
+(stdisplay-n "=> I don't know what to expect right now")
+(set! ingredient `(,(range 1 4) ,(range 2 5)))
+(print-stream (stream-product ingredient))

@@ -58,10 +58,10 @@ a
 (set! partial '(- (~ $0 9)))
 (partial (~ $1 27))
 
-(stdisplay-n "Product => 30")
+(stdisplay-n "Function Composition => 30")
 (set! mult3 '(* 3 $0))
-(set! prod '(mult3 (add3)))
-(prod 7)
+(set! comp '(mult3 (add3)))
+(comp 7)
 
 (stdisplay-n "Over-interpretuation behavior => 7")
 ((+ 3 4))
