@@ -1,0 +1,64 @@
+eval0(',(+ 1 2))
+= eval1(,(+ 1 2))
+= eval0((+ 1 2))  ; Function call
+= 3
+
+eval0('',,(+ 1 2))
+= eval1(',,(+ 1 2))
+= eval2(,,(+ 1 2))
+= eval1(,(+ 1 2))
+= eval0((+ 1 2))  ; base case
+= 3
+
+eval0(''',,(+ 1 2))
+= eval1('',,(+ 1 2))
+= eval2(',,(+ 1 2))
+= eval3(,,(+ 1 2))
+= eval2(,(+ 1 2))
+= eval1((+ 1 2))  ; base case
+= eval1(+) :: eval1(1) :: eval1(2)
+= + :: 1 :: 2
+= (+ 1 2)
+
+eval0('',,,(+ 1 2))
+= eval1(',,,(+ 1 2))
+= eval2(,,,(+ 1 2))
+= eval1(,,(+ 1 2))
+= eval0(,(+ 1 2))  ; Error!
+
+eval0(''',(+ 1 2))
+= eval1('',(+ 1 2))
+= eval2(',(+ 1 2))
+= eval3(,(+ 1 2))
+= eval2((+ 1 2))
+= eval2((+ 1 2))
+= eval2(+) :: eval2(1) :: eval2(2)
+
+eval0('(+ 1 2))
+= eval1((+ 1 2))
+= eval1(+) :: eval1(1) :: eval1(2)
+= + :: 1 :: 2
+= (+ 1 2)
+
+eval0((+ 1 2))  ; Function call
+= 3
+
+Formal proof: what do I want this quoting thing to do, really?
+It is a way of creating higher-order function. A quote denotes
+a function.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

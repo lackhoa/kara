@@ -7,31 +7,42 @@
 ; Represent null record, used in hashtables.
 (define null-record "null-record")
 
-; Evaluation = Analysis[Environment]
-(define (keval exp env) ((analyze exp) env))
+; Evaluation = Analysis[Environment, starting at level 0]
+(define (keval exp env) ((analyze exp 0) env))
 
 ; The main switch block: the syntax analyzer.
 ; It returns a function which take an environment...
 ; to return the final evaluation.
-(define (analyze exp)
+(define (analyze exp q-level)
     (cond
-        ; Don't care about environment
-        ((self-eval? exp) (lambda (env) exp))
-        ((quoted? exp) (lambda (env) (quoted-text exp)))
-        ; Care about environment
-        ((primitive? exp)
-         (let ((analyzed-body (analyze (primitive-body exp))))
-              (lambda (env) (eval (analyzed-body env)))))
-        ((quasiquoted? exp) (analyze-quasiquoted exp))
-        ((env-request? exp) (lambda (env) env))
-        ((var? exp) (lambda (env) (env-lookup exp env)))
-        ((asgn? exp) (analyze-asgn exp))
-        ((if? exp) (analyze-if exp))
-        ((cond? exp) (analyze-if (cond->if exp)))
-        ((seq? exp) (analyze-seq exp))
+        [(< q-level 0) (error "analyze" "Mistructured expression" exp)]
+
+        ; Don't care about the environment
+        [(self-eval? exp) (lambda (env) exp)]
+
+        ; Care about the environment
+        [(quoted? exp)
+            (let ([body-analyzed (analyze (quoted-text exp) (+ q-level 1))])
+                (if (= q-level 0)
+                    body-analyzed
+                    (lambda (env) `(quote ,(body-analyzed env)))))]
+        [(primitive? exp)
+            (let ((analyzed-body (analyze (primitive-body exp) q-level)))
+                (lambda (env) (eval (analyzed-body env))))]
+        [(unquoted? exp)
+            (let ([body-analyzed (analyze (unquoted-text exp) (- q-level 1))])
+                (if (= q-level 1)
+                    body-analyzed
+                    (lambda (env) `(unquote ,(body-analyzed env)))))]
+        [(env-request? exp) (lambda (env) env)]
+        [(var? exp) (lambda (env) (env-lookup exp env))]
+        [(asgn? exp) (analyze-asgn exp)]
+        [(if? exp) (analyze-if exp)]
+        [(cond? exp) (analyze-if (cond->if exp))]
+        [(seq? exp) (analyze-seq exp)]
         ; Code execution is last
-        ((pair? exp) (analyze-exec exp))
-        (else (error "analyze" "Invalid expression" exp))))
+        [(pair? exp) (analyze-exec exp)]
+        [else (error "analyze" "Invalid expression" exp)))]
 
 
 ; This hashtable remembers the analyzation of functions, because...
@@ -72,23 +83,8 @@
 (define (quoted? exp) (tagged? exp 'quote))
 (define (quoted-text exp) (cadr exp))
 
-(define (quasiquoted? exp) (tagged? exp 'quasiquote))
-(define (quasiquoted-text exp) (cadr exp))
 (define (unquoted? exp) (tagged? exp 'unquote))
 (define (unquoted-text exp) (cadr exp))
-
-(define (atom? x) (not (or (pair? x) (null? x))))
-
-(define (analyze-quasiquoted-core exp)
-    (cond ((atom? exp) (lambda (env) exp))
-          ((null? exp) (lambda (env) (list)))
-          ((unquoted? exp) (analyze (unquoted-text exp)))
-          ; Unempty list, not unquoted
-          (else (let ((first (analyze-quasiquoted-core (car exp)))
-                      (rest (analyze-quasiquoted-core (cdr exp))))
-                     (lambda (env) (cons (first env) (rest env)))))))
-
-(define (analyze-quasiquoted exp) (analyze-quasiquoted-core (quasiquoted-text exp)))
 
 (define (env-request? exp) (eq? exp ENV_REQUEST_TAG))
 

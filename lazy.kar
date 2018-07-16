@@ -10,8 +10,8 @@
 (set! stream-map
     '(if (stream-null? $1)
          empty-stream
-         (stream-cons `((quote ,$0) (quote ,(stream-car $1)))
-                      `(stream-map (quote ,$0) (quote ,(stream-cdr $1))))))
+         (stream-cons '(',,$0 ',,(stream-car $1))
+                      '(stream-map ',,$0 quote ',,(stream-cdr $1)))))
 
 ; params: $function, $stream
 (set! stream-mapfx
@@ -40,20 +40,21 @@
 (set! range
     '(if (> $0 $1)
          empty-stream
-         (stream-cons `(quote ,$0) `(range ,(+ 1 $0) ,$1))))
+         (stream-cons ',$0 '(range ,(+ 1 $0) ,$1))))
 
 ; params: $(a list of streams)
 ; returns: a stream of lists
-(set! stream-product
-    '(seq (set! first (car $0))
-          (set! rest (cdr $0))
-          (if (null? rest)
-              (stream-map (quote `(,$0)) first)  ; Return a stream of lists containing single items in first
-              (seq (set! prod-rest (stream-product rest))
-                   (stream-map
-                       `(seq (set! iter-first $0)
-                             (stream-map `(cons ,iter-first $0) ,prod-rest))
-                       first)))))
+(set! stream-product '(seq
+    (set! L $0) (set! first (car L)) (set! rest (cdr L))
+    (if (null? rest)
+        (stream-map '(,L) first)  ; a stream of lists containing single items in first
+        (seq
+            (set! prod-rest (stream-product rest))
+            (stream-map
+                '(seq
+                    (set! iter-first $0)
+                    (stream-map '(cons ,iter-first $0) ,prod-rest))
+                first)))))
 
 ; Testing
 (set! new-range (range 5 10))
