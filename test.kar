@@ -74,10 +74,16 @@ a
 (fact 3)
 
 (stdisplay-n "Environment request => all keys")
-(hashtable-keys (car meta-env))
+(hash-keys (car meta-env))
 
 (stdisplay-n "Primitive => 8")
 (! '(let ((x 5)) (+ 3 x)))
 
-(stdisplay-n "Quasiquote => (10 (18 18) 72)")
-`(10 (18 ,(+ 9 9)) ,(+ (* 8 8) 8))
+(stdisplay-n "Quasiquote => (10 (18 (+ 9 9)) 72)")
+`(10 `(18 ,(+ 9 9)) ,(+ (* 8 8) 8))
+
+(stdisplay-n "String formating => Hi mom and dad")
+(format "Hi ~s and ~s" '(mom dad))
+
+; (stdisplay-n "Listing => (1 2 3 4 5)")
+; (list 1 2 3 4 (+ 2 3))

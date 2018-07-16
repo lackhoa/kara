@@ -1,4 +1,6 @@
-(load "kara_eval.scm")
+#lang racket
+
+(require "kara_eval.scm")
 
 ; ------------------------------------------------------------
 ; The interpreter
@@ -11,11 +13,12 @@
         (let reader ([next (read input)])
             (if (eof-object? next)
                 (begin
-                    (close-port input)
+                    (close-input-port input)
                     (display "Loading all done.") (newline))
                 (begin
                     (let ((in (interpret next)))
-                        (if (not (or (eq? in (void)) (eq? in 'ok)))
+                        (when
+                            (not (or (eq? in (void)) (eq? in 'ok)))
                             (begin (display in) (newline))))
                     (reader (read input)))))))
 
@@ -49,11 +52,11 @@
 (update-frame! The-frame 'even? '(! `(even? ',$0)))
 (update-frame! The-frame 'random '(! `(random ',$0)))
 ; Hashtable
-(update-frame! The-frame 'make-eq-hashtable '(! `(make-eq-hashtable)))
-(update-frame! The-frame 'hashtable-contains? '(! `(hashtable-contains? ',$0 ',$1)))
-(update-frame! The-frame 'hashtable-ref '(! `(hashtable-ref ',$0 ',$1 ',$2)))
-(update-frame! The-frame 'hashtable-set! '(! `(hashtable-set! ',$0 ',$1 ',$2)))
-(update-frame! The-frame 'hashtable-keys '(! `(hashtable-keys ',$0)))
+(update-frame! The-frame 'make-hash '(! `('make-hash)))
+(update-frame! The-frame 'hash-contains? '(! `(hash-contains? ',$0 ',$1)))
+(update-frame! The-frame 'hash-ref '(! `(hash-ref ',$0 ',$1 ',$2)))
+(update-frame! The-frame 'hash-set! '(! `(hash-set! ',$0 ',$1 ',$2)))
+(update-frame! The-frame 'hash-keys '(! `(hash-keys ',$0)))
 ; System
 (update-frame! The-frame 'raise '(! `(raise ',$0)))
 (update-frame! The-frame 'error '(! `(error ',$0 ',$1 ',$2)))

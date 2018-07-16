@@ -1,3 +1,9 @@
+#lang racket
+
+(provide keval)
+(provide new-frame)
+(provide update-frame!)
+
 ; Represent null record, used in hashtables.
 (define null-record "null-record")
 
@@ -31,7 +37,8 @@
 ; This hashtable remembers the analyzation of functions, because...
 ; we functions can be analyzed many times, and we can't distinguish them...
 ; from expressions
-(set! analysis-table (make-eq-hashtable))
+(define analysis-table null)
+(set! analysis-table (make-hash))
 
 
 ; -------------------------------------------------------------
@@ -69,6 +76,8 @@
 (define (quasiquoted-text exp) (cadr exp))
 (define (unquoted? exp) (tagged? exp 'unquote))
 (define (unquoted-text exp) (cadr exp))
+
+(define (atom? x) (not (or (pair? x) (null? x))))
 
 (define (analyze-quasiquoted-core exp)
     (cond ((atom? exp) (lambda (env) exp))
@@ -117,10 +126,10 @@
 (define (binding-val binding) (cadr binding))
 
 ; Frame: a hash table to store bindings
-(define (new-frame) (make-eq-hashtable))
+(define (new-frame) (make-hash))
 
 (define (update-frame! frame var val)
-    (hashtable-set! frame var val))
+    (hash-set! frame var val))
 
 (define (int->unnamed-para int)
     (cond
@@ -131,7 +140,7 @@
         (else (error "int->unnamed-para" "Invalid number" int))))
 
 (define (frame-lookup frame var)
-    (hashtable-ref frame var null-record))
+    (hash-ref frame var null-record))
 
 ; Environment: a list of frames starting with the local...
 ; frame and ending with the outermost frame.
@@ -226,11 +235,11 @@
         (lambda (env)
             (let*((eval-analyzed (analyzed-operator env))
                   (forked-env (extend-env env (bindings->frame bindings env)))
-                  (lookup (hashtable-ref analysis-table eval-analyzed null-record)))
+                  (lookup (hash-ref analysis-table eval-analyzed null-record)))
                 (if (not (eq? lookup null-record))
                     (lookup forked-env)
                     (let ((doubly-analyzed (analyze eval-analyzed)))
-                        (begin (hashtable-set! analysis-table eval-analyzed doubly-analyzed)
+                        (begin (hash-set! analysis-table eval-analyzed doubly-analyzed)
                                ; This is basically `keval`
                                (doubly-analyzed forked-env))))))))
 
@@ -271,6 +280,6 @@
             frame
             (let ((first (car bindings)))
                 ; The value provided must be applied to `env`
-                (hashtable-set! frame (car first) ((cadr first) env))
+                (hash-set! frame (car first) ((cadr first) env))
                 (loop (cdr bindings) frame))))
     (loop bindings (new-frame)))

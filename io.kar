@@ -1,11 +1,3 @@
-; params: the file path
-(set! my-file-output-port
-    '(! `(open-file-output-port
-               ,$0
-               (file-options append)
-               (buffer-mode none)
-               (native-transcoder))))
-
 ; params: $msg, $out-port
 (set! display-n
   '(seq (display $0 $1) (newline $1)))
@@ -14,11 +6,11 @@
   '(seq (display $0 $1) (repeat '(newline $1) 2)))
 
 ; params: $msg, $out-port
-(set! stdisplay '(display (~ $1 (console-output-port))))
+(set! stdisplay '(display (~ $1 (current-output-port))))
 ; params: $msg
-(set! stdisplay-n '(display-n (~ $1 (console-output-port))))
+(set! stdisplay-n '(display-n (~ $1 (current-output-port))))
 ; params: $msg
-(set! stdisplay-nn '(display-nn (~ $1 (console-output-port))))
+(set! stdisplay-nn '(display-nn (~ $1 (current-output-port))))
 
 ; Used by `format`
 (set! quote-all

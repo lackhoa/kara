@@ -39,4 +39,4 @@
 ; -----------------------------------------------------------
 ; I/O
 ; -----------------------------------------------------------
-(set! console-output-port '(! '(console-output-port)))
+(set! current-output-port '(! '(current-output-port)))
