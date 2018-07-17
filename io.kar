@@ -12,10 +12,11 @@
 ; params: $msg
 (set! stdisplay-nn '(display-nn (~ $1 (current-output-port))))
 
-; Used by `format`
+; Used by `format`: evaluate all the objects in Kara's env,
+; then we must quote all of them to interface to Scheme
 (set! quote-all
-    '(if (null? $0) '() (cons `',(car $0) (quote-all (cdr $0)))))
+    '(if (null? $0) '() (cons '',,(car $0) (quote-all (cdr $0)))))
 ; params: $textual-output-port, $format-string, $objects
 (set! format
-    '(! (append `(format ',$0) (quote-all $1))))
+    '(! (append '(format ,$0) (quote-all $1))))
 ; That function was ridiculously hard to write

@@ -7,33 +7,24 @@
 ; Represent null record, used in hashtables.
 (define null-record "null-record")
 
-; Evaluation = Analysis[Environment, starting at level 0]
-(define (keval exp env) ((analyze exp 0) env))
+; I don't know why this is missing from Racket
+(define (atom? exp) (not (or (null? exp)
+                             (pair? exp))))
+
+; Evaluation = Analysis[Environment]
+(define (keval exp env) ((analyze exp) env))
 
 ; The main switch block: the syntax analyzer.
-; It returns a function which take an environment...
-; to return the final evaluation.
-(define (analyze exp q-level)
+; It returns a function which takes an environment
+; and return the final evaluation.
+(define (analyze exp)
     (cond
-        [(< q-level 0) (error "analyze" "Mistructured expression" exp)]
-
-        ; Don't care about the environment
         [(self-eval? exp) (lambda (env) exp)]
-
-        ; Care about the environment
-        [(quoted? exp)
-            (let ([body-analyzed (analyze (quoted-text exp) (+ q-level 1))])
-                (if (= q-level 0)
-                    body-analyzed
-                    (lambda (env) `(quote ,(body-analyzed env)))))]
-        [(primitive? exp)
-            (let ((analyzed-body (analyze (primitive-body exp) q-level)))
-                (lambda (env) (eval (analyzed-body env))))]
+        [(quoted? exp) (analyze-quoted (quoted-text exp) 1)]
+        [(primitive? exp) (analyze-primitive exp)]
         [(unquoted? exp)
-            (let ([body-analyzed (analyze (unquoted-text exp) (- q-level 1))])
-                (if (= q-level 1)
-                    body-analyzed
-                    (lambda (env) `(unquote ,(body-analyzed env)))))]
+            (error "analyze" "Unquote used in wrong context" exp)]
+
         [(env-request? exp) (lambda (env) env)]
         [(var? exp) (lambda (env) (env-lookup exp env))]
         [(asgn? exp) (analyze-asgn exp)]
@@ -42,9 +33,31 @@
         [(seq? exp) (analyze-seq exp)]
         ; Code execution is last
         [(pair? exp) (analyze-exec exp)]
-        [else (error "analyze" "Invalid expression" exp)))]
+        [else (error "analyze" "Invalid expression" exp)]))
 
+(define (analyze-quoted exp q-level)
+    (cond
+        [(quoted? exp)
+            (let ([analyzed-text (analyze-quoted (quoted-text exp)
+                                                 (+ q-level 1))])
+                 (lambda (env) `(quote ,(analyzed-text env))))]
 
+        [(= (unquote-level exp) q-level) (analyze (unquoted-data exp))]
+        [(> (unquote-level exp) q-level)
+            (error "analyze-quoted" "Too many unquotes!" exp)]
+        [(pair? exp)
+            (let ([analyzed-items
+                   (map (lambda (e) (analyze-quoted e q-level)) exp)])
+                 (lambda (env) (map (lambda (a) (a env)) analyzed-items)))]
+
+        [(atom? exp) (lambda (env) exp)]
+        [(null? exp) (lambda (env) '())]
+        [else (error "analyze-quoted" "What 'else' did we miss?" exp)]))
+
+(define (analyze-primitive exp)
+    (let ([analyzed-body (analyze (primitive-body exp))])
+        (lambda (env) (eval (analyzed-body env)))))
+        
 ; This hashtable remembers the analyzation of functions, because...
 ; we functions can be analyzed many times, and we can't distinguish them...
 ; from expressions
@@ -85,6 +98,14 @@
 
 (define (unquoted? exp) (tagged? exp 'unquote))
 (define (unquoted-text exp) (cadr exp))
+(define (unquoted-data exp)
+    (if (unquoted? exp)
+        (unquoted-data (unquoted-text exp))
+        exp))
+(define (unquote-level exp)
+    (if (unquoted? exp)
+        (+ 1 (unquote-level (unquoted-text exp)))
+        0))
 
 (define (env-request? exp) (eq? exp ENV_REQUEST_TAG))
 
