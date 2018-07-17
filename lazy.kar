@@ -1,27 +1,5 @@
 (load "io.kar")
 
-; params: $stream, $index
-(set! stream-ref
-    '(if (= $1 0)
-         (stream-car $0)
-         (stream-ref (stream-cdr $0) (- $1 1))))
-
-; params: $function, $stream
-(set! stream-map
-    '(if (stream-null? $1)
-         empty-stream
-         (stream-cons '(',,$0 ',,(stream-car $1))
-                      '(stream-map ',,$0 quote ',,(stream-cdr $1)))))
-
-; params: $function, $stream
-(set! stream-mapfx
-    '(if (stream-null? $1)
-         'done
-         (seq ($0 (stream-car $1))
-              (stream-mapfx $0 (stream-cdr $1)))))
-
-(set! print-stream '(stream-mapfx '(stdisplay-n $0) $0))
-
 ; params: $stream
 (set! stream-car '((car $0)))
 
@@ -30,11 +8,37 @@
 
 ; params: $(the function evaluating to the first item of the stream)
 ;         $(the function evaluating to the rest of the stream (which is itself a stream))
-(set! stream-cons '`(,$0 ,$1))
+(set! stream-cons ''(,$0 ,$1))
 
 (set! empty-stream '())
 
 (set! stream-null? '(null? $0))
+
+; params: $stream, $index
+(set! stream-ref
+    '(if (= $1 0)
+         (stream-car $0)
+         (stream-ref (stream-cdr $0) (- $1 1))))
+
+
+
+; params: func, $stream
+; returns: a stream
+(set! stream-map
+    '(if (stream-null? $0)
+         empty-stream
+         (stream-cons '(',,func ',,(stream-car $0))
+                      '(stream-map (~ func ',,func) ',,(stream-cdr $0)))))
+
+; params: func, $stream
+; strictly for side-effects
+(set! stream-mapfx
+    '(if (stream-null? $0)
+         'done
+         (seq (func (stream-car $0))
+              (stream-mapfx (stream-cdr $0)))))
+
+(set! print-stream '(stream-mapfx $0 (~ func '(stdisplay-n $0))))
 
 ; params: $low, $high
 (set! range
@@ -47,25 +51,48 @@
 (set! stream-product '(seq
     (set! L $0) (set! first (car L)) (set! rest (cdr L))
     (if (null? rest)
-        (stream-map '(,L) first)  ; a stream of lists containing single items in first
+        ; Base case: a stream of lists containing single items in first
+        (stream-map (~ func ''(,$0)) first)
+        ; Recursive case:
         (seq
             (set! prod-rest (stream-product rest))
+            ; prod-rest is a stream
             (stream-map
-                '(seq
+                (~ func '(seq
                     (set! iter-first $0)
-                    (stream-map '(cons ,iter-first $0) ,prod-rest))
+                    (stream-map (~ func '(cons ',,iter-first $0)) ',,prod-rest)))
                 first)))))
-
+;(~ func '(cons ',,iter-first $0))
 ; Testing
 (set! new-range (range 5 10))
 (stdisplay-n "=> 10")
 (stream-ref new-range 5)
-(stdisplay-n "=> 81")
-(stream-ref (stream-map '(* $0 $0) new-range) 4)
-(stdisplay-n "=> squares")
-(print-stream (stream-map '(* $0 $0) new-range))
-(stdisplay-n "=> #t")
-(stream-car (stream-cdr (stream-map odd? (range 10000 1000000))))
-(stdisplay-n "=> I don't know what to expect right now")
-(set! ingredient `(,(range 1 4) ,(range 2 5)))
-(print-stream (stream-product ingredient))
+
+(stdisplay-n "Mapping 0 => 81")
+(stream-ref (stream-map (~ func '(* $0 $0)) new-range) 4)
+
+(stdisplay-n "Mapping 1 => squares")
+(print-stream (stream-map (~ func '(* $0 $0)) new-range))
+
+(stdisplay-n "Mapping 2 => #t")
+(stream-car (stream-cdr (stream-map (~ func odd?) (range 10000 1000000))))
+
+(stdisplay-n "=> Infinite integers => 100")
+(set! inf-range '(stream-cons $0 '(inf-range (+ ,$0 1))))
+(stream-ref (inf-range 1) 99)
+
+(stdisplay-n "Stream of sixes => 6")
+(set! sixes (stream-cons '6 'sixes))
+(stream-ref sixes 6)
+
+(stdisplay-n "Double => 16")
+(set! scale-stream '(stream-map (~ func '(* $0 ,factor)) $0))
+(set! double (stream-cons '1 '(scale-stream double (~ factor 2))))
+(stream-ref double 4)
+
+
+
+; (stdisplay-n "=> I don't know what to expect right now")
+; (set! ingredient '(,(range 1 4) ,(range 2 5)))
+;(set! ingredient '(,(range 1 4)))
+; (print-stream (stream-product ingredient))

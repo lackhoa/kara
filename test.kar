@@ -92,8 +92,12 @@ a
 (stdisplay-n "String formating => Hi mom and dad")
 (format "Hi ~s and ~s" '(mom dad))
 
-
-
+; The ultimate test of speed
+; (set! fibo
+    ; '(cond
+        ; [(= $0 0) 1] [(= $0 1) 1]
+        ; [else (+ (fibo (- $0 1)) (fibo (- $0 2)))]))
+; (fibo 20)
 
 
 
