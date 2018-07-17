@@ -6,8 +6,8 @@
 ; params: $stream
 (set! stream-cdr '((cadr $0)))
 
-; params: $(the function evaluating to the first item of the stream)
-;         $(the function evaluating to the rest of the stream (which is itself a stream))
+; params: $(the function evaluating to the first value)
+;         $(the function evaluating to the rest of the stream (a stream-generating function))
 (set! stream-cons ''(,$0 ,$1))
 
 (set! empty-stream '())
@@ -28,7 +28,7 @@
     '(if (stream-null? $0)
          empty-stream
          (stream-cons '(',,func ',,(stream-car $0))
-                      '(stream-map (~ func ',,func) ',,(stream-cdr $0)))))
+                      '(stream-map (~ func ',,func) (stream-cdr ',,$0)))))
 
 ; params: func, $stream
 ; strictly for side-effects
@@ -62,7 +62,7 @@
                     (set! iter-first $0)
                     (stream-map (~ func '(cons ',,iter-first $0)) ',,prod-rest)))
                 first)))))
-;(~ func '(cons ',,iter-first $0))
+
 ; Testing
 (set! new-range (range 5 10))
 (stdisplay-n "=> 10")
@@ -94,5 +94,5 @@
 
 ; (stdisplay-n "=> I don't know what to expect right now")
 ; (set! ingredient '(,(range 1 4) ,(range 2 5)))
-;(set! ingredient '(,(range 1 4)))
+; (set! ingredient '(,(range 1 4)))
 ; (print-stream (stream-product ingredient))

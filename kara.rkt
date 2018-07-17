@@ -1,6 +1,8 @@
 #lang racket
 
 (require "kara_eval.rkt")
+(provide kload)
+(provide repl)
 
 ; ------------------------------------------------------------
 ; The interpreter
