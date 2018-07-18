@@ -1,9 +1,3 @@
-#lang racket
-
-(provide keval)
-(provide new-frame)
-(provide update-frame!)
-
 ; Evaluation = Analysis[Environment]
 (define (keval exp env) ((analyze exp) env))
 
@@ -31,21 +25,21 @@
         [else (error "analyze" "Invalid expression" exp)]))
 
 
-; Represent null record, used in hashtables.
+; Represent null record, used in hashtabletables.
 (define null-record "null-record")
 
 ; I don't know why this is missing from Racket
 (define (atom? exp) (not (or (null? exp)
                              (pair? exp))))
 
-(define traced-functions (make-hash))
+(define traced-functions (make-eq-hashtable))
 
 (define (trace-command? exp)
     (tagged? exp 'trace))
 
 ; The function name is not evaluated.
 (define (analyze-trace-command exp)
-    (hash-set! traced-functions (cadr exp) #t)
+    (hashtable-set! traced-functions (cadr exp) #t)
     ; But you have to return something here
     (lambda (env) (format "Traced ~s" (cadr exp))))
 
@@ -72,11 +66,10 @@
     (let ([analyzed-body (analyze (primitive-body exp))])
         (lambda (env) (eval (analyzed-body env)))))
 
-; This hashtable remembers the analyzation of functions, because...
+; This hashtabletable remembers the analyzation of functions, because...
 ; we functions can be analyzed many times, and we can't distinguish them...
 ; from expressions
-(define analysis-table null)
-(set! analysis-table (make-hash))
+(define analysis-table (make-eq-hashtable))
 
 
 ; -------------------------------------------------------------
@@ -156,11 +149,11 @@
 (define (binding-var binding) (car binding))
 (define (binding-val binding) (cadr binding))
 
-; Frame: a hash table to store bindings
-(define (new-frame) (make-hash))
+; Frame: a hashtable table to store bindings
+(define (new-frame) (make-eq-hashtable))
 
 (define (update-frame! frame var val)
-    (hash-set! frame var val))
+    (hashtable-set! frame var val))
 
 (define (int->unnamed-para int)
     (cond
@@ -171,7 +164,7 @@
         (else (error "int->unnamed-para" "Invalid number" int))))
 
 (define (frame-lookup frame var)
-    (hash-ref frame var null-record))
+    (hashtable-ref frame var null-record))
 
 ; Environment: a list of frames starting with the local...
 ; frame and ending with the outermost frame.
@@ -266,20 +259,20 @@
         (lambda (env)
             (let*([eval-analyzed (analyzed-operator env)]
                   [forked-env (extend-env env (bindings->frame bindings env))]
-                  [lookup (hash-ref analysis-table eval-analyzed null-record)])
+                  [lookup (hashtable-ref analysis-table eval-analyzed null-record)])
                 ; When the function is called, Do the tracing
-                (when (traced? (operator exp))
+                (if (traced? (operator exp))
                     (begin (display (operator exp)) (newline)))
                 ; The main job is done here
                 (if (not (eq? lookup null-record))
                     (lookup forked-env)
                     (let ((doubly-analyzed (analyze eval-analyzed)))
-                        (begin (hash-set! analysis-table eval-analyzed doubly-analyzed)
+                        (begin (hashtable-set! analysis-table eval-analyzed doubly-analyzed)
                                ; This is basically `keval`
                                (doubly-analyzed forked-env))))))))
 
 (define (traced? func)
-    (hash-has-key? traced-functions func))
+    (hashtable-contains? traced-functions func))
 
 ; -----------------------------------------------------------
 ; Code Execution
@@ -318,6 +311,6 @@
             frame
             (let ((first (car bindings)))
                 ; The value provided must be applied to `env`
-                (hash-set! frame (car first) ((cadr first) env))
+                (hashtable-set! frame (car first) ((cadr first) env))
                 (loop (cdr bindings) frame))))
     (loop bindings (new-frame)))

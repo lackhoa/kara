@@ -1,8 +1,4 @@
-#lang racket
-
-(require "kara_eval.rkt")
-(provide kload)
-(provide repl)
+(load "kara_eval.scm")
 
 ; ------------------------------------------------------------
 ; The interpreter
@@ -19,7 +15,7 @@
                     (display "Loading done.") (newline))
                 (begin
                     (let ((interpreted (interpret next)))
-                        (when
+                        (if
                             (not (or (eq? interpreted (void))
                                      (eq? interpreted 'ok)))
                             (display-output interpreted)))
