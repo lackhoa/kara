@@ -8,6 +8,7 @@
 
 ; params: $(the function evaluating to the first value)
 ;         $(the function evaluating to the rest of the stream (a stream-generating function))
+; This is the only stream constructor.
 (set! stream-cons ''(,$0 ,$1))
 
 (set! empty-stream '())
@@ -21,6 +22,25 @@
          (stream-ref (stream-cdr $0) (- $1 1))))
 
 
+
+
+
+; -----------------------------------------------
+; Complex functions
+; -----------------------------------------------
+
+; params: $stream1, $stream2
+(set! glue
+    '(if (stream-null? $0)
+         $1
+         (stream-cons '(stream-car ',,$0)
+                      '(glue (stream-cdr ',,$0) ',,$1))))
+
+; params: $(A non-empty stream of streams)
+(set! glue*
+    '(if (stream-null? (stream-cdr $0))
+         (stream-car $0)
+         (glue (stream-car $0) (glue* (stream-cdr $0)))))
 
 ; params: func, $stream
 ; returns: a stream
@@ -57,11 +77,12 @@
         (seq
             (set! prod-rest (stream-product rest))
             ; prod-rest is a stream
-            (stream-map
-                (~ func '(seq
-                    (set! iter-first $0)
-                    (stream-map (~ func '(cons ',,iter-first $0)) ',,prod-rest)))
-                first)))))
+            (set! to-be-glued
+                (stream-map first
+                    (~ func '(seq
+                        (set! iter-first $0)
+                        (stream-map ',,prod-rest (~ func '(cons ',,iter-first $0)))))))
+            (glue* to-be-glued)))))
 
 ; Testing
 (set! new-range (range 5 10))
@@ -90,7 +111,15 @@
 (set! double (stream-cons '1 '(scale-stream double (~ factor 2))))
 (stream-ref double 4)
 
-; (stdisplay-n "=> I don't know what to expect right now")
-; (set! ingredient '(,(range 1 4) ,(range 2 5)))
+(stdisplay-n "Glue streams: 1 -> 4, 11 -> 14")
+(print-stream (glue (range 1 4) (range 11 14)))
+
+(stdisplay-n "Glue more streams: 1 -> 4, 11 -> 14, 21 -> 24")
+(set! intermediate (stream-cons '(range 11 14) '(stream-cons '(range 21 24) ''())))
+(set! stream-of-streams (stream-cons '(range 1 4) 'intermediate))
+(print-stream (glue* stream-of-streams))
+
+(stdisplay-n "=> I don't know what to expect right now")
 ; (set! ingredient '(,(range 1 4)))
-; (print-stream (stream-product ingredient))
+(set! ingredient '(,(range 1 4) ,(range 2 5) ,(range 10 11)))
+(print-stream (stream-product ingredient))
