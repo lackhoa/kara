@@ -64,7 +64,8 @@
 (set! range
     '(if (> $0 $1)
          empty-stream
-         (stream-cons ',$0 '(range ,(+ 1 $0) ,$1))))
+         (stream-cons ',$0 '(range (+ 1 ,$0) ,$1))))
+
 
 ; params: $(a list of streams)
 ; returns: a stream of lists
@@ -79,47 +80,51 @@
             ; prod-rest is a stream
             (set! to-be-glued
                 (stream-map first
-                    (~ func '(seq
-                        (set! iter-first $0)
-                        (stream-map ',,prod-rest (~ func '(cons ',,iter-first $0)))))))
+                    (~ func '(stream-prod-aux (~ iter-first $0)
+                                              (~ prod-rest ',,prod-rest)))))
             (glue* to-be-glued)))))
+; params: iter-first, prod-rest
+(set! stream-prod-aux '(seq
+    (stream-map prod-rest (~ func '(cons ',,iter-first $0)))))
 
 ; Testing
-(set! new-range (range 5 10))
-(stdisplay-n "=> 10")
-(stream-ref new-range 5)
+; (set! new-range (range 5 10))
+; (stdisplay-n "=> 10")
+; (stream-ref new-range 5)
 
-(stdisplay-n "Mapping 0 => 81")
-(stream-ref (stream-map (~ func '(* $0 $0)) new-range) 4)
+; (stdisplay-n "Mapping 0 => 81")
+; (stream-ref (stream-map (~ func '(* $0 $0)) new-range) 4)
 
-(stdisplay-n "Mapping 1 => squares")
-(print-stream (stream-map (~ func '(* $0 $0)) new-range))
+; (stdisplay-n "Mapping 1 => squares")
+; (print-stream (stream-map (~ func '(* $0 $0)) new-range))
 
-(stdisplay-n "Mapping 2 => #t")
-(stream-car (stream-cdr (stream-map (~ func odd?) (range 10000 1000000))))
+; (stdisplay-n "Mapping 2 => #t")
+; (stream-car (stream-cdr (stream-map (~ func odd?) (range 10000 1000000))))
 
-(stdisplay-n "=> Infinite integers => 100")
-(set! inf-range '(stream-cons $0 '(inf-range (+ ,$0 1))))
-(stream-ref (inf-range 1) 99)
+; (stdisplay-n "=> Infinite integers => 100")
+; (set! inf-range '(stream-cons $0 '(inf-range (+ ,$0 1))))
+; (stream-ref (inf-range 1) 99)
 
-(stdisplay-n "Stream of sixes => 6")
-(set! sixes (stream-cons '6 'sixes))
-(stream-ref sixes 6)
+; (stdisplay-n "Stream of sixes => 6")
+; (set! sixes (stream-cons '6 'sixes))
+; (stream-ref sixes 6)
 
-(stdisplay-n "Double => 16")
-(set! scale-stream '(stream-map (~ func '(* $0 ,factor)) $0))
-(set! double (stream-cons '1 '(scale-stream double (~ factor 2))))
-(stream-ref double 4)
+; (stdisplay-n "Double => 16")
+; (set! scale-stream '(stream-map (~ func '(* $0 ,factor)) $0))
+; (set! double (stream-cons '1 '(scale-stream double (~ factor 2))))
+; (stream-ref double 4)
 
-(stdisplay-n "Glue streams: 1 -> 4, 11 -> 14")
-(print-stream (glue (range 1 4) (range 11 14)))
+; (stdisplay-n "Glue streams: 1 -> 4, 11 -> 14")
+; (print-stream (glue (range 1 4) (range 11 14)))
 
-(stdisplay-n "Glue more streams: 1 -> 4, 11 -> 14, 21 -> 24")
-(set! intermediate (stream-cons '(range 11 14) '(stream-cons '(range 21 24) ''())))
-(set! stream-of-streams (stream-cons '(range 1 4) 'intermediate))
-(print-stream (glue* stream-of-streams))
+; (stdisplay-n "Glue more streams: 1 -> 4, 11 -> 14, 21 -> 24")
+; (set! intermediate (stream-cons '(range 11 14) '(stream-cons '(range 21 24) ''())))
+; (set! stream-of-streams (stream-cons '(range 1 4) 'intermediate))
+; (print-stream (glue* stream-of-streams))
 
-(stdisplay-n "=> I don't know what to expect right now")
+(stdisplay-n "=> I don't know")
 ; (set! ingredient '(,(range 1 4)))
-(set! ingredient '(,(range 1 4) ,(range 2 5) ,(range 10 11)))
-(print-stream (stream-product ingredient))
+(set! ingredient '(,(range 1 4) ,(range 2 5)))
+; (set! ingredient '(,(range 1 4) ,(range 2 5) ,(range 10 11)))
+; (print-stream (stream-product ingredient))
+(stream-product ingredient)
