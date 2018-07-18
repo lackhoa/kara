@@ -40,7 +40,6 @@
 ; List
 (update-frame! The-frame 'car '(! '(car ',,$0)))
 (update-frame! The-frame 'cdr '(! '(cdr ',,$0)))
-(update-frame! The-frame 'set-car! '(! '(set-car! ',,$0 ',,$1)))
 (update-frame! The-frame 'cons '(! '(cons ',,$0 ',,$1)))
 (update-frame! The-frame 'null? '(! '(null? ',,$0)))
 ; Arithmetic
@@ -56,7 +55,7 @@
 (update-frame! The-frame 'random '(! '(random ',,$0)))
 ; Hashtable
 (update-frame! The-frame 'make-hash '(! '('make-hash)))
-(update-frame! The-frame 'hash-contains? '(! '(hash-contains? ',,$0 ',,$1)))
+(update-frame! The-frame 'hash-has-key? '(! '(hash-has-key? ',,$0 ',,$1)))
 (update-frame! The-frame 'hash-ref '(! '(hash-ref ',,$0 ',,$1 ',,$2)))
 (update-frame! The-frame 'hash-set! '(! '(hash-set! ',,$0 ',,$1 ',,$2)))
 (update-frame! The-frame 'hash-keys '(! '(hash-keys ',,$0)))
