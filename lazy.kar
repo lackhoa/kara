@@ -27,7 +27,7 @@
 (set! stream-map
     '(if (stream-null? $0)
          empty-stream
-         (stream-cons '(',,func ',,(stream-car $0))
+         (stream-cons '(',,func (stream-car ',,$0))
                       '(stream-map (~ func ',,func) (stream-cdr ',,$0)))))
 
 ; params: func, $stream
@@ -89,8 +89,6 @@
 (set! scale-stream '(stream-map (~ func '(* $0 ,factor)) $0))
 (set! double (stream-cons '1 '(scale-stream double (~ factor 2))))
 (stream-ref double 4)
-
-
 
 ; (stdisplay-n "=> I don't know what to expect right now")
 ; (set! ingredient '(,(range 1 4) ,(range 2 5)))

@@ -73,7 +73,7 @@ a
 (fact 3)
 
 (stdisplay-n "Environment request => all keys")
-(hash-keys (car meta-env))
+(hash-keys (car (meta-env)))
 
 (stdisplay-n "Primitive => 8")
 (! '(let ((x 5)) (+ 3 x)))
@@ -91,6 +91,14 @@ a
 
 (stdisplay-n "String formating => Hi mom and dad")
 (format "Hi ~s and ~s" '(mom dad))
+
+(stdisplay-n "Tracing => fibonacci")
+(set! fibo
+    '(cond
+        [(= $0 0) 1] [(= $0 1) 1]
+        [else (+ (fibo (- $0 1)) (fibo (- $0 2)))]))
+(trace fibo)
+(fibo 3)
 
 ; The ultimate test of speed
 ; (set! fibo

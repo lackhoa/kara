@@ -4,13 +4,6 @@
 (provide new-frame)
 (provide update-frame!)
 
-; Represent null record, used in hashtables.
-(define null-record "null-record")
-
-; I don't know why this is missing from Racket
-(define (atom? exp) (not (or (null? exp)
-                             (pair? exp))))
-
 ; Evaluation = Analysis[Environment]
 (define (keval exp env) ((analyze exp) env))
 
@@ -25,15 +18,36 @@
         [(unquoted? exp)
             (error "analyze" "Unquote used in wrong context" exp)]
 
-        [(env-request? exp) (lambda (env) env)]
         [(var? exp) (lambda (env) (env-lookup exp env))]
         [(asgn? exp) (analyze-asgn exp)]
         [(if? exp) (analyze-if exp)]
         [(cond? exp) (analyze-if (cond->if exp))]
         [(seq? exp) (analyze-seq exp)]
+        ; Special commands
+        [(env-request? exp) (lambda (env) env)]
+        [(trace-command? exp) (analyze-trace-command exp)]
         ; Code execution is last
         [(pair? exp) (analyze-exec exp)]
         [else (error "analyze" "Invalid expression" exp)]))
+
+
+; Represent null record, used in hashtables.
+(define null-record "null-record")
+
+; I don't know why this is missing from Racket
+(define (atom? exp) (not (or (null? exp)
+                             (pair? exp))))
+
+(define traced-functions (make-hash))
+
+(define (trace-command? exp)
+    (tagged? exp 'trace))
+
+; The function name is not evaluated.
+(define (analyze-trace-command exp)
+    (hash-set! traced-functions (cadr exp) #t)
+    ; But you have to return something here
+    (lambda (env) (format "Traced ~s" (cadr exp))))
 
 (define (analyze-quoted exp q-level)
     (cond
@@ -57,7 +71,7 @@
 (define (analyze-primitive exp)
     (let ([analyzed-body (analyze (primitive-body exp))])
         (lambda (env) (eval (analyzed-body env)))))
-        
+
 ; This hashtable remembers the analyzation of functions, because...
 ; we functions can be analyzed many times, and we can't distinguish them...
 ; from expressions
@@ -107,7 +121,7 @@
         (+ 1 (unquote-level (unquoted-text exp)))
         0))
 
-(define (env-request? exp) (eq? exp ENV_REQUEST_TAG))
+(define (env-request? exp) (tagged? exp ENV_REQUEST_TAG))
 
 (define (primitive? exp) (tagged? exp PRIMITIVE_TAG))
 (define (primitive-body exp) (cadr exp))
@@ -250,15 +264,22 @@
     (let ((analyzed-operator (analyze (operator exp)))
           (bindings (binding-exps->bindings (call-binding-exps exp))))
         (lambda (env)
-            (let*((eval-analyzed (analyzed-operator env))
-                  (forked-env (extend-env env (bindings->frame bindings env)))
-                  (lookup (hash-ref analysis-table eval-analyzed null-record)))
+            (let*([eval-analyzed (analyzed-operator env)]
+                  [forked-env (extend-env env (bindings->frame bindings env))]
+                  [lookup (hash-ref analysis-table eval-analyzed null-record)])
+                ; When the function is called, Do the tracing
+                (when (traced? (operator exp))
+                    (begin (display (operator exp)) (newline)))
+                ; The main job is done here
                 (if (not (eq? lookup null-record))
                     (lookup forked-env)
                     (let ((doubly-analyzed (analyze eval-analyzed)))
                         (begin (hash-set! analysis-table eval-analyzed doubly-analyzed)
                                ; This is basically `keval`
                                (doubly-analyzed forked-env))))))))
+
+(define (traced? func)
+    (hash-has-key? traced-functions func))
 
 ; -----------------------------------------------------------
 ; Code Execution

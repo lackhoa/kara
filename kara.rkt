@@ -18,10 +18,11 @@
                     (close-input-port input)
                     (display "Loading done.") (newline))
                 (begin
-                    (let ((in (interpret next)))
+                    (let ((interpreted (interpret next)))
                         (when
-                            (not (or (eq? in (void)) (eq? in 'ok)))
-                            (begin (display in) (newline))))
+                            (not (or (eq? interpreted (void))
+                                     (eq? interpreted 'ok)))
+                            (display-output interpreted)))
                     (reader (read input)))))))
 
 ; -----------------------------------------------------------
@@ -82,11 +83,15 @@
 ; The Repl
 ; ------------------------------------------------------------
 
-(define input-prompt "K>>> ")
+(define input-prompt "K<<< ")
+
+(define output-prompt "K>>> ")
 
 (define (repl)
     (display input-prompt)
     (let ((input (read)))
-        (display (interpret input)))
-    (newline)
+        (display-output (interpret input)))
     (repl))
+
+(define (display-output output)
+    (display output-prompt) (display output) (newline))
