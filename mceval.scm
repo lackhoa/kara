@@ -329,13 +329,13 @@
 (define input-prompt ";;; M-Eval input:")
 (define output-prompt ";;; M-Eval value:")
 
-(define (driver-loop)
+(define (repl)
   (prompt-for-input input-prompt)
   (let ((input (read)))
     (let ((output (eval input the-global-environment)))
       (announce-output output-prompt)
       (user-print output)))
-  (driver-loop))
+  (repl))
 
 (define (prompt-for-input string)
   (newline) (newline) (display string) (newline))
@@ -351,9 +351,6 @@
                      '<procedure-env>))
       (display object)))
 
-;;;Following are commented out so as not to be evaluated when
-;;; the file is loaded.
 (define the-global-environment (setup-environment))
-;;(driver-loop)
 
 'METACIRCULAR-EVALUATOR-LOADED
