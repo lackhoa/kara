@@ -24,6 +24,7 @@
         [(cond? exp) (analyze-if (cond->if exp))]
         [(seq? exp) (analyze-seq exp)]
         [(lambda? exp) (analyze-lambda exp)]
+        [(delay? exp) (analyze-delay exp)]
         ; Special commands
         [(env-request? exp) (lambda (env) env)]
         [(trace-command? exp) (analyze-trace-command exp)]
@@ -67,10 +68,6 @@
     (or (number? exp) (string? exp) (eq? exp #t) (eq? exp #f)))
 
 (define (var? exp) (symbol? exp))
-
-(define (asgn? exp) (tagged? exp ASGN_TAG))
-(define (asgn-var exp) (cadr exp))
-(define (asgn-val exp) (caddr exp))
 
 (define (quoted? exp) (tagged? exp 'quote))
 (define (quoted-text exp) (cadr exp))
@@ -136,6 +133,9 @@
 (define (make-lambda params body)
     (cons 'lambda (cons params body)))
 
+(define (delay? exp) (tagged? 'delay exp))
+(define (new-thunk) ())
+
 (define (seq? exp) (tagged? exp SEQUENCE_TAG))
 (define (seq-actions seq) (cdr seq))
 
@@ -171,7 +171,7 @@
 
 ; Environment: a list of frames starting with the local...
 ; frame and ending with the outermost frame.
-; Environments are immutable, but frames can change
+; Environments are immutable, and so are frames.
 (define (local-frame env) (car env))
 (define (outer-frames env) (cdr env))
 (define empty-env '())
@@ -181,8 +181,6 @@
 (define (extend-env env frame) (cons frame env))
 
 ; Variable lookup through the entire environment.
-; Unnamed parameters should NOT be inherited from the enclosing...
-; environment, for a few intentional cases (e.g. Currying).
 (define (env-lookup var env)
     (if (eq? env empty-env)
         (error "env-lookup" "Var not bound in env" var)
@@ -192,19 +190,19 @@
                 lookup))))
 
 ; NEED CHANGE!
-; Assignment statements can only affect the local frame.
+; Definition can only affect the local frame.
 ; The value is immediately evaluated in the current environment.
-; Note that the variable on the left is not evaluated, this is one...
-; of the rare cases where we do not evaluate something before acting on it
+; Note that the defined variable is not evaluated, this is one
+; of the rare cases where we do not evaluate something before acting on it.
 (define (analyze-def definition)
-    ; Using `let` since we want to analyze before...
+    ; Using `let` since we want to analyze before
     ; returning the lambda.
-    (let ((vproc (analyze (asgn-val assignment))))
-        (lambda (env)
-            (update-frame! (local-frame env)
-                (asgn-var assignment)
-                (vproc env))
-            'ok)))
+    (define vproc (analyze (asgn-val assignment)))
+    (lambda (env)
+        (update-frame (local-frame env)
+            (asgn-var assignment)
+            (vproc env))
+        'ok))
 
 ; The conditionals
 (define (analyze-if exp)
