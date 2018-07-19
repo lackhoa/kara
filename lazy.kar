@@ -1,27 +1,30 @@
 (load "io.kar")
 
-; params: $stream
-(set! stream-car '((car $0)))
+; Force the promise of the first value.
+(def (stream-car stream) (force (car stream)))
 
-; params: $stream
-(set! stream-cdr '((cadr $0)))
+; Force the promise of the other values.
+(def (stream-cdr stream) (force (cadr stream)))
 
-; params: $(the function evaluating to the first value)
-;         $(the function evaluating to the rest of the stream (a stream-generating function))
+; params: first-promise (the promise of the first value)
+;         rest-promise (a promise of the rest of the stream
+;                      (a stream promise))
 ; This is the only stream constructor.
-(set! stream-cons ''(,$0 ,$1))
+(def (stream-cons first-promise rest-promise)
+    (list first-promise rest-promise))
 
-(set! empty-stream '())
+; The empty stream is represented as the empty list.
+; It is a unique value.
+(def empty-stream ((list null null)))
+; The only empty stream is the one defined above.
+(def (stream-null? stream) (eq? empty-stream stream))
 
-(set! stream-null? '(null? $0))
+(defun (stream-ref stream index)
+    (if (= index 0)
+        (stream-car stream)
+        (stream-ref (stream-cdr stream) (- index 1))))
 
-; params: $stream, $index
-(set! stream-ref
-    '(if (= $1 0)
-         (stream-car $0)
-         (stream-ref (stream-cdr $0) (- $1 1))))
-
-
+(defun print-stream (stream-mapfx stdisplay-n stream))
 
 
 
@@ -29,71 +32,67 @@
 ; Complex functions
 ; -----------------------------------------------
 
-; params: $stream1, $stream2
-(set! glue
-    '(if (stream-null? $0)
-         $1
-         (stream-cons '(stream-car ',,$0)
-                      '(glue (stream-cdr ',,$0) ',,$1))))
+(def (glue stream1 stream2)
+    (if (stream-null? stream1)
+        $1
+        (stream-cons (delay (stream-car stream1))
+                     (delay (glue (stream-cdr stream1) stream2)))))
 
-; params: $(A non-empty stream of streams)
-(set! glue*
-    '(if (stream-null? (stream-cdr $0))
-         (stream-car $0)
-         (glue (stream-car $0) (glue* (stream-cdr $0)))))
+(def (glue* stream-of-streams)
+    (if (stream-null? (stream-cdr stream-of-streams))
+        (stream-car stream-of-streams)
+        (glue (stream-car stream-of-streams)
+              (glue* (stream-cdr stream-of-streams)))))
 
-; params: func, $stream
-; returns: a stream
-(set! stream-map
-    '(if (stream-null? $0)
-         empty-stream
-         (stream-cons '(',,func (stream-car ',,$0))
-                      '(stream-map (~ func ',,func) (stream-cdr ',,$0)))))
+; returns: a stream of processed items
+(def (stream-map func stream)
+    (if (stream-null? $0)
+        empty-stream
+        (stream-cons (delay (func (stream-car $0)))
+                     (delay (stream-map func (stream-cdr $0))))))
 
-; params: func, $stream
-; strictly for side-effects
-(set! stream-mapfx
-    '(if (stream-null? $0)
-         'done
-         (seq (func (stream-car $0))
-              (stream-mapfx (stream-cdr $0)))))
+; just like stream-map, but strictly for side-effects
+(def (stream-mapfx func stream)
+    (if (stream-null? $0)
+        'done
+        (seq (func (stream-car $0))
+             (stream-mapfx func (stream-cdr $0)))))
 
-(set! print-stream '(stream-mapfx $0 (~ func '(stdisplay-n $0))))
 
 ; params: $low, $high
-(set! range
-    '(if (> $0 $1)
-         empty-stream
-         (stream-cons ',$0 '(range (+ 1 ,$0) ,$1))))
+(defun range
+    (if (> $0 $1)
+        empty-stream
+        (stream-cons (delay $0) (delay (range (+ 1 $0) $1)))))
 
 
-; params: $(a list of streams)
-; returns: a stream of lists
-(set! stream-product '(seq
-    (set! L $0) (set! first (car L)) (set! rest (cdr L))
+; params: streams (a list of streams to take product).
+; returns: a stream of lists.
+(def (stream-product streams)
+    (def first (car streams)) (def rest (cdr streams))
     (if (null? rest)
-        ; Base case: a stream of lists containing single items in first
-        (stream-map (~ func ''(,$0)) first)
+        ; Base case: a stream of lists containing single items in first.
+        (stream-map (lambda (item) (list item)) first)
         ; Recursive case:
         (seq
-            (set! prod-rest (stream-product rest))
-            ; prod-rest is a stream
-            (set! to-be-glued
-                (stream-map first
-                    (~ func '(stream-prod-aux (~ iter-first $0)
-                                              (~ prod-rest ',,prod-rest)))))
-            (glue* to-be-glued)))))
-; params: iter-first, prod-rest
-(set! stream-prod-aux '(seq
-    (stream-map prod-rest (~ func '(cons ',,iter-first $0)))))
+            ; `prod-rest` is a stream.
+            (def prod-rest (stream-product rest))
+            ; See the code for `prod-aux` below.
+            (glue* (stream-map (prod-aux prod-rest) first)))))
+; params: iter-first, prod-rest.
+; Used by `stream-product`.
+(def (prod-aux prod-rest)
+    (lambda (iter-first)
+        (stream-map (lambda (iter-prod) (cons iter-first iter-prod))
+                    prod-rest)))
 
 ; Testing
 ; (set! new-range (range 5 10))
 ; (stdisplay-n "=> 10")
-; (stream-ref new-range 5)
+; (stream-ref new-range (~ index 5))
 
 ; (stdisplay-n "Mapping 0 => 81")
-; (stream-ref (stream-map (~ func '(* $0 $0)) new-range) 4)
+; (stream-ref (stream-map (~ func '(* $0 $0)) new-range) (~ index 4))
 
 ; (stdisplay-n "Mapping 1 => squares")
 ; (print-stream (stream-map (~ func '(* $0 $0)) new-range))
@@ -103,16 +102,16 @@
 
 ; (stdisplay-n "=> Infinite integers => 100")
 ; (set! inf-range '(stream-cons $0 '(inf-range (+ ,$0 1))))
-; (stream-ref (inf-range 1) 99)
+; (stream-ref (inf-range 1) (~ index 99))
 
 ; (stdisplay-n "Stream of sixes => 6")
 ; (set! sixes (stream-cons '6 'sixes))
-; (stream-ref sixes 6)
+; (stream-ref sixes (~ index 6))
 
 ; (stdisplay-n "Double => 16")
 ; (set! scale-stream '(stream-map (~ func '(* $0 ,factor)) $0))
 ; (set! double (stream-cons '1 '(scale-stream double (~ factor 2))))
-; (stream-ref double 4)
+; (stream-ref double (~ index 4))
 
 ; (stdisplay-n "Glue streams: 1 -> 4, 11 -> 14")
 ; (print-stream (glue (range 1 4) (range 11 14)))
@@ -122,9 +121,9 @@
 ; (set! stream-of-streams (stream-cons '(range 1 4) 'intermediate))
 ; (print-stream (glue* stream-of-streams))
 
-(stdisplay-n "=> I don't know")
+; (stdisplay-n "=> I don't know")
 ; (set! ingredient '(,(range 1 4)))
-(set! ingredient '(,(range 1 4) ,(range 2 5)))
+; (set! ingredient '(,(range 1 4) ,(range 2 5)))
 ; (set! ingredient '(,(range 1 4) ,(range 2 5) ,(range 10 11)))
 ; (print-stream (stream-product ingredient))
-(stream-product ingredient)
+; (stream-product ingredient)

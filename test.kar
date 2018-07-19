@@ -1,7 +1,7 @@
 (load "io.kar")
 
 (stdisplay-n "Setting and retrieving a variable => 5")
-(set! a 5)
+(def a 5)
 a
 
 (stdisplay-n "If true => 1")
@@ -11,7 +11,7 @@ a
 (if #f 1 2)
 
 (stdisplay-n "If no else => 5")
-(seq (set! const 5) (if #f (set! const 6) const))
+(seq (def const 5) (if #f (def const 6) const))
 
 (stdisplay-n "Conditional first => 1")
 (cond (#t 1) (#f 2) (else 3))
@@ -29,47 +29,26 @@ a
 (+ (+ 2 8) 2)
 
 (stdisplay-n "Apply compound procedure 1 => z")
-(''z)
+((const () 'z))
 
 (stdisplay-n "Apply compound procedure 2 => 6")
-('z (~ z 6))
+((lambda (z) z) z 6)
 
 (stdisplay-n "Apply compound procedure => 15")
-('(+ x y) (~ x 7) (~ y 8))
-
-(stdisplay-n "Apply compound procedure 4 => 7")
-('$0 7)
-
-(stdisplay-n "Apply compound procedure 5 => 20")
-('(+ $0 $1) 7 13)
-
-(stdisplay-n "Both keyword and non-keyword => 56")
-('(* mult $0) 7 (~ mult 8))
+((lambda (x y) (+ x y)) 7 8)
 
 (stdisplay-n "Store procedure and use them later => 10")
-(set! add3 '(+ 3 $0))
+(def add3 (lambda ($) (+ 3 $)))
 (add3 7)
 
 (stdisplay-n "map procedure => (3...8)")
-(map (~ func add3) '(0 1 2 3 4 5))
-
-(stdisplay-n "Currying => -18")
-(set! partial '(- (~ $0 9)))
-(partial (~ $1 27))
-
-(stdisplay-n "Function Composition => 30")
-(set! mult3 '(* 3 $0))
-(set! comp '(mult3 (add3)))
-(comp 7)
-
-(stdisplay-n "Over-interpretuation behavior => 7")
-((+ 3 4))
+(map add3 (list 0 1 2 3 4 5))
 
 (stdisplay-n "Sequencing => 36")
-(seq (set! x 9) (* x 4))
+(seq (def x 9) (* x 4))
 
 (stdisplay-n "Factorial => 6")
-(set! fact '(if (= $0 1) 1 (* (fact (- $0 1)) $0)))
+(def fact (lambda ($) (if (= $ 1) 1 (* (fact (-  1)) $))))
 (fact 3)
 
 (stdisplay-n "Environment request => all keys")
@@ -79,11 +58,11 @@ a
 (! '(let ((x 5)) (+ 3 x)))
 
 (stdisplay-n "Quasiquotation1 => (10 (18 18) 72)")
-(set! a 9)
+(def a 9)
 '(10 (18 ,(+ 9 a)) ,(+ (* 8 8) 8))
 
 (stdisplay-n "Quasiquotation2 => (10 '(18 20) 72)")
-(set! b 11)
+(def b 11)
 '(10 '(18 ,,(+ 9 b)) ,(+ (* 8 8) 8))
 
 (stdisplay-n "Quasiquotation2 => (10 '(18 ,(+ 9 a)) 72)")
@@ -93,15 +72,15 @@ a
 (format "Hi ~s and ~s" '(mom dad))
 
 (stdisplay-n "Tracing => fibonacci")
-(set! fibo
+(def (fibo $)
     '(cond
-        [(= $0 0) 1] [(= $0 1) 1]
-        [else (+ (fibo (- $0 1)) (fibo (- $0 2)))]))
+        [(= $ 0) 1] [(= $ 1) 1]
+        [else (+ (fibo (- $ 1)) (fibo (- $ 2)))]))
 (trace fibo)
 (fibo 3)
 
 ; The ultimate test of speed
-; (set! fibo
+; (def fibo
     ; '(cond
         ; [(= $0 0) 1] [(= $0 1) 1]
         ; [else (+ (fibo (- $0 1)) (fibo (- $0 2)))]))

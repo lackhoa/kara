@@ -19,10 +19,11 @@
             (error "analyze" "Unquote used in wrong context" exp)]
 
         [(var? exp) (lambda (env) (env-lookup exp env))]
-        [(asgn? exp) (analyze-asgn exp)]
+        [(def? exp) (analyze-def exp)]
         [(if? exp) (analyze-if exp)]
         [(cond? exp) (analyze-if (cond->if exp))]
         [(seq? exp) (analyze-seq exp)]
+        [(lambda? exp) (analyze-lambda exp)]
         ; Special commands
         [(env-request? exp) (lambda (env) env)]
         [(trace-command? exp) (analyze-trace-command exp)]
@@ -40,43 +41,7 @@
 
 (define traced-functions (make-hash))
 
-(define (trace-command? exp)
-    (tagged? exp 'trace))
 
-; The function name is not evaluated.
-(define (analyze-trace-command exp)
-    (hash-set! traced-functions (cadr exp) #t)
-    ; But you have to return something here
-    (lambda (env) (format "Traced ~s" (cadr exp))))
-
-(define (analyze-quoted exp q-level)
-    (cond
-        [(quoted? exp)
-            (let ([analyzed-text (analyze-quoted (quoted-text exp)
-                                                 (+ q-level 1))])
-                 (lambda (env) `(quote ,(analyzed-text env))))]
-
-        [(= (unquote-level exp) q-level) (analyze (unquoted-data exp))]
-        [(> (unquote-level exp) q-level)
-            (error "analyze-quoted" "Too many unquotes!" exp)]
-        [(pair? exp)
-            (let ([analyzed-items
-                   (map (lambda (e) (analyze-quoted e q-level)) exp)])
-                 (lambda (env) (map (lambda (a) (a env)) analyzed-items)))]
-
-        [(atom? exp) (lambda (env) exp)]
-        [(null? exp) (lambda (env) '())]
-        [else (error "analyze-quoted" "What 'else' did we miss?" exp)]))
-
-(define (analyze-primitive exp)
-    (let ([analyzed-body (analyze (primitive-body exp))])
-        (lambda (env) (eval (analyzed-body env)))))
-
-; This hashtable remembers the analyzation of functions, because...
-; we functions can be analyzed many times, and we can't distinguish them...
-; from expressions
-(define analysis-table null)
-(set! analysis-table (make-hash))
 
 
 ; -------------------------------------------------------------
@@ -121,6 +86,9 @@
         (+ 1 (unquote-level (unquoted-text exp)))
         0))
 
+(define (trace-command? exp)
+    (tagged? exp 'trace))
+
 (define (env-request? exp) (tagged? exp ENV_REQUEST_TAG))
 
 (define (primitive? exp) (tagged? exp PRIMITIVE_TAG))
@@ -139,6 +107,34 @@
 (define (cond-else-clause? clause) (eq? (car clause) 'else))
 (define (cond-pred clause) (car clause))
 (define (cond-actions clause) (cadr clause))
+
+(define (def? exp)
+    (tagged? exp 'def))
+
+(define (definition-of-data? exp)
+    (symbol? (cadr exp))
+
+(define (def-var exp)
+    (if (definition-of-data? exp)
+        ; Data
+        (cadr exp)
+        ; Function
+        (caddr exp)))
+        
+(define (def-val exp)
+    (if (definition-of-data? exp)
+        ; Data
+        (caddr exp)
+        ; Function
+        (make-lambda (cdadr exp)    ; formal parameters (cdr (car (cdr...)))
+                     (cddr exp))))  ; body
+
+(define (lambda? exp) (tagged? 'lambda exp))
+(define (lambda-params exp) (cadr))
+(define (lambda-body exp) (cddr exp))
+; Constructor for lambda, used by `def-val
+(define (make-lambda params body)
+    (cons 'lambda (cons params body)))
 
 (define (seq? exp) (tagged? exp SEQUENCE_TAG))
 (define (seq-actions seq) (cdr seq))
@@ -195,11 +191,12 @@
                 (env-lookup var (outer-frames env))
                 lookup))))
 
+; NEED CHANGE!
 ; Assignment statements can only affect the local frame.
 ; The value is immediately evaluated in the current environment.
 ; Note that the variable on the left is not evaluated, this is one...
 ; of the rare cases where we do not evaluate something before acting on it
-(define (analyze-asgn assignment)
+(define (analyze-def definition)
     ; Using `let` since we want to analyze before...
     ; returning the lambda.
     (let ((vproc (analyze (asgn-val assignment))))
@@ -255,28 +252,90 @@
             (raise "Empty sequence")
             (core (car analyzed-actions) (cdr analyzed-actions)))))
 
+; The function name is not evaluated.
+(define (analyze-trace-command exp)
+    (hash-set! traced-functions (cadr exp) #t)
+    ; But you have to return something here
+    (lambda (env) (format "Traced ~s" (cadr exp))))
+
+
+; A procedure is defined as follow:
+(define (make-proc parameters body env)
+    (list 'proc parameters body env))
+
+; Note that there is no "primitive" procedure.
+(define (proc? proc)
+    (tagged? proc 'proc))
+
+(define (proc-params proc) (cadr p))
+
+(define (proc-body proc) (caddr p))
+
+(define (proc-env proc) (cadddr p))
+
+; A procedure function call is just an evaluation in a new environment
+; The real work is done in analyze-exec.
+(define (analyze-lambda exp)
+    (let ([analyzed-body (analyze (lambda-body exp))])
+        (lambda (env) (analyzed-body exp))))
+
+(define (analyze-quoted exp q-level)
+    (cond
+        [(quoted? exp)
+            (let ([analyzed-text (analyze-quoted (quoted-text exp)
+                                                 (+ q-level 1))])
+                 (lambda (env) `(quote ,(analyzed-text env))))]
+
+        [(= (unquote-level exp) q-level) (analyze (unquoted-data exp))]
+        [(> (unquote-level exp) q-level)
+            (error "analyze-quoted" "Too many unquotes!" exp)]
+        [(pair? exp)
+            (let ([analyzed-items
+                   (map (lambda (e) (analyze-quoted e q-level)) exp)])
+                 (lambda (env) (map (lambda (a) (a env)) analyzed-items)))]
+
+        [(atom? exp) (lambda (env) exp)]
+        [(null? exp) (lambda (env) (list))]
+        [else (error "analyze-quoted" "What 'else' did we miss?" exp)]))
+
+(define (analyze-primitive exp)
+    (let ([analyzed-body (analyze (primitive-body exp))])
+        (lambda (env) (eval (analyzed-body env)))))
+
+
 ; Analyze a function execution
 ; The code expression is evaluated in the enclosing environment...
 ; while the execution is done by evaluating in a forked environment.
 ; It's not strange that `analyze` is called twice, since each call...
 ; bears a distinct meaning.
 (define (analyze-exec exp)
-    (let ((analyzed-operator (analyze (operator exp)))
-          (bindings (binding-exps->bindings (call-binding-exps exp))))
+    (define operator (operator exp))
+    (define operands (operands exp))
+    (let ([analyzed-operator (analyze operator)]
+          [analyzed-operands (map analyze operands)])
         (lambda (env)
-            (let*([eval-analyzed (analyzed-operator env)]
-                  [forked-env (extend-env env (bindings->frame bindings env))]
-                  [lookup (hash-ref analysis-table eval-analyzed null-record)])
-                ; When the function is called, Do the tracing
-                (when (traced? (operator exp))
-                    (begin (display (operator exp)) (newline)))
-                ; The main job is done here
-                (if (not (eq? lookup null-record))
-                    (lookup forked-env)
-                    (let ((doubly-analyzed (analyze eval-analyzed)))
-                        (begin (hash-set! analysis-table eval-analyzed doubly-analyzed)
-                               ; This is basically `keval`
-                               (doubly-analyzed forked-env))))))))
+            ; When a traced function is called, notify the user
+            (when (traced? operator)
+                (begin (display (operator exp)) (newline)))
+            ; The main job is done here
+            (define body (proc-body analyzed-operator))
+            (define params (proc-params analyzed-operator))
+            (when (not (eq? (length params))
+                            (length operands))
+                  (error "analyze-exec" "Arity mismatch in function" operator))
+            ; The new frame initialized by the arguments
+            (define new-frame
+                (zip-and-make-frame (new-frame params operands))))
+            ; The environment to run the code
+            (define new-env (extend-env env new-frame))
+            ; Finally, run the code in the new environment
+            (body new-env)))
+; Used by `analyze-exec`
+(define (zip-and-make-frame frame first second)
+    (when (null? first)
+          (begin update-frame frame (car first) (car second))
+                 (zip-and-make-frame (cdr first) (cdr second))))
+
 
 (define (traced? func)
     (hash-has-key? traced-functions func))
