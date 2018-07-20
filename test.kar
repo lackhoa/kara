@@ -1,8 +1,12 @@
 (load "io.kar")
 
-(stdisplay-n "Setting and retrieving a variable => 5")
+(stdisplay-n "Defining and retrieving a variable => 5")
 (def a 5)
 a
+
+(stdisplay-n "Definition of code => 16")
+(def (foo x) (+ x 11))
+(foo a)
 
 (stdisplay-n "If true => 1")
 (if #t 1 2)
@@ -14,28 +18,46 @@ a
 (seq (def const 5) (if #f (def const 6) const))
 
 (stdisplay-n "Conditional first => 1")
-(cond (#t 1) (#f 2) (else 3))
+(cond [#t 1] [#f 2] [else 3])
 
-(stdisplay-n "Conditional second => 2")
-(cond (#f 1) (#t 2) (else 3))
+(stdisplay-n "Conditional second => 5")
+(cond (#f 1) (#t (def a 5) a) (else 3))
 
 (stdisplay-n "Conditional else => 3")
-(cond (#f 1) (#f 2) (else 3))
+(cond [#f 1] [#f 2] [else 3])
 
-(stdisplay-n "Conditional without else => (void)")
+(stdisplay-n "Conditional without else => #f")
 (cond (#f 1) (#f 2))
+
+(stdisplay-n "When => 89")
+(when #t (def a 89) a)
 
 (stdisplay-n "Apply complex primitive procedure => 12")
 (+ (+ 2 8) 2)
 
-(stdisplay-n "Apply compound procedure 1 => z")
-((const () 'z))
+(stdisplay-n "Constant function => z")
+((const 'z))
 
-(stdisplay-n "Apply compound procedure 2 => 6")
-((lambda (z) z) z 6)
+(stdisplay-n "Sequence in lambda => 9")
+((lambda (z) (def z (+ z 6)) z) 3)
 
 (stdisplay-n "Apply compound procedure => 15")
 ((lambda (x y) (+ x y)) 7 8)
+
+(stdisplay-n "Using rest argument in `define` => (1 2 3 4)")
+(def (my-list . x) x)
+(my-list 1 2 3 4)
+
+(stdisplay-n "Using rest argument in `lambda` => (4 3 2 1)")
+((lambda x x) 4 3 2 1)
+
+(stdisplay-n "Using both positional and rest argument in `define` => (1 2 3 4 5 6)")
+(def (cons-list i . L) (cons i L))
+(cons-list 1 2 3 4 5 6)
+
+(stdisplay-n "Using both positional and rest argument in `lambda` => (6 5 4 3 2 1)")
+((lambda (i . L) (cons i L)) 6 5 4 3 2 1)
+
 
 (stdisplay-n "Store procedure and use them later => 10")
 (def add3 (lambda ($) (+ 3 $)))
@@ -72,23 +94,32 @@ a
 (format "Hi ~s and ~s" '(mom dad))
 
 (stdisplay-n "Tracing => fibonacci")
-(def (fibo $)
-    '(cond
-        [(= $ 0) 1] [(= $ 1) 1]
-        [else (+ (fibo (- $ 1)) (fibo (- $ 2)))]))
+(def (fibo n)
+    (cond
+        [(= n 0) 1] [(= n 1) 1]
+        [else (+ (fibo (- n 1)) (fibo (- n 2)))]))
 (trace fibo)
 (fibo 3)
 
-; The ultimate test of speed
-; (def fibo
-    ; '(cond
-        ; [(= $0 0) 1] [(= $0 1) 1]
-        ; [else (+ (fibo (- $0 1)) (fibo (- $0 2)))]))
-; (fibo 20)
+(stdisplay-n "Delayed evaluation => 666")
+(def a 8)
+(def delayed (delay a))
+(def a 666)
+(force delayed)
+
+(stdisplay-n "Lexical Scoping => 85, 80")
+(def a 80)
+(def (foo) (def a (+ a 5) a))
+a
+
+
+; DANGER!!!
+(stdisplay-n "The ultimate test of speed => some huge number")
+(fibo 20)
 
 
 
 
 
 
-
+"All tests ran successfully (or at least it didn't crash)"

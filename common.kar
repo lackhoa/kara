@@ -1,45 +1,32 @@
 ; Arithmetic
-(set! odd? '(not (even?)))
-(set! > '(< $1 $0))
-
+(def odd? (lambda (b) (not (even? b))))
+(def > (lambda ($0 $1) (< $1 $0)))
 ; List
-(set! cadr '(car (cdr)))
-(set! cddr '(cdr (cdr)))
-(set! caddr '(car (cddr)))
-(set! cdddr '(cdr (cddr)))
-(set! cadddr '(car (cdddr)))
-(set! pair? '(not (null?)))
-(set! append '(! '(append ',,$0 ',,$1)))
-; params: $0 (list), $1 (index)
-(set! list-ref
-    '(if (= $1 0) (car $0) (list-ref (cdr $0) (- $1 1))))
-(set! list-clone
-    '(if (null?) '() (cons (car) (list-clone (cdr)))))
-(set! reverse '(! '(reverse ',,$0)))
-
-; String
-(set! string-append '(! '(string-append $0 $1)))
+(def cadr (lambda (L) (car (cdr L))))
+(def cddr (lambda (L) (cdr (cdr L))))
+(def caddr (lambda (L) (car (cddr L))))
+(def cdddr (lambda (L) (cdr (cddr L))))
+(def cadddr (lambda (L) (car (cdddr L))))
+(def pair? (lambda (L) (not (null? L))))
 
 ; -----------------------------------------------------------
 ; Functional stuff
 ; -----------------------------------------------------------
-; params: func, $list
-(set! map
-    '(if (null? $0)
-         '()
-         (cons (func (car $0)) (map (cdr $0)))))
+(def (map func L)
+    (if (null? L)
+         (list)
+         (cons (func (car L)) (map func (cdr L)))))
 
 ; Map for use with side effect (doesn't return anything)
-; params: func, $list
-(set! mapfx
-    '(if (null? $0)
+(def (mapfx func L)
+    (if (null? L)
          'done
-         (seq (func (car $0)) (mapfx (cdr $0)))))
+         (seq (func (car L)) (mapfx func (cdr L)))))
 
-; params: $function, $(how many times to repeat)
-(set! repeat '(if (> $1 0) (seq ($0) (repeat (~ $1 (- $1 1))))))
+(def (repeat func times)
+    (when (> times 0) (seq (func)
+                           (repeat func (- times 1)))))
 
-; -----------------------------------------------------------
-; I/O
-; -----------------------------------------------------------
-(set! current-output-port '(! '(current-output-port)))
+                           
+                           
+"Common Library Loaded"

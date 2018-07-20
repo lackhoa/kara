@@ -1,22 +1,8 @@
-; params: $msg, $out-port
-(set! display-n
-  '(seq (display $0 $1) (newline $1)))
-; params: $msg , $out-port
-(set! display-nn
-  '(seq (display $0 $1) (repeat '(newline $1) 2)))
+(def (display-n msg port)
+    (seq (display msg port) (newline port)))
+(def (display-nn msg port)
+    (seq (display msg port) (repeat (newline port) 2)))
 
-; params: $msg, $out-port
-(set! stdisplay '(display (~ $1 (current-output-port))))
-; params: $msg
-(set! stdisplay-n '(display-n (~ $1 (current-output-port))))
-; params: $msg
-(set! stdisplay-nn '(display-nn (~ $1 (current-output-port))))
-
-; Used by `format`: evaluate all the objects in Kara's env,
-; then we must quote all of them to interface to Scheme
-(set! quote-all
-    '(if (null? $0) '() (cons '',,(car $0) (quote-all (cdr $0)))))
-; params: $textual-output-port, $format-string, $objects
-(set! format
-    '(! (append '(format ,$0) (quote-all $1))))
-; That function was ridiculously hard to write
+(def (stdisplay msg)    (display msg (current-output-port)))
+(def (stdisplay-n msg)  (display-n msg (current-output-port)))
+(def (stdisplay-nn msg) (display-nn msg (current-output-port)))
