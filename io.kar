@@ -1,7 +1,7 @@
 (def (display-n msg port)
-    (seq (display msg port) (newline port)))
+    (display msg port) (newline port))
 (def (display-nn msg port)
-    (seq (display msg port) (repeat (newline port) 2)))
+    (display msg port) (repeat (newline port) 2))
 
 (def (stdisplay msg)    (display msg (current-output-port)))
 (def (stdisplay-n msg)  (display-n msg (current-output-port)))

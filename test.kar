@@ -39,28 +39,28 @@ a
 ((const 'z))
 
 (stdisplay-n "Sequence in lambda => 9")
-((lambda (z) (def z (+ z 6)) z) 3)
+((lam (z) (def z (+ z 6)) z) 3)
 
 (stdisplay-n "Apply compound procedure => 15")
-((lambda (x y) (+ x y)) 7 8)
+((lam (x y) (+ x y)) 7 8)
 
 (stdisplay-n "Using rest argument in `define` => (1 2 3 4)")
 (def (my-list . x) x)
 (my-list 1 2 3 4)
 
 (stdisplay-n "Using rest argument in `lambda` => (4 3 2 1)")
-((lambda x x) 4 3 2 1)
+((lam x x) 4 3 2 1)
 
 (stdisplay-n "Using both positional and rest argument in `define` => (1 2 3 4 5 6)")
 (def (cons-list i . L) (cons i L))
 (cons-list 1 2 3 4 5 6)
 
 (stdisplay-n "Using both positional and rest argument in `lambda` => (6 5 4 3 2 1)")
-((lambda (i . L) (cons i L)) 6 5 4 3 2 1)
+((lam (i . L) (cons i L)) 6 5 4 3 2 1)
 
 
 (stdisplay-n "Store procedure and use them later => 10")
-(def add3 (lambda ($) (+ 3 $)))
+(def (add3 $) (+ 3 $))
 (add3 7)
 
 (stdisplay-n "map procedure => (3...8)")
@@ -70,7 +70,8 @@ a
 (seq (def x 9) (* x 4))
 
 (stdisplay-n "Factorial => 6")
-(def fact (lambda (n) (if (= n 1) 1 (* (fact (- n 1)) n))))
+(def (fact n)
+    (if (= n 1) 1 (* (fact (- n 1)) n)))
 (fact 3)
 
 (stdisplay-n "Environment request => all keys")
@@ -109,6 +110,10 @@ a
 
 (stdisplay-n "Inline forcing => 666")
 (force (delay a))
+
+(stdisplay-n "Delay out of scope => 333")
+(def (foo) (def inside-foo 333) (delay inside-foo))
+(force (foo))
 
 (stdisplay-n "Lexical Scoping => 85, 80")
 (def a 80)

@@ -1,30 +1,33 @@
 (load "io.kar")
 
-; Force the promise of the first value.
-(def (stream-car stream) (force (car stream)))
-
-; Force the promise of the other values.
-(def (stream-cdr stream) (force (cadr stream)))
-
-; params: first-promise (the promise of the first value)
-;         rest-promise (a promise of the rest of the stream
-;                      (a stream promise))
 ; This is the only stream constructor.
+; param first-promise: (the promise of the first value)
+; param rest-promise: (the promise of the rest of the stream)
 (def (stream-cons first-promise rest-promise)
     (list first-promise rest-promise))
 
+; Force the promise of the first value.
+(def (stream-car stream)
+    (force (car stream)))
+
+; Force the promise of the other values.
+(def (stream-cdr stream)
+    (force (cadr stream)))
+
 ; The empty stream is represented as the empty list.
 ; It is a unique value.
-(def empty-stream ((list null null)))
+(def empty-stream "The Empty Stream")
 ; The only empty stream is the one defined above.
-(def (stream-null? stream) (eq? empty-stream stream))
+(def (stream-null? stream)
+    (eqv? empty-stream stream))
 
-(defun (stream-ref stream index)
+(def (stream-ref stream index)
     (if (= index 0)
         (stream-car stream)
         (stream-ref (stream-cdr stream) (- index 1))))
 
-(defun print-stream (stream-mapfx stdisplay-n stream))
+(def (print-stream stream)
+    (stream-mapfx stdisplay-n stream))
 
 
 
@@ -34,10 +37,11 @@
 
 (def (glue stream1 stream2)
     (if (stream-null? stream1)
-        $1
+        stream2
         (stream-cons (delay (stream-car stream1))
                      (delay (glue (stream-cdr stream1) stream2)))))
 
+; params stream-of-streams: a non-empty stream of stream
 (def (glue* stream-of-streams)
     (if (stream-null? (stream-cdr stream-of-streams))
         (stream-car stream-of-streams)
@@ -46,84 +50,95 @@
 
 ; returns: a stream of processed items
 (def (stream-map func stream)
-    (if (stream-null? $0)
+    (if (stream-null? stream)
         empty-stream
-        (stream-cons (delay (func (stream-car $0)))
-                     (delay (stream-map func (stream-cdr $0))))))
+        (stream-cons (delay (func (stream-car stream)))
+                     (delay (stream-map func (stream-cdr stream))))))
 
 ; just like stream-map, but strictly for side-effects
 (def (stream-mapfx func stream)
-    (if (stream-null? $0)
+    (if (stream-null? stream)
         'done
-        (seq (func (stream-car $0))
-             (stream-mapfx func (stream-cdr $0)))))
+        (seq (func (stream-car stream))
+             (stream-mapfx func (stream-cdr stream)))))
 
-
-; params: $low, $high
-(defun range
-    (if (> $0 $1)
+(def (range lower upper)
+    (if (> lower upper)
         empty-stream
-        (stream-cons (delay $0) (delay (range (+ 1 $0) $1)))))
+        (stream-cons (delay lower)
+                     (delay (range (+ 1 lower) upper)))))
 
 
 ; params: streams (a list of streams to take product).
 ; returns: a stream of lists.
 (def (stream-product streams)
-    (def first (car streams)) (def rest (cdr streams))
+    (def first (car streams))
+    (def rest (cdr streams))
     (if (null? rest)
         ; Base case: a stream of lists containing single items in first.
-        (stream-map (lambda (item) (list item)) first)
+        (stream-map (lam (item) (list item))
+                    first)
         ; Recursive case:
         (seq
             ; `prod-rest` is a stream.
             (def prod-rest (stream-product rest))
             ; See the code for `prod-aux` below.
             (glue* (stream-map (prod-aux prod-rest) first)))))
+
 ; params: iter-first, prod-rest.
 ; Used by `stream-product`.
 (def (prod-aux prod-rest)
-    (lambda (iter-first)
-        (stream-map (lambda (iter-prod) (cons iter-first iter-prod))
+    (lam (iter-first)
+        (stream-map (lam (iter-prod) (cons iter-first iter-prod))
                     prod-rest)))
 
 ; Testing
-; (set! new-range (range 5 10))
-; (stdisplay-n "=> 10")
-; (stream-ref new-range (~ index 5))
+(def new-range (range 5 10))
+(stdisplay-n "Range => 10")
+(stream-ref new-range 5)
 
-; (stdisplay-n "Mapping 0 => 81")
-; (stream-ref (stream-map (~ func '(* $0 $0)) new-range) (~ index 4))
+(stdisplay-n "Mapping 0 => 81")
+(def (square x) (* x x))
+(stream-ref (stream-map square new-range) 4)
 
-; (stdisplay-n "Mapping 1 => squares")
-; (print-stream (stream-map (~ func '(* $0 $0)) new-range))
+(stdisplay-n "Mapping 1 => squares")
+(print-stream (stream-map square new-range))
 
-; (stdisplay-n "Mapping 2 => #t")
-; (stream-car (stream-cdr (stream-map (~ func odd?) (range 10000 1000000))))
+(stdisplay-n "Mapping 2 => #t")
+(stream-car (stream-cdr (stream-map odd? (range 10000 1000000))))
 
-; (stdisplay-n "=> Infinite integers => 100")
-; (set! inf-range '(stream-cons $0 '(inf-range (+ ,$0 1))))
-; (stream-ref (inf-range 1) (~ index 99))
+(stdisplay-n "=> Infinite integers => 100")
+(def (inf-range start) (stream-cons (delay start)
+                                    (delay (inf-range (+ start 1)))))
+(stream-ref (inf-range 1) 99)
 
-; (stdisplay-n "Stream of sixes => 6")
-; (set! sixes (stream-cons '6 'sixes))
-; (stream-ref sixes (~ index 6))
+(stdisplay-n "Stream of sixes => 6")
+(def sixes (stream-cons (delay 6) (delay sixes)))
+(stream-ref sixes 6)
 
-; (stdisplay-n "Double => 16")
-; (set! scale-stream '(stream-map (~ func '(* $0 ,factor)) $0))
-; (set! double (stream-cons '1 '(scale-stream double (~ factor 2))))
-; (stream-ref double (~ index 4))
+(stdisplay-n "Double => 16")
+(def (scale-stream item)
+    (stream-map (lam (x) (* x factor)) item))
+(def double (stream-cons (delay 1) (delay (scale-stream double 2))))
+(stream-ref double 4)
 
-; (stdisplay-n "Glue streams: 1 -> 4, 11 -> 14")
-; (print-stream (glue (range 1 4) (range 11 14)))
+(stdisplay-n "Glue streams: 1 -> 4, 11 -> 14")
+(print-stream (glue (range 1 4) (range 11 14)))
 
-; (stdisplay-n "Glue more streams: 1 -> 4, 11 -> 14, 21 -> 24")
-; (set! intermediate (stream-cons '(range 11 14) '(stream-cons '(range 21 24) ''())))
-; (set! stream-of-streams (stream-cons '(range 1 4) 'intermediate))
-; (print-stream (glue* stream-of-streams))
+(stdisplay-n "Glue more streams: 1 -> 4, 11 -> 14, 21 -> 24")
+(def intermediate (stream-cons (delay (range 11 14))
+                               (delay (stream-cons (delay (range 21 24)) empty-stream))))
+(def stream-of-streams (stream-cons (delay (range 1 4))
+                                    (delay intermediate)))
+(print-stream (glue* stream-of-streams))
 
-; (stdisplay-n "=> I don't know")
-; (set! ingredient '(,(range 1 4)))
-; (set! ingredient '(,(range 1 4) ,(range 2 5)))
-; (set! ingredient '(,(range 1 4) ,(range 2 5) ,(range 10 11)))
-; (print-stream (stream-product ingredient))
-; (stream-product ingredient)
+(stdisplay-n "=> I don't know")
+(def ingredient (list (range 1 4)))
+(def ingredient (list (range 1 4) (range 2 5)))
+(def ingredient (list (range 1 4) (range 2 5) (range 10 11)))
+(print-stream (stream-product ingredient))
+(stream-product ingredient)
+
+
+
+"All lazy tests passed (or at least they all ran)"

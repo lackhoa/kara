@@ -48,16 +48,16 @@
 (define (atom? exp) (not (or (null? exp)
                              (pair? exp))))
 
-(define traced-functions (make-hash))
+(define traced-procs (make-hash))
 
 
 
 
-; -------------------------------------------------------------
+; -----------------------------------------------------------
 ; Arbitrary Constants
 ; If you hate my choices of notation, go ahead and change them
 ; but remember to change them in the code, too.
-; -------------------------------------------------------------
+; -----------------------------------------------------------
 (define KEYWORD_TAG     '~)
 (define UNNAMED_PREFIX  '$)
 (define SEQUENCE_TAG    'seq)
@@ -68,9 +68,9 @@
 
 
 
-; -------------------------------------------------------------
+; -----------------------------------------------------------
 ; Types of expressions and their structures
-; -------------------------------------------------------------
+; -----------------------------------------------------------
 (define (tagged? exp tag) (and (pair? exp)
                                (eq? (car exp) tag)))
 
@@ -147,41 +147,81 @@
         (caadr exp)))
 
 ; Get the value of the definition regardless of whether
-; it's data or code.
+; it's data or code. Note that we also do the analyzing work here.
 (define (def-val exp)
     (if (definition-of-data? exp)
         ; Data
-        (caddr exp)
-        ; Code: turn that to a lambda, then it will finally
-        ; be evaluated to a procedure.
-        (make-lambda (cdadr exp)    ; formal parameters (cdr (car (cdr...)))
-                     (cddr exp))))  ; body
+        (analyze (list-ref exp 2))
+        ; Code: turn that into a procedure
+        (let ([bproc (analyze-seq (make-seq (list-tail exp 2)))])
+            (lambda (env)
+                (make-proc (car (list-ref exp 1))  ; name
+                           (cdr (list-ref exp 1))  ; formal parameters
+                           bproc                   ; body
+                           env)))))                ; lexical environment
 
-(define (lambda? exp) (tagged? exp 'lambda))
-(define (lambda-params exp) (cadr exp))
-(define (lambda-body exp) (cddr exp))
-; Constructor for lambda, used by `def-val
+(define (lambda? exp) (tagged? exp 'lam))
+
+; Used to convert const to lambda
 (define (make-lambda params body)
     (cons 'lambda (cons params body)))
+
+(define (lambda-params exp) (list-ref exp 1))
+(define (lambda-body exp) (list-tail exp 2))
 
 (define (const? exp)
     (tagged? exp 'const))
 (define (const-body const)
     (cdr const))
 
-; A name is NOT the procedure.
-(define (prim-proc-name? proc)
-    (hash-has-key? prim-procs proc))
-; A primitive procedure is a tagged Scheme function.
-(define (prim-proc? exp)
-    (tagged? exp 'primitive-implementation))
-(define (apply-prim-proc proc args)
-    (apply (cadr proc) args))
-; Requirement: the procedure is primitive (in the table)
-(define (get-primitive-implementation prim-proc-name)
+; -----------------------------------------------------------
+; Primitive Procedure
+; -----------------------------------------------------------
+; Note that primitive procedures don't have parameters or environments
+; since they were created outside of the language.
+
+; Be careful to distinguish the procedure from its name,
+; which needs not be the same as that of the hosting Scheme.
+(define (prim-proc-name? exp)
+    (hash-has-key? prim-procs exp))
+
+; Requirement: the procedure is indeed primitive
+(define (get-implementation prim-proc-name)
     (hash-ref prim-procs prim-proc-name null-record))
-(define (compound-proc? proc)
-    (tagged? proc 'proc))
+
+(define (prim-proc? exp)
+    (tagged? exp 'prim-proc))
+
+(define (make-prim-proc name body)
+    (list 'prim-proc name body))
+
+(define (prim-proc-body prim-proc)
+    (list-ref prim-proc 2))
+
+(define (apply-prim-proc prim-proc args)
+    (apply (prim-proc-body prim-proc) args))
+
+; -----------------------------------------------------------
+; Compound Procedure (or just Procedure for short)
+; -----------------------------------------------------------
+
+(define (proc? exp)
+    (tagged? exp 'proc))
+
+; The body of a procedure is an analyzed chunk of code.
+(define (make-proc name params body env)
+    (list 'proc name params body env))
+
+(define (proc-params proc) (list-ref proc 2))
+(define (proc-body proc) (list-ref proc 3))
+; The procedure's lexical scope when it is evaluated.
+(define (proc-env proc) (list-ref proc 4))
+
+; -----------------------------------------------------------
+; Common procedure interface
+; -----------------------------------------------------------
+(define (proc-name proc)
+    (list-ref proc 1))
 
 (define (seq? exp) (tagged? exp SEQUENCE_TAG))
 (define (seq-actions seq) (cdr seq))
@@ -247,11 +287,12 @@
 ; Note that the defined variable is not evaluated.
 (define (analyze-def definition)
     (define var (def-var definition))
-    (define vproc (analyze (def-val definition)))
+    ; Note that the value has already been analyzed
+    (define val (def-val definition))
     (lambda (env)
         (update-frame! (local-frame env)
                        var
-                       (vproc env))
+                       (val env))
         'ok))
 
 ; The conditionals
@@ -309,37 +350,29 @@
 
 ; The function name is not evaluated.
 (define (analyze-trace-command exp)
-    (hash-set! traced-functions (cadr exp) #t)
+    (hash-set! traced-procs (cadr exp) #t)
     ; But you have to return something here
     (lambda (env) (format "Traced ~s" (cadr exp))))
 
 (define (analyze-untrace-command exp)
-    (hash-remove! traced-functions (cadr exp))
+    (hash-remove! traced-procs (cadr exp))
     ; But you have to return something here
     (lambda (env) (format "Untraced ~s" (cadr exp))))
 
-; A procedure is defined as follow:
-(define (make-proc parameters body env)
-    (list 'proc parameters body env))
-
-(define (proc? exp)
-    (tagged? exp 'proc))
-
-(define (proc-params proc) (cadr proc))
-(define (proc-body proc) (caddr proc))
-; The procedure's lexical scope when it is evaluated.
-(define (proc-env proc) (cadddr proc))
 
 ; Lambda is the interface to making a new procedure.
 (define (analyze-lambda exp)
     (define params (lambda-params exp))
+    (define body (lambda-body exp))
     ; Reuse analyze-seq because we can
-    (define bproc (analyze-seq (make-seq (lambda-body exp))))
-    (lambda (env) (make-proc params bproc env)))
+    (define bproc (analyze-seq (make-seq body)))
+    ; The name of the procedure is the entire lambda expression
+    ; So you shouldn't make a long function and not name it
+    (lambda (env) (make-proc exp params bproc env)))
 
 (define (analyze-prim-proc-name prim-proc-name)
-    (define impl (get-primitive-implementation prim-proc-name))
-    (lambda (env) (list 'primitive-implementation impl)))
+    (define impl (get-implementation prim-proc-name))
+    (lambda (env) (make-prim-proc prim-proc-name impl)))
     
 ; Now this one is complicated and very different from quasiquotation
 (define (analyze-quoted exp q-level)
@@ -378,7 +411,8 @@
     (lambda (env)
         (define maybe-thunk (promise env))
         (if (thunk? maybe-thunk)
-            ((thunk-code maybe-thunk) env)
+            ; Compute the thunk's code inside of its own environment
+            ((thunk-code maybe-thunk) (thunk-env maybe-thunk))
             (error "analyze-force" "Expression not a thunk" maybe-thunk))))
 
 
@@ -396,38 +430,34 @@
     (define aprocs (map analyze $operands))
 
     (lambda (env)
-        ; When a traced function is called, notify the user
-        (when (traced? $operator)
-            (begin (display $operator) (newline)))
-        ; The main job is done here
         (execute-application (fproc env)
                              (map (lambda (aproc) (aproc env))
                                   aprocs))))
 
 ; Called from `analyze-application`
 (define (execute-application proc args)
-    (cond [(prim-proc? proc) (apply-prim-proc proc args)]
-          [(compound-proc? proc)
+    (define name (proc-name proc))
+    (cond [(prim-proc? proc) (trace-notify name args)
+                             (apply-prim-proc proc args)]
+
+          [(proc? proc)
+           (trace-notify name args)
            (define params (proc-params proc))
-           ; `params` can just be an atom
-           ; (a single rest argument is passed in).
-           ; This design is very clever, since it covers
-           ; both `define` and `lambda`.
+           ; Note: `params` can be an atom (a single 'rest' argument is passed in).
+           ; This design is very clever, since it covers both `define` and `lambda`.
            (when (and (list? params)
                       (not (eq? (length params)
                                 (length args))))
                  (error "analyze-application"
                         "Arity mismatch"
-                        (list proc args)))
+                        (list name args)))
            ; The new frame initialized by the arguments
            (define exec-frame
                (zip-and-make-frame (new-frame) params args))
-           ; The environment to run the code
+           ; Finally, run the (already analyzed) code in the new environment.
            (define new-env (extend-env (proc-env proc) exec-frame))
-           ; Finally, run the code (already analyzed) in
-           ; the new environment
-           (define body (proc-body proc))
-           (body new-env)]
+           ((proc-body proc) new-env)]
+
           [else (error "analyze-application"
                        "Non-procedure application"
                        proc)]))
@@ -435,22 +465,29 @@
 ; Used by `analyze-application`
 (define (zip-and-make-frame frame first second)
     (cond [(null? first) frame]
+
           ; Normal argument incoming if it is a pair
-          ; (including improper list in case of rest argument)
+          ; (including improper list in case of 'rest' argument)
           [(pair? first)
            (begin (update-frame! frame (car first) (car second))
                   (zip-and-make-frame frame (cdr first) (cdr second)))]
-          ; Rest arg: this must be the final argument,
-          ; so we must also return
-          [else (begin (update-frame! frame first second)
-                       frame)]))
 
-(define (traced? func)
-    (hash-has-key? traced-functions func))
+          ; Rest argument: this must be the final argument, so we return the frame
+          [else (update-frame! frame first second)
+                frame]))
 
-; -----------------------------------------------------
+(define (traced? name)
+    (hash-has-key? traced-procs name))
+
+; When a traced procedure is called, notify the user
+(define (trace-notify name args)
+    (when (traced? name)
+        (display (format "(~s ~s)" name args))
+        (newline)))
+
+; -----------------------------------------------------------
 ; Built-in Procedures and Initialization
-; -----------------------------------------------------
+; -----------------------------------------------------------
 
 (define output-prompt "K>>> ")
 
@@ -465,9 +502,7 @@
         ; This guy uses named let
         (let reader ([next (read input)])
             (if (eof-object? next)
-                (begin
-                    (close-input-port input)
-                    (display "Loading done.") (newline))
+                (close-input-port input)
                 (begin
                     (let ((interpreted (interpret next)))
                         (when
@@ -477,13 +512,19 @@
                     (reader (read input)))))))
 
 (define prim-procs (make-hash))
+; Operations on Objects
+(hash-set! prim-procs 'eq? eq?)
+(hash-set! prim-procs 'eqv? eqv?)
+(hash-set! prim-procs 'atom? atom?)
+(hash-set! prim-procs 'null? null?)
+(hash-set! prim-procs 'pair? pair?)
+(hash-set! prim-procs 'list? list?)
 ; List
 (hash-set! prim-procs 'car car)
 (hash-set! prim-procs 'cdr cdr)
 (hash-set! prim-procs 'cons cons)
 (hash-set! prim-procs 'append append)
 (hash-set! prim-procs 'list list)
-(hash-set! prim-procs 'null? null?)
 (hash-set! prim-procs 'list-ref list-ref)
 ; Arithmetic
 (hash-set! prim-procs '+ +)
@@ -491,10 +532,15 @@
 (hash-set! prim-procs '* *)
 (hash-set! prim-procs '/ /)
 (hash-set! prim-procs '= =)
+(hash-set! prim-procs '< <)
 (hash-set! prim-procs 'remainder remainder)
 (hash-set! prim-procs 'even? even?)
 (hash-set! prim-procs 'not not)
 (hash-set! prim-procs 'random random)
+(hash-set! prim-procs 'and (lambda (p q) (and p q)))
+(hash-set! prim-procs 'or (lambda (p q) (or p q)))
+(hash-set! prim-procs 'nand (lambda (p q) (nand p q)))
+(hash-set! prim-procs 'nor (lambda (p q) (nor p q)))
 ; Hashtable
 (hash-set! prim-procs 'make-hash make-hash)
 (hash-set! prim-procs 'hash-has-key? hash-has-key?)
@@ -513,29 +559,30 @@
 ; Others
 (hash-set! prim-procs 'random random)
 (hash-set! prim-procs 'void void)
-(define The-frame (new-frame))
 
 ; The global environment with The frame
+(define The-frame (new-frame))
 (define global-env (list The-frame))
 
 ; The common library writen in Kara
-(display "Loading the Common Library...") (newline)
 (kload "common.kar")
 
 
 
-; ------------------------------------------------------------
+; -----------------------------------------------------------
 ; The Repl
-; ------------------------------------------------------------
+; -----------------------------------------------------------
 
 (define input-prompt "K<<< ")
 
 
 (define (repl)
     (display input-prompt)
-    (let ((input (read)))
-        (display-output (interpret input)))
-    (repl))
+    (define input (read))
+    (when (nor (eq? input eof)
+               (equal? input '(exit)))
+        (display-output (interpret input))
+        (repl)))
 
 
 

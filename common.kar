@@ -1,31 +1,34 @@
 ; Arithmetic
-(def odd? (lambda (b) (not (even? b))))
-(def > (lambda ($0 $1) (< $1 $0)))
+(def (odd? n) (not (even? n)))
+(def (> x y) (nor (< x y) (= x y)))
 ; List
-(def cadr (lambda (L) (car (cdr L))))
-(def cddr (lambda (L) (cdr (cdr L))))
-(def caddr (lambda (L) (car (cddr L))))
-(def cdddr (lambda (L) (cdr (cddr L))))
-(def cadddr (lambda (L) (car (cdddr L))))
-(def pair? (lambda (L) (not (null? L))))
+(def null '())
+(def (cadr L) (car (cdr L)))
+(def (cddr L) (cdr (cdr L)))
+(def (caddr L) (car (cddr L)))
+(def (cdddr L) (cdr (cddr L)))
+(def (cadddr L) (car (cdddr L)))
 
 ; -----------------------------------------------------------
 ; Functional stuff
 ; -----------------------------------------------------------
 (def (map func L)
     (if (null? L)
-         (list)
-         (cons (func (car L)) (map func (cdr L)))))
+         null
+         (cons (func (car L))
+                     (map func (cdr L)))))
 
 ; Map for use with side effect (doesn't return anything)
 (def (mapfx func L)
     (if (null? L)
          'done
-         (seq (func (car L)) (mapfx func (cdr L)))))
+         (seq (func (car L))
+              (mapfx func (cdr L)))))
 
 (def (repeat func times)
-    (when (> times 0) (seq (func)
-                           (repeat func (- times 1)))))
+    (when (> times 0)
+        (func)
+        (repeat func (- times 1))))
 
                            
                            
