@@ -1,0 +1,56 @@
+(load "list.kar")
+
+; Testing
+(def new-range (range 5 10))
+(stdisplay-n "Range => 10")
+(stream-ref new-range 5)
+
+(stdisplay-n "Reduce => 120")
+(reduce * 1 (list 1 2 3 4 5))
+
+; (stdisplay-n "Mapping 0 => 81")
+; (def (square x) (* x x))
+; (lazy-ref (stream-map square new-range) 4)
+
+; (stdisplay-n "Mapping 1 => squares")
+; (print-stream (stream-map square new-range))
+
+; (stdisplay-n "Mapping 2 => #t")
+; (car (cdr (stream-map odd? (range 10000 1000000))))
+
+; (stdisplay-n "=> Infinite integers => 100")
+; (def (inf-range start) (cons start
+;                                     (delay (inf-range (+ start 1)))))
+; (lazy-ref (inf-range 1) 99)
+
+; (stdisplay-n "Stream of sixes => 6")
+; (def sixes (cons 6 (delay sixes)))
+; (lazy-ref sixes 6)
+
+; (stdisplay-n "Double => 16")
+; (def (scale-stream item)
+;     (stream-map (lam (x) (* x factor)) item))
+; (def double (cons 1 (delay (scale-stream double 2))))
+; (lazy-ref double 4)
+
+; (stdisplay-n "flatmap streams: 1 -> 4, 11 -> 14")
+; (print-stream (flatmap (range 1 4) (range 11 14)))
+
+; (stdisplay-n "flatmap more streams: 1 -> 4, 11 -> 14, 21 -> 24")
+; (def intermediate (cons (delay (range 11 14))
+;                              (delay (cons (delay (range 21 24)) empty-stream))))
+; (def stream-of-streams (cons (delay (range 1 4))
+;                                   (delay intermediate)))
+; (print-stream (flatmap stream-of-streams))
+
+; (stdisplay-n "=> I don't know")
+; (def ingredient (list (range 1 4)))
+; (def ingredient (list (range 1 4) (range 2 5)))
+; (def ingredient (list (range 1 4) (range 2 5) (range 10 11)))
+; (print-stream (stream-product ingredient))
+; (stream-product ingredient)
+
+
+
+"All lazy tests passed (or at least they all ran)"
+

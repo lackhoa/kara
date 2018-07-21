@@ -1,0 +1,119 @@
+(load "io.kar")
+
+; This is the only stream constructor (same one used for strict list)
+; param first-promise: (the promise of the first value)
+; param rest-promise: (the promise of the rest of the stream)
+; (def (cons first-promise rest-promise)
+;     (cons first-promise rest-promise))
+
+; Forces the promise of the first value.
+(def (fcar stream)
+    (force (car stream)))
+
+; Forces the promise of the other values.
+(def (fcdr stream)
+    (force (cdr stream)))
+
+; The empty stream is represented as the empty list.
+; It is a unique value, not even the delayed empty list is equal
+(def empty-stream '())
+
+; list-ref must be re-design since the one in Racket
+; is random-access
+(def (stream-ref stream index)
+    (if (= index 0)
+        (fcar stream)
+        (stream-ref (fcdr stream) (- index 1))))
+
+(def (print-stream stream)
+    (stream-mapfx stdisplay-n stream))
+
+; -----------------------------------------------
+; Complex functions
+; -----------------------------------------------
+
+(def (filter pred stream)
+    (cond [(null? stream) empty-stream]
+          [(pred (fcar stream))
+           (cons (delay (fcar stream)
+                        (filter pred (fcdr stream))))]
+           [else (filter pred (fcdr stream))]))
+
+(def (reduce op init stream)
+    (if (null? stream)
+        init
+        (op (fcar stream)
+            (reduce op init (fcdr stream)))))
+
+(def (range lower upper)
+    (if (> lower upper)
+        '()
+        (cons lower
+              (delay (range (+ 1 lower) upper)))))
+
+(def (map func L)
+    (if (null? L)
+         null
+         (cons (func (car L))
+                     (map func (cdr L)))))
+
+; Map for use with side effect (doesn't return anything)
+(def (mapfx func L)
+    (if (null? L)
+         'done
+         (seq (func (car L))
+              (mapfx func (cdr L)))))
+
+
+(def (flatmap stream1 stream2)
+    (if (null? stream1)
+        stream2
+        (cons (delay (car stream1))
+                     (delay (flatmap (cdr stream1) stream2)))))
+
+; params stream-of-streams: a non-empty stream of stream
+(def (flatmap stream-of-streams)
+    (if (null? (cdr stream-of-streams))
+        (car stream-of-streams)
+        (flatmap (car stream-of-streams)
+              (flatmap (cdr stream-of-streams)))))
+
+; returns: a stream of processed items
+(def (stream-map func stream)
+    (if (null? stream)
+        empty-stream
+        (cons (delay (func (car stream)))
+                     (delay (stream-map func (cdr stream))))))
+
+; just like stream-map, but strictly for side-effects
+(def (stream-mapfx func stream)
+    (if (null? stream)
+        'done
+        (seq (func (car stream))
+             (stream-mapfx func (cdr stream)))))
+
+
+
+; params: streams (a list of streams to take product).
+; returns: a stream of lists.
+(def (stream-product streams)
+    (def first (car streams))
+    (def rest (cdr streams))
+    (if (null? rest)
+        ; Base case: a stream of lists containing single items in first.
+        (stream-map (lam (item) (list item))
+                    first)
+        ; Recursive case:
+        (seq
+            ; `prod-rest` is a stream.
+            (def prod-rest (stream-product rest))
+            ; See the code for `prod-aux` below.
+            (flatmap (stream-map (prod-aux prod-rest) first)))))
+
+; params: iter-first, prod-rest.
+; Used by `stream-product`.
+(def (prod-aux prod-rest)
+    (lam (iter-first)
+        (stream-map (lam (iter-prod) (cons iter-first iter-prod))
+                    prod-rest)))
+

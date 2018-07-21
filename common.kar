@@ -2,28 +2,13 @@
 (def (odd? n) (not (even? n)))
 (def (> x y) (nor (< x y) (= x y)))
 ; List
-(def null '())
-(def (cadr L) (car (cdr L)))
-(def (cddr L) (cdr (cdr L)))
-(def (caddr L) (car (cddr L)))
-(def (cdddr L) (cdr (cddr L)))
-(def (cadddr L) (car (cdddr L)))
+(load "list.kar")
+; I/O
+(load "io.kar")
 
 ; -----------------------------------------------------------
 ; Functional stuff
 ; -----------------------------------------------------------
-(def (map func L)
-    (if (null? L)
-         null
-         (cons (func (car L))
-                     (map func (cdr L)))))
-
-; Map for use with side effect (doesn't return anything)
-(def (mapfx func L)
-    (if (null? L)
-         'done
-         (seq (func (car L))
-              (mapfx func (cdr L)))))
 
 (def (repeat func times)
     (when (> times 0)

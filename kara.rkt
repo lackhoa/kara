@@ -413,7 +413,8 @@
         (if (thunk? maybe-thunk)
             ; Compute the thunk's code inside of its own environment
             ((thunk-code maybe-thunk) (thunk-env maybe-thunk))
-            (error "analyze-force" "Expression not a thunk" maybe-thunk))))
+            ; If already forced then don't bother
+            maybe-thunk)))
 
 
 ; -----------------------------------------------------------
@@ -519,12 +520,12 @@
 (hash-set! prim-procs 'null? null?)
 (hash-set! prim-procs 'pair? pair?)
 (hash-set! prim-procs 'list? list?)
-; List
+; Strict List
+(hash-set! prim-procs 'list list)
+(hash-set! prim-procs 'cons cons)
 (hash-set! prim-procs 'car car)
 (hash-set! prim-procs 'cdr cdr)
-(hash-set! prim-procs 'cons cons)
 (hash-set! prim-procs 'append append)
-(hash-set! prim-procs 'list list)
 (hash-set! prim-procs 'list-ref list-ref)
 ; Arithmetic
 (hash-set! prim-procs '+ +)

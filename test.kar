@@ -115,6 +115,9 @@ a
 (def (foo) (def inside-foo 333) (delay inside-foo))
 (force (foo))
 
+(stdisplay-n "Over-forcing => 111")
+(force (force (delay 111)))
+
 (stdisplay-n "Lexical Scoping => 85, 80")
 (def a 80)
 (def (foo)
