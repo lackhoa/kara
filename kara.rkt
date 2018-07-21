@@ -35,6 +35,7 @@
         ; Special commands
         [(env-request? exp) (lambda (env) env)]
         [(trace-command? exp) (analyze-trace-command exp)]
+        [(untrace-command? exp) (analyze-untrace-command exp)]
         ; Code execution is last
         [(pair? exp) (analyze-application exp)]
         [else (error "analyze" "Invalid expression" exp)]))
@@ -101,6 +102,9 @@
 
 (define (trace-command? exp)
     (tagged? exp 'trace))
+
+(define (untrace-command? exp)
+    (tagged? exp 'untrace))
 
 (define (env-request? exp) (tagged? exp ENV_REQUEST_TAG))
 
@@ -189,8 +193,8 @@
 (define (delay? exp) (tagged? exp 'delay))
 (define (force? exp) (tagged? exp 'force))
 
-(define (delayed-code exp) (cdr exp))
-(define (forced-promise exp) (cdr exp))
+(define (delayed-code exp) (cadr exp))
+(define (force-promise exp) (cadr exp))
 (define (thunk? exp) (tagged? exp' thunk))
 ; Thunk is composed of analyzed code and the lexical environment.
 (define (make-thunk code env) (list 'thunk code env))
@@ -309,6 +313,10 @@
     ; But you have to return something here
     (lambda (env) (format "Traced ~s" (cadr exp))))
 
+(define (analyze-untrace-command exp)
+    (hash-remove! traced-functions (cadr exp))
+    ; But you have to return something here
+    (lambda (env) (format "Untraced ~s" (cadr exp))))
 
 ; A procedure is defined as follow:
 (define (make-proc parameters body env)
@@ -357,14 +365,18 @@
 (define (analyze-primitive exp)
     (lambda (env) (eval (primitive-body exp))))
 
+; Delay will create a thunk object, containing
+; 1. the analyzed code and,
+; 2. the environment to run that code in.
 (define (analyze-delay exp)
     (define delayed-analyzed (analyze (delayed-code exp)))
     (lambda (env)
         (make-thunk delayed-analyzed env)))
 
 (define (analyze-force exp)
+    (define promise (analyze (force-promise exp)))
     (lambda (env)
-        (define maybe-thunk ((forced-promise exp) env))
+        (define maybe-thunk (promise env))
         (if (thunk? maybe-thunk)
             ((thunk-code maybe-thunk) env)
             (error "analyze-force" "Expression not a thunk" maybe-thunk))))

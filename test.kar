@@ -70,7 +70,7 @@ a
 (seq (def x 9) (* x 4))
 
 (stdisplay-n "Factorial => 6")
-(def fact (lambda ($) (if (= $ 1) 1 (* (fact (-  1)) $))))
+(def fact (lambda (n) (if (= n 1) 1 (* (fact (- n 1)) n))))
 (fact 3)
 
 (stdisplay-n "Environment request => all keys")
@@ -91,7 +91,7 @@ a
 '(10 '(18 ,(+ 9 a)) ,(+ (* 8 8) 8))
 
 (stdisplay-n "String formating => Hi mom and dad")
-(format "Hi ~s and ~s" '(mom dad))
+(format "Hi ~s and ~s" 'mom 'dad)
 
 (stdisplay-n "Tracing => fibonacci")
 (def (fibo n)
@@ -107,14 +107,21 @@ a
 (def a 666)
 (force delayed)
 
+(stdisplay-n "Inline forcing => 666")
+(force (delay a))
+
 (stdisplay-n "Lexical Scoping => 85, 80")
 (def a 80)
-(def (foo) (def a (+ a 5) a))
+(def (foo)
+    (def a (+ a 5))
+    a)
+(foo)
 a
 
 
 ; DANGER!!!
 (stdisplay-n "The ultimate test of speed => some huge number")
+(untrace fibo)
 (fibo 20)
 
 
