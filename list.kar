@@ -1,6 +1,10 @@
 (load "io.kar")
 
-; This file focuses on the lazy way of working with lists
+; This file focuses on the lazy way of working with sequences
+; The terminology is like this (although it's too late to establish):
+; Sequence = List + Stream 
+; Stream = Lazy
+; List = Strict
 
 ; -----------------------------------------------
 ; Foundation of the Stream Paradigm
@@ -117,3 +121,18 @@
     (reduce prod-aux
             (list null)  ; Base case: kind of undefined?
             streams))
+
+
+; params s: a single sequence as a set
+;           (although not guaranteed by the algorithm).
+; returns: a stream of list as subsets of the given set
+(def (powerset s)
+    (def (pow-aux first pow-rest)
+         (append (map (lam (pow-rest-iter)
+                          (cons first pow-rest-iter))
+                      pow-rest) ; Include first
+                 pow-rest))     ; Exclude first
+
+    (reduce pow-aux
+            (list null)  ; Base case: the only subset of the empty set is itself
+            s))
