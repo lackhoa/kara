@@ -1,5 +1,11 @@
 (load "io.kar")
 
+; This file focuses on the lazy way of working with lists
+
+; -----------------------------------------------
+; Foundation of the Stream Paradigm
+; -----------------------------------------------
+
 ; This is the only stream constructor (same one used for strict list)
 ; param first-promise: (the promise of the first value)
 ; param rest-promise: (the promise of the rest of the stream)
@@ -26,95 +32,88 @@
           [else (stream-ref (fcdr stream)
                             (- index 1))]))
 
-(def (print-stream stream)
-    (stream-mapfx stdisplay-n stream))
+; The idea is like mapfx, but doesn't mix up the order
+(def (for-each proc s)
+    (if (null? s)
+        'done
+        (seq (proc (fcar s))
+             (for-each proc (fcdr s)))))
+
+(def (display-stream stream)
+    (for-each stdisplay-n stream))
 
 ; -----------------------------------------------
-; Complex functions
+; Useful functions
 ; -----------------------------------------------
 
-(def (filter pred stream)
-    (cond [(null? stream) empty-stream]
-          [(pred (fcar stream))
-           (cons (fcar stream)
-                 (delay (filter pred (fcdr stream))))]
-           [else (filter pred (fcdr stream))]))
-
+; The most important stream function
 (def (reduce op init stream)
     (if (null? stream)
         init
         (op (fcar stream)
             (reduce op init (fcdr stream)))))
 
+(def (filter pred stream)
+    (reduce (lam (x y)
+                (if (pred x) (cons x y) y))
+            null
+            stream))
+
+; Really?
+(def (stream-append seq1 seq2)
+    (reduce cons seq2 seq1))
+
+; Mapping and reducing with stream-append to create nested maps
+(def (flatmap proc seq)
+    (reduce stream-append null (map proc seq)))
+
+(def (remove x s)
+    (filter (lam (item) (not (eq? item x)))
+            s))
+
+(def (permutations s)
+    ; This function sticks the x to the permutations that doesn't contain x
+    (def (permute-aux x)
+        (map (lam (p) (cons x p))
+            (permutations (remove x s))))
+
+    ; Main job done here
+    (if (null? s)
+        (list null)  ; Sequence containing empty set
+        (flatmap permute-aux s)))
+
+(def (stream->list stream)
+    (reduce cons null stream))
+
+(def (length sequence)
+    (reduce (lam (x y) (+ 1 y)) 0 sequence))
+
 (def (range lower upper)
     (if (> lower upper)
-        '()
+        null
         (cons lower
               (delay (range (+ 1 lower) upper)))))
 
 (def (map func L)
-    (if (null? L)
-         null
-         (cons (func (fcar L))
-               (delay (map func (fcdr L))))))
+    (reduce (lam (x y)
+                 (cons (func x) y))
+            null
+            L))
 
-; Map for use with side effect (doesn't return anything)
-(def (mapfx func L)
-    (if (null? L)
-         'done
-         (seq (func (fcar L))
-              (mapfx func (fcdr L)))))
-
-
-(def (flatmap stream1 stream2)
-    (if (null? stream1)
-        stream2
-        (cons (delay (car stream1))
-                     (delay (flatmap (cdr stream1) stream2)))))
-
-; params stream-of-streams: a non-empty stream of stream
-(def (flatmap stream-of-streams)
-    (if (null? (cdr stream-of-streams))
-        (car stream-of-streams)
-        (flatmap (car stream-of-streams)
-              (flatmap (cdr stream-of-streams)))))
-
-; returns: a stream of processed items
-(def (stream-map func stream)
-    (if (null? stream)
-        empty-stream
-        (cons (delay (func (car stream)))
-                     (delay (stream-map func (cdr stream))))))
-
-; just like stream-map, but strictly for side-effects
-(def (stream-mapfx func stream)
-    (if (null? stream)
-        'done
-        (seq (func (car stream))
-             (stream-mapfx func (cdr stream)))))
-
-
+(def (wrap thing)
+    (list thing))
 
 ; params: streams (a list of streams to take product).
-; returns: a stream of lists.
-(def (stream-product streams)
-    (def first (car streams))
-    (def rest (cdr streams))
-    (if (null? rest)
-        ; Base case: a stream of lists containing single items in first.
-        (stream-map (lam (item) (list item))
-                    first)
-        ; Recursive case:
-        (seq
-            ; `prod-rest` is a stream.
-            (def prod-rest (stream-product rest))
-            ; See the code for `prod-aux` below.
-            (flatmap (stream-map (prod-aux prod-rest) first)))))
+; returns: a stream of strict lists as products
+(def (product streams)
+    ; The algorithm of the reduce
+    (def (prod-aux first prod-rest)
+        (flatmap (lam (iter-first)
+                      (map (lam (iter-prod-rest)
+                               (cons iter-first iter-prod-rest))
+                           prod-rest))
+                 first))
 
-; params: iter-first, prod-rest.
-; Used by `stream-product`.
-(def (prod-aux prod-rest)
-    (lam (iter-first)
-        (stream-map (lam (iter-prod) (cons iter-first iter-prod))
-                    prod-rest)))
-
+    (reduce prod-aux
+            (list null)  ; Base case: kind of undefined?
+            streams))

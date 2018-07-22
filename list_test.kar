@@ -11,54 +11,23 @@
 (stdisplay-n "Mapping 0 => 81")
 (stream-ref (map square new-range) 4)
 
-(stdisplay-n "list-fib-squares => (0 1 1 4 9 25 ... 3025)")
-(def (list-fib-squares n)
-    (reduce cons
-            null
+(stdisplay-n "Reduce + map + filter => 225")
+(def (prod-of-squares-of-odds seq)
+    (reduce *
+            1
             (map square
-                 (map fib
-                      (range 0 n)))))
-(list-fib-squares 10)
+                 (filter odd? seq))))
+(prod-of-squares-of-odds (list 1 2 3 4 5))
 
-; (stdisplay-n "Mapping 1 => squares")
-; (print-stream (map square new-range))
+(def permu (permutations (list 1 2 3)))
+(stdisplay-n "Stream->list => Permutation for (1 2 3)")
+(stream->list permu)
 
-; (stdisplay-n "Mapping 2 => #t")
-; (car (cdr (map odd? (range 10000 1000000))))
+(stdisplay-n "stream-append streams: 2 -> 5 to 11 -> 14")
+(def (stream->stream x) x)
+(stream->list (stream-append (range 2 6) (range 11 14)))
 
-; (stdisplay-n "=> Infinite integers => 100")
-; (def (inf-range start) (cons start
-;                                     (delay (inf-range (+ start 1)))))
-; (stream-ref (inf-range 1) 99)
-
-; (stdisplay-n "Stream of sixes => 6")
-; (def sixes (cons 6 (delay sixes)))
-; (stream-ref sixes 6)
-
-; (stdisplay-n "Double => 16")
-; (def (scale-stream item)
-;     (map (lam (x) (* x factor)) item))
-; (def double (cons 1 (delay (scale-stream double 2))))
-; (stream-ref double 4)
-
-; (stdisplay-n "flatmap streams: 1 -> 4, 11 -> 14")
-; (print-stream (flatmap (range 1 4) (range 11 14)))
-
-; (stdisplay-n "flatmap more streams: 1 -> 4, 11 -> 14, 21 -> 24")
-; (def intermediate (cons (delay (range 11 14))
-;                              (delay (cons (delay (range 21 24)) empty-stream))))
-; (def stream-of-streams (cons (delay (range 1 4))
-;                                   (delay intermediate)))
-; (print-stream (flatmap stream-of-streams))
-
-; (stdisplay-n "=> I don't know")
-; (def ingredient (list (range 1 4)))
-; (def ingredient (list (range 1 4) (range 2 5)))
-; (def ingredient (list (range 1 4) (range 2 5) (range 10 11)))
-; (print-stream (stream-product ingredient))
-; (stream-product ingredient)
 
 
 
 "All lazy tests passed (or at least they all ran)"
-
