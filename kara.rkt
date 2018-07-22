@@ -153,9 +153,12 @@
         ; Data
         (analyze (list-ref exp 2))
         ; Code: turn that into a procedure
-        (let ([bproc (analyze-seq (make-seq (list-tail exp 2)))])
+        (let ([bproc (analyze-seq (make-seq (list-tail exp 2)))]
+              [name (car (list-ref exp 1))])
+            (when (prim-proc-name? name)
+                  (error "def-val" "You are shadowing a primitive: ~s" name))
             (lambda (env)
-                (make-proc (car (list-ref exp 1))  ; name
+                (make-proc name
                            (cdr (list-ref exp 1))  ; formal parameters
                            bproc                   ; body
                            env)))))                ; lexical environment
@@ -450,8 +453,11 @@
                       (not (eq? (length params)
                                 (length args))))
                  (error "analyze-application"
-                        "Arity mismatch"
-                        (list name args)))
+                        (format "Arity mismatch in ~s, expected ~s, got ~s"
+                                name
+                                (length params)
+                                (length args))
+                        (cons name args)))
            ; The new frame initialized by the arguments
            (define exec-frame
                (zip-and-make-frame (new-frame) params args))
