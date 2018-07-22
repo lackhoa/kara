@@ -8,30 +8,38 @@
 (stdisplay-n "Reduce => 120")
 (reduce * 1 (list 1 2 3 4 5))
 
-; (stdisplay-n "Mapping 0 => 81")
-; (def (square x) (* x x))
-; (lazy-ref (stream-map square new-range) 4)
+(stdisplay-n "Mapping 0 => 81")
+(stream-ref (map square new-range) 4)
+
+(stdisplay-n "list-fib-squares => (0 1 1 4 9 25 ... 3025)")
+(def (list-fib-squares n)
+    (reduce cons
+            null
+            (map square
+                 (map fib
+                      (range 0 n)))))
+(list-fib-squares 10)
 
 ; (stdisplay-n "Mapping 1 => squares")
-; (print-stream (stream-map square new-range))
+; (print-stream (map square new-range))
 
 ; (stdisplay-n "Mapping 2 => #t")
-; (car (cdr (stream-map odd? (range 10000 1000000))))
+; (car (cdr (map odd? (range 10000 1000000))))
 
 ; (stdisplay-n "=> Infinite integers => 100")
 ; (def (inf-range start) (cons start
 ;                                     (delay (inf-range (+ start 1)))))
-; (lazy-ref (inf-range 1) 99)
+; (stream-ref (inf-range 1) 99)
 
 ; (stdisplay-n "Stream of sixes => 6")
 ; (def sixes (cons 6 (delay sixes)))
-; (lazy-ref sixes 6)
+; (stream-ref sixes 6)
 
 ; (stdisplay-n "Double => 16")
 ; (def (scale-stream item)
-;     (stream-map (lam (x) (* x factor)) item))
+;     (map (lam (x) (* x factor)) item))
 ; (def double (cons 1 (delay (scale-stream double 2))))
-; (lazy-ref double 4)
+; (stream-ref double 4)
 
 ; (stdisplay-n "flatmap streams: 1 -> 4, 11 -> 14")
 ; (print-stream (flatmap (range 1 4) (range 11 14)))

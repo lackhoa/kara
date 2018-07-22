@@ -21,9 +21,10 @@
 ; list-ref must be re-design since the one in Racket
 ; is random-access
 (def (stream-ref stream index)
-    (if (= index 0)
-        (fcar stream)
-        (stream-ref (fcdr stream) (- index 1))))
+    (cond [(null? stream) "Out of bound"]
+          [(= index 0) (fcar stream)]
+          [else (stream-ref (fcdr stream)
+                            (- index 1))]))
 
 (def (print-stream stream)
     (stream-mapfx stdisplay-n stream))
@@ -35,8 +36,8 @@
 (def (filter pred stream)
     (cond [(null? stream) empty-stream]
           [(pred (fcar stream))
-           (cons (delay (fcar stream)
-                        (filter pred (fcdr stream))))]
+           (cons (fcar stream)
+                 (delay (filter pred (fcdr stream))))]
            [else (filter pred (fcdr stream))]))
 
 (def (reduce op init stream)
@@ -54,15 +55,15 @@
 (def (map func L)
     (if (null? L)
          null
-         (cons (func (car L))
-                     (map func (cdr L)))))
+         (cons (func (fcar L))
+               (delay (map func (fcdr L))))))
 
 ; Map for use with side effect (doesn't return anything)
 (def (mapfx func L)
     (if (null? L)
          'done
-         (seq (func (car L))
-              (mapfx func (cdr L)))))
+         (seq (func (fcar L))
+              (mapfx func (fcdr L)))))
 
 
 (def (flatmap stream1 stream2)

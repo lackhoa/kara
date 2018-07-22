@@ -2,6 +2,7 @@
 (def (odd? n) (not (even? n)))
 (def (> x y) (nor (< x y) (= x y)))
 ; List
+(def null '())
 (load "list.kar")
 ; I/O
 (load "io.kar")
@@ -15,6 +16,15 @@
         (func)
         (repeat func (- times 1))))
 
-                           
-                           
+; ------------------------------------------------------------                           
+; Nice testing function
+; ------------------------------------------------------------                           
+(def (fib n)
+    (cond [(= 0 n) 1]
+          [(= 1 n) 1]
+          [else (+ (fib (- n 1)) (fib (- n 2)))]))
+
+(def (square n)
+    (* n n))
+
 "Common Library Loaded"
