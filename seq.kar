@@ -1,0 +1,136 @@
+(load "io.kar")
+
+; This file focuses on the lazy way of working with sequences but all
+; functions are suitable for strict sequences (many are as efficient).
+; The terminology is like this:
+; Stream = Lazy Sequence
+; List = Strict Sequence
+
+; -----------------------------------------------
+; Foundation of the Stream Paradigm
+; -----------------------------------------------
+
+; Forces the first value, if it's a promise
+(def (fcar seq)
+    (force (car seq)))
+
+; Forces the rest of the sequence, if it's a promise
+(def (fcdr seq)
+    (force (cdr seq)))
+
+; The empty stream is represented as the empty list.
+; It is a unique value, not even the delayed empty list is equal
+(def empty-stream '())
+
+; list-ref must be re-design since the one in Racket
+; is random-access
+(def (seq-ref seq index)
+    (cond [(null? seq) "Out of bound"]
+          [(= index 0) (fcar seq)]
+          [else (seq-ref (fcdr seq)
+                         (- index 1))]))
+
+; The idea is like mapfx, but doesn't mix up the order
+(def (for-each proc s)
+    (if (null? s)
+        'done
+        (seq (proc (fcar s))
+             (for-each proc (fcdr s)))))
+
+(def (display-seq seq)
+    (for-each stdisplay-n seq))
+
+; -----------------------------------------------
+; Useful functions
+; -----------------------------------------------
+(def (in-seq? x seq)
+     (cond [(null? seq) #f]
+           [(equal? x (fcar seq)) #t]
+           [else (in-seq? x (fcdr seq))]))
+
+; The most important sequence function
+(def (reduce op init seq)
+    (if (null? seq)
+        init
+        (op (fcar seq)
+            (reduce op init (fcdr seq)))))
+
+(def (filter pred seq)
+    (reduce (lam (x y)
+                (if (pred x) (cons x y) y))
+            null
+            seq))
+
+; Really?
+(def (seq-append seq1 seq2)
+    (reduce cons seq2 seq1))
+
+; Mapping and reducing with seq-append to create nested maps
+(def (flatmap proc seq)
+    (reduce seq-append null (map proc seq)))
+
+(def (remove x s)
+    (filter (lam (item) (not (eq? item x)))
+            s))
+
+(def (permutations s)
+    ; This function sticks the x to the permutations that doesn't contain x
+    (def (permute-aux x)
+        (map (lam (p) (cons x p))
+            (permutations (remove x s))))
+
+    ; Main job done here
+    (if (null? s)
+        (list null)  ; Sequence containing empty set
+        (flatmap permute-aux s)))
+
+(def (seq->list seq)
+    (reduce cons null seq))
+
+(def (length sequence)
+    (reduce (lam (x y) (+ 1 y)) 0 sequence))
+
+(def (range lower upper)
+    (if (> lower upper)
+        null
+        (cons lower
+              (delay (range (+ 1 lower) upper)))))
+
+(def (map func L)
+    (reduce (lam (x y)
+                 (cons (func x) y))
+            null
+            L))
+
+(def (wrap thing)
+    (list thing))
+
+; params: seq (a sequence of sequences to take product).
+; returns: a sequence of lists as products
+(def (product seqs)
+    ; The algorithm of the reduce
+    (def (prod-aux first prod-rest)
+        (flatmap (lam (iter-first)
+                      (map (lam (iter-prod-rest)
+                               (cons iter-first iter-prod-rest))
+                           prod-rest))
+                 first))
+
+    (reduce prod-aux
+            (list null)  ; Base case: kind of undefined?
+            seqs))
+
+
+; params s: a single sequence as a set
+;           (although not guaranteed by the algorithm).
+; returns: a sequence of list as subsets of the given set
+(def (powerset s)
+    (def (pow-aux first pow-rest)
+         (append (map (lam (pow-rest-iter)
+                          (cons first pow-rest-iter))
+                      pow-rest) ; Include first
+                 pow-rest))     ; Exclude first
+
+    (reduce pow-aux
+            (list null)  ; Base case: the only subset of the empty set is itself
+            s))

@@ -3,7 +3,7 @@
 (def (> x y) (nor (< x y) (= x y)))
 ; List
 (def null '())
-(load "list.kar")
+(load "seq.kar")
 ; I/O
 (load "io.kar")
 
@@ -22,15 +22,13 @@
      (eq? (car exp) tag))
 
 ; Used to construct a term of a type.
-; Using improper list here because we can't assume that
-; the content will be a list.
-(def (tag exp type)
-     (type . exp))
+(def (tag the-tag contents)
+     (cons the-tag contents))
 
-(def (type-of exp)
+(def (tag-of exp)
      (car exp))
 
-(def (content tagged)
+(def (contents tagged)
      (cdr tagged))
 
 ; ------------------------------------------------------------                           
