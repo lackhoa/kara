@@ -522,7 +522,6 @@
 ; Operations on Objects
 (hash-set! prim-procs 'eq? eq?)
 (hash-set! prim-procs 'eqv? eqv?)
-(hash-set! prim-procs 'equal? equal?)
 (hash-set! prim-procs 'atom? atom?)
 (hash-set! prim-procs 'null? null?)
 (hash-set! prim-procs 'pair? pair?)

@@ -49,10 +49,6 @@
 ; -----------------------------------------------
 ; Useful functions
 ; -----------------------------------------------
-(def (in-seq? x seq)
-     (cond [(null? seq) #f]
-           [(equal? x (fcar seq)) #t]
-           [else (in-seq? x (fcdr seq))]))
 
 ; The most important stream function
 (def (reduce op init stream)

@@ -1,0 +1,41 @@
+; Constructor for set
+(def (seq->set seq)
+     (tag (reduce adjoin-set null seq) 'set))
+
+(def (empty-set? set)
+     (null? (content set)))
+
+(def (the-empty-set)
+     (seq->set null))
+
+; Concerned with efficiency? Change this function.
+(def (in-set? x set)
+     (in-seq? x (content set)))
+
+(def (adjoin-set x set)
+     (if (in-set? x set)
+         set
+         (seq->set (cons x (content set)))))
+
+(def (intersection-set s1 s2)
+     (if (or (empty-set? s1) (empty-set? s2))
+         the-empty-set
+         (seq (def s1-first (fcar (content s1)))
+              (def s1-rest  (seq->set (fcdr (content s1))))
+              (if (in-set? s1-first s2)
+                  (seq->set (cons s1-first
+                                  (seq->set (intersection-set s1-rest
+                                                              s2))))
+                  (intersection-set s1-rest s2)))))
+
+; You can switch s1 and s2 and this function would still work.
+(def (union-set s1 s2)
+     (seq->set (reduce adjoin-set
+                       (content s1)
+                       (content s2))))
+
+
+
+
+
+

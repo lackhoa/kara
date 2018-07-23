@@ -1,0 +1,29 @@
+; Concerned with efficiency? Change this function.
+(def (in-set? x set)
+     (cond [(null? set) #f]
+           [(equal? x (fcar set)) #t]
+           [else (in-set? x (fcdr set))]))
+
+(def (adjoin-set x set)
+     (if (in-set? x set)
+         set
+         (cons x set)))
+
+(def (intersection-set s1 s2)
+     (if (or (null? s1) (null? s2)) null
+         (seq (def s1-first (fcar s1))
+              (def s1-rest  (fcdr s1))
+              (if (in-set? s1-first s2)
+                  (cons s1-first
+                        (intersection-set s1-rest s2))
+                  (intersection-set s1-rest s2)))))
+
+; You can switch s1 and s2 and this function would still work.
+(def (union-set s1 s2)
+     (reduce adjoin-set s1 s2))
+
+
+
+
+
+
