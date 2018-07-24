@@ -445,7 +445,9 @@
 ; Used by `analyze-pmatch`
 (define (match-loop val clauses env)
     (if (null? clauses)
-        #f
+        ; It's still debated whether or not partial pattern matching
+        ; is a thing
+        (error "analyze-match" "Matching failed" val)
         (let* ([clause (car clauses)]
                [pred (car clause)]
                [vars (cadr clause)]

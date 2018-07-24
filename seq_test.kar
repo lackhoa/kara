@@ -38,4 +38,9 @@
 (stdisplay-n "Powerset of {A, B, C, D}")
 (powerset '(A B C D))
 
+(def (scale factor seq)
+    (map (lam (x) (* x factor)) seq))
+(stdisplay-n "Interleaving => (0 0 1 11 2 22 3 33 ...)")
+(interleave (range 1 9) (scale 11 (range 1 9)))
+
 "All lazy tests passed (or at least they all ran)"
