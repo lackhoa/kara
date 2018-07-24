@@ -32,6 +32,7 @@
         [(const? exp) (analyze-lambda (const->lambda exp))]
         [(delay? exp) (analyze-delay exp)]
         [(force? exp) (analyze-force exp)]
+        [(pmatch? exp) (analyze-pmatch exp)]
         ; Special commands
         [(env-request? exp) (lambda (env) env)]
         [(trace-command? exp) (analyze-trace-command exp)]
@@ -244,8 +245,20 @@
 (define (thunk-code exp) (cadr exp))
 (define (thunk-env exp) (caddr exp))
 
-
-
+; Pattern matching
+(define (pmatch? exp) (tagged? exp 'case))
+(define (pmatch-val pmatch)     (cadr pmatch))
+(define (pmatch-clauses pmatch) (list-tail pmatch 2))
+(define (pmatch-clause-pat clause)     (car clause))
+(define (pmatch-clause-actions clause) (cdr clause))
+(define (pat-constructor pat)
+    (if (list? pat)
+        (car pat)
+        (error "pat-constructor" "Illegal pattern" pat)))
+(define (pat-vars pat)
+    (if (list? pat)
+        (cdr pat)
+        (error "pat-constructor" "Illegal pattern" pat)))
 
 ; -----------------------------------------------------------
 ; Analysis
@@ -419,6 +432,49 @@
             ; If already forced then don't bother
             maybe-thunk)))
 
+(define (analyze-pmatch pmatch)
+    (define aval     (analyze (pmatch-val pmatch)))
+    (define processed-clauses (process-pmatch-clauses (pmatch-clauses pmatch)))
+    (lambda (env)
+        (let ([val (aval env)])
+             ; If the value is not a list then no pattern matching for you
+             (if (list? val)
+                 (match-loop val processed-clauses env)
+                 #f))))
+
+; Used by `analyze-pmatch`
+(define (match-loop val clauses env)
+    (if (null? clauses)
+        #f
+        (let* ([clause (car clauses)]
+               [pred (car clause)]
+               [vars (cadr clause)]
+               [analyzed-actions (list-ref clause 2)])
+            (if (pred val)
+                ; This is precisely the same pattern as function application
+                (let* ([exec-frame (zip-and-make-frame (new-frame)
+                                                       vars
+                                                       (cdr val))]
+                       [new-env (extend-env env exec-frame)])
+                    ; Run the code
+                    (analyzed-actions new-env))
+                (match-loop val (cdr clauses) env)))))
+
+; Used by analyze-pmatch
+; Analyze the patterns' requirement the actions in the clauses
+(define (process-pmatch-clauses clauses)
+    (define (analyze-clause clause)
+        (define pat (pmatch-clause-pat clause))
+        (define pred (lambda (val)
+                        (and (= (length pat) (length val))
+                             (eq? (car val) (pat-constructor pat)))))
+        (define analyzed-actions
+            (analyze-seq (make-seq (pmatch-clause-actions clause))))
+        ; After analyzing, we have the predicate,
+        ; the variables' names, and the analyzed actions
+        (list pred (pat-vars pat) analyzed-actions))
+
+    (map analyze-clause clauses))
 
 ; -----------------------------------------------------------
 ; Code Execution
@@ -469,7 +525,8 @@
                        "Non-procedure application"
                        proc)]))
 
-; Used by `analyze-application`
+; Used by both `analyze-application` (originally)
+; and pattern matching
 (define (zip-and-make-frame frame first second)
     (cond [(null? first) frame]
 
