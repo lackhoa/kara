@@ -14,6 +14,10 @@
 (def (car seq)
     (force (lcar seq)))
 
+; This is kind of useful, as well
+(def (cadr seq)
+    ((car (cdr seq))))
+
 ; Forces the rest of the sequence, if it's a promise
 (def (cdr seq)
     (force (lcdr seq)))
