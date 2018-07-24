@@ -1,15 +1,20 @@
-(load "list.kar")
+(load "seq.kar")
 
-; Testing
+(stdisplay-n "in-seq? => #t")
+(in-seq? 3 (list 1 2 3))
+
+(stdisplay-n "in-seq? => #f")
+(in-seq? 4 (list 1 2 3))
+
 (def new-range (range 5 10))
 (stdisplay-n "Range => 10")
-(stream-ref new-range 5)
+(seq-ref new-range 5)
 
 (stdisplay-n "Reduce => 120")
 (reduce * 1 (list 1 2 3 4 5))
 
 (stdisplay-n "Mapping 0 => 81")
-(stream-ref (map square new-range) 4)
+(seq-ref (map square new-range) 4)
 
 (stdisplay-n "Reduce + map + filter => 225")
 (def (prod-of-squares-of-odds seq)
@@ -20,16 +25,15 @@
 (prod-of-squares-of-odds (list 1 2 3 4 5))
 
 (def permu (permutations (list 1 2 3)))
-(stdisplay-n "Stream->list => Permutation for (1 2 3)")
-(stream->list permu)
+(stdisplay-n "seq->list => Permutation for (1 2 3)")
+(seq->list permu)
 
-(stdisplay-n "stream-append streams: 2 -> 5 to 11 -> 14")
-(def (stream->stream x) x)
-(stream->list (stream-append (range 2 6) (range 11 14)))
+(stdisplay-n "seq-append: 2 -> 5 to 11 -> 14")
+(seq->list (seq-append (range 2 6) (range 11 14)))
 
 (stdisplay-n "Product")
 (def ingredient (list (range 0 3) (range  4 6) (range 7 10)))
-(stream->list (product ingredient))
+(seq->list (product ingredient))
 
 (stdisplay-n "Powerset of {A, B, C, D}")
 (powerset '(A B C D))

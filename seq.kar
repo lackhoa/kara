@@ -11,12 +11,12 @@
 ; -----------------------------------------------
 
 ; Forces the first value, if it's a promise
-(def (fcar seq)
-    (force (car seq)))
+(def (car seq)
+    (force (lcar seq)))
 
 ; Forces the rest of the sequence, if it's a promise
-(def (fcdr seq)
-    (force (cdr seq)))
+(def (cdr seq)
+    (force (lcdr seq)))
 
 ; The empty stream is represented as the empty list.
 ; It is a unique value, not even the delayed empty list is equal
@@ -26,16 +26,16 @@
 ; is random-access
 (def (seq-ref seq index)
     (cond [(null? seq) "Out of bound"]
-          [(= index 0) (fcar seq)]
-          [else (seq-ref (fcdr seq)
+          [(= index 0) (car seq)]
+          [else (seq-ref (cdr seq)
                          (- index 1))]))
 
 ; The idea is like mapfx, but doesn't mix up the order
 (def (for-each proc s)
     (if (null? s)
         'done
-        (seq (proc (fcar s))
-             (for-each proc (fcdr s)))))
+        (seq (proc (car s))
+             (for-each proc (cdr s)))))
 
 (def (display-seq seq)
     (for-each stdisplay-n seq))
@@ -45,15 +45,15 @@
 ; -----------------------------------------------
 (def (in-seq? x seq)
      (cond [(null? seq) #f]
-           [(equal? x (fcar seq)) #t]
-           [else (in-seq? x (fcdr seq))]))
+           [(equal? x (car seq)) #t]
+           [else (in-seq? x (cdr seq))]))
 
 ; The most important sequence function
 (def (reduce op init seq)
     (if (null? seq)
         init
-        (op (fcar seq)
-            (reduce op init (fcdr seq)))))
+        (op (car seq)
+            (reduce op init (cdr seq)))))
 
 (def (filter pred seq)
     (reduce (lam (x y)
@@ -62,12 +62,12 @@
             seq))
 
 ; Really?
-(def (seq-append seq1 seq2)
+(def (append seq1 seq2)
     (reduce cons seq2 seq1))
 
-; Mapping and reducing with seq-append to create nested maps
+; Mapping and reducing with append to create nested maps
 (def (flatmap proc seq)
-    (reduce seq-append null (map proc seq)))
+    (reduce append null (map proc seq)))
 
 (def (remove x s)
     (filter (lam (item) (not (eq? item x)))

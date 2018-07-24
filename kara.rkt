@@ -36,8 +36,8 @@
         [(env-request? exp) (lambda (env) env)]
         [(trace-command? exp) (analyze-trace-command exp)]
         [(untrace-command? exp) (analyze-untrace-command exp)]
-        ; Code execution is last
-        [(pair? exp) (analyze-application exp)]
+        ; Code execution is last (must be a property list)
+        [(list? exp) (analyze-application exp)]
         [else (error "analyze" "Invalid expression" exp)]))
 
 
@@ -527,13 +527,13 @@
 (hash-set! prim-procs 'null? null?)
 (hash-set! prim-procs 'pair? pair?)
 (hash-set! prim-procs 'list? list?)
-; Strict List
+; Strict List (prepended with "l")
 (hash-set! prim-procs 'list list)
 (hash-set! prim-procs 'cons cons)
-(hash-set! prim-procs 'car car)
-(hash-set! prim-procs 'cadr cadr)
-(hash-set! prim-procs 'cdr cdr)
-(hash-set! prim-procs 'append append)
+(hash-set! prim-procs 'lcar car)
+(hash-set! prim-procs 'lcadr cadr)
+(hash-set! prim-procs 'lcdr cdr)
+(hash-set! prim-procs 'lappend append)
 (hash-set! prim-procs 'list-ref list-ref)
 ; Arithmetic
 (hash-set! prim-procs '+ +)

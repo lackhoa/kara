@@ -1,28 +1,22 @@
 (load "io.kar")
 
-; This file focuses on the lazy way of working with sequences
-; The terminology is like this (although it's too late to establish):
-; Sequence = List + Stream 
-; Stream = Lazy
-; List = Strict
+; This file focuses on the lazy way of working with sequences but all
+; functions are suitable for strict sequences (many are as efficient).
+; The terminology is like this:
+; Stream = Lazy Sequence
+; List = Strict Sequence
 
 ; -----------------------------------------------
 ; Foundation of the Stream Paradigm
 ; -----------------------------------------------
 
-; This is the only stream constructor (same one used for strict list)
-; param first-promise: (the promise of the first value)
-; param rest-promise: (the promise of the rest of the stream)
-; (def (cons first-promise rest-promise)
-;     (cons first-promise rest-promise))
+; Forces the first value, if it's a promise
+(def (fcar seq)
+    (force (car seq)))
 
-; Forces the promise of the first value.
-(def (fcar stream)
-    (force (car stream)))
-
-; Forces the promise of the other values.
-(def (fcdr stream)
-    (force (cdr stream)))
+; Forces the rest of the sequence, if it's a promise
+(def (fcdr seq)
+    (force (cdr seq)))
 
 ; The empty stream is represented as the empty list.
 ; It is a unique value, not even the delayed empty list is equal
@@ -30,11 +24,11 @@
 
 ; list-ref must be re-design since the one in Racket
 ; is random-access
-(def (stream-ref stream index)
-    (cond [(null? stream) "Out of bound"]
-          [(= index 0) (fcar stream)]
-          [else (stream-ref (fcdr stream)
-                            (- index 1))]))
+(def (seq-ref seq index)
+    (cond [(null? seq) "Out of bound"]
+          [(= index 0) (fcar seq)]
+          [else (seq-ref (fcdr seq)
+                         (- index 1))]))
 
 ; The idea is like mapfx, but doesn't mix up the order
 (def (for-each proc s)
@@ -43,8 +37,8 @@
         (seq (proc (fcar s))
              (for-each proc (fcdr s)))))
 
-(def (display-stream stream)
-    (for-each stdisplay-n stream))
+(def (display-seq seq)
+    (for-each stdisplay-n seq))
 
 ; -----------------------------------------------
 ; Useful functions
@@ -54,26 +48,26 @@
            [(equal? x (fcar seq)) #t]
            [else (in-seq? x (fcdr seq))]))
 
-; The most important stream function
-(def (reduce op init stream)
-    (if (null? stream)
+; The most important sequence function
+(def (reduce op init seq)
+    (if (null? seq)
         init
-        (op (fcar stream)
-            (reduce op init (fcdr stream)))))
+        (op (fcar seq)
+            (reduce op init (fcdr seq)))))
 
-(def (filter pred stream)
+(def (filter pred seq)
     (reduce (lam (x y)
                 (if (pred x) (cons x y) y))
             null
-            stream))
+            seq))
 
 ; Really?
-(def (stream-append seq1 seq2)
+(def (seq-append seq1 seq2)
     (reduce cons seq2 seq1))
 
-; Mapping and reducing with stream-append to create nested maps
+; Mapping and reducing with seq-append to create nested maps
 (def (flatmap proc seq)
-    (reduce stream-append null (map proc seq)))
+    (reduce seq-append null (map proc seq)))
 
 (def (remove x s)
     (filter (lam (item) (not (eq? item x)))
@@ -90,8 +84,8 @@
         (list null)  ; Sequence containing empty set
         (flatmap permute-aux s)))
 
-(def (stream->list stream)
-    (reduce cons null stream))
+(def (seq->list seq)
+    (reduce cons null seq))
 
 (def (length sequence)
     (reduce (lam (x y) (+ 1 y)) 0 sequence))
@@ -111,9 +105,9 @@
 (def (wrap thing)
     (list thing))
 
-; params: streams (a list of streams to take product).
-; returns: a stream of strict lists as products
-(def (product streams)
+; params: seq (a sequence of sequences to take product).
+; returns: a sequence of lists as products
+(def (product seqs)
     ; The algorithm of the reduce
     (def (prod-aux first prod-rest)
         (flatmap (lam (iter-first)
@@ -124,12 +118,12 @@
 
     (reduce prod-aux
             (list null)  ; Base case: kind of undefined?
-            streams))
+            seqs))
 
 
 ; params s: a single sequence as a set
 ;           (although not guaranteed by the algorithm).
-; returns: a stream of list as subsets of the given set
+; returns: a sequence of list as subsets of the given set
 (def (powerset s)
     (def (pow-aux first pow-rest)
          (append (map (lam (pow-rest-iter)
