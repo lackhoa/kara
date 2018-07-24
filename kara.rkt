@@ -558,7 +558,16 @@
 (define output-prompt "K>>> ")
 
 (define (display-output output)
-    (display output-prompt) (display output) (newline))
+    (display output-prompt)
+    (if (proc? output)
+        ; Don't print the whole procedure environment
+        (display (list 'compound-procedure
+                       (proc-name output)
+                       (proc-params output)
+                       '<Scheme-procedure>
+                       '<environment>))
+        (display output))
+    (newline))
 
 ; The interpreter
 (define (interpret exp) (keval exp global-env))
