@@ -1,7 +1,0 @@
-(stdisplay-n "Implicit Atom")
-(make-implicit even)
-
-(stdisplay-n "Explicit Atom")
-(make-implicit (range ))
-
-

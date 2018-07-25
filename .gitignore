@@ -1,7 +1,4 @@
 *.swp
 *.swo
 *.bak
-*.kar~
-*.rkt~
-*.kar~
-atom.kar~
+*~

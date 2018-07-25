@@ -1,23 +1,30 @@
 (def (timed-stream stream deadline)
-    (if (> deadline (time-ms))
-        ; Still got time
-        (cons (tag 'Val (car stream))
-              (delay (timed-stream (cdr stream) deadline)))
-        ; Out of time
-        (seq
-          (def continuation-point
-               (lam (new-deadline)
-                 (timed-stream stream new-deadline)))
-          (list (tag 'Timeout continuation-point)))))
+    (cond [(null? stream) null]
+          [(> deadline (time-ms))
+           (cons (tag 'Val (car stream))
+                 (delay (timed-stream (cdr stream) deadline)))]
+          [else
+            (def continuation-point
+              (lam (new-deadline)
+                (timed-stream stream new-deadline)))
+            (list (tag 'Timeout continuation-point))]))
 
-(def (time-manager stream)
-   (case (car stream)
-      [(Val x) (cons x
-                     (delay (time-manager (cdr stream))))]
-      [(Timeout cont)
-       (stdisplay-n "Continue for 30 ms:")
-       (cont (+ (time-ms) 30))]))
+(def (juggler timed-stream1 cont2)
+   (if (null? timed-stream1)
+       null
+       (case (car timed-stream1)
+         [(Val x)
+          (cons x
+                (delay (juggler (cdr timed-stream1) cont2)))]
+         [(Timeout cont1)
+          (juggler (cont2 (+ (time-ms) 10)) cont1)])))
 
-(def test-stream (timed-stream (range -1000 null)
-                                  (+ (time-ms) 20)))
-(display-seq (time-manager test-stream))
+(def (juggler-starter s1 s2)
+  (juggler (timed-stream s1 (+ (time-ms) 10))
+           (lam (deadline)
+               (timed-stream s2 deadline))))
+
+(def s1 (filter odd? (range 0 null)))
+(def s2 (filter even? (range 0 null)))
+(display-seq (timed-stream (juggler-starter s1 s2)
+                           (+ (time-ms) 3)))
