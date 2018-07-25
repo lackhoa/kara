@@ -557,16 +557,26 @@
 
 (define output-prompt "K>>> ")
 
+(define (my-output-format output)
+    (cond
+        [(proc? output)
+         ; Don't print the environment and Scheme's procedure
+         (format "[compound-procedure ~s ~s <Scheme-procedure> <proc-environment>]"
+                 (proc-name output)
+                 (proc-params output))]
+        [(thunk? output)
+         ; Don't print the thunk's environment
+         (format "[thunk <thunk-code> <thunk-environment>]")]
+        [(pair? output)
+         ; This part is a slight hack, our list representation for
+         ; special values is flawed.
+         (cons (my-output-format (car output))
+               (my-output-format (cdr output)))]
+        [else output]))
+
 (define (display-output output)
     (display output-prompt)
-    (if (proc? output)
-        ; Don't print the whole procedure environment
-        (display (list 'compound-procedure
-                       (proc-name output)
-                       (proc-params output)
-                       '<Scheme-procedure>
-                       '<environment>))
-        (display output))
+    (display (my-output-format output))
     (newline))
 
 ; The interpreter

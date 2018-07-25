@@ -20,7 +20,7 @@
 ; ------------------------------------------------------------
 ; An alias used to construct a term of a type.
 (def (tag the-tag contents)
-     (list the-tag contents))
+    (list the-tag contents))
 
 ; Don't reall need these two functions since we
 ; already have pattern-matching
