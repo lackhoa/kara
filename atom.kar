@@ -1,33 +1,12 @@
 ; Atoms are like the mathematical sense of sets
-
-; Implicit atom
-(def (make-implicit pred)
-     (list 'implicit pred))
-
-(def (pred-implicit implicit)
-     (cadr implicit))
-
-(def (implicit? atom)
-     (tagged? atom 'implicit))
-
-; Explicit atom
-(def (make-explicit set)
-     (list 'explicit set))
-
-(def (set-explicit explicit)
-     (cadr explicit))
-
-(def (explicit? atom)
-     (tagged? atom 'explicit))
-
-; The atom type
-(def (atom? thing)
-     (or (implicit? thing) (tagged? thing)))
+; The atom type has two constructors:
+; Implicit predicate
+; Explicit set
 
 (def (in-atom? x atom)
-     (cond [(implicit? atom) (pred-implicit x)]
-           [(explicit? atom) (in-set? x (set-explicit atom))]
-           [else (error "in-atom" "Not an atom" atom)]))
+     (case atom
+       [(Implicit pred) (pred x)]
+       [(Explicit set)  (in-set? x set)]))
 
 
 
