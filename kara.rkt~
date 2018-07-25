@@ -605,6 +605,7 @@
 (hash-set! prim-procs 'null? null?)
 (hash-set! prim-procs 'pair? pair?)
 (hash-set! prim-procs 'list? list?)
+(hash-set! prim-procs 'number? number?)
 ; Strict List (prepended with "l")
 (hash-set! prim-procs 'list list)
 (hash-set! prim-procs 'cons cons)

@@ -1,0 +1,23 @@
+(def (timed-stream stream deadline)
+    (if (> deadline (time-ms))
+        ; Still got time
+        (cons (tag 'Val (car stream))
+              (delay (timed-stream (cdr stream) deadline)))
+        ; Out of time
+        (seq
+          (def continuation-point
+               (lam (new-deadline)
+                 (timed-stream stream new-deadline)))
+          (list (tag 'Timeout continuation-point)))))
+
+(def (time-manager stream)
+   (case (car stream)
+      [(Val x) (cons x
+                     (delay (time-manager (cdr stream))))]
+      [(Timeout cont)
+       (stdisplay-n "Continue for 30 ms:")
+       (cont (+ (time-ms) 30))]))
+
+(def test-stream (timed-stream (range -1000 null)
+                                  (+ (time-ms) 20)))
+(display-seq (time-manager test-stream))

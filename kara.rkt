@@ -644,6 +644,9 @@
 (hash-set! prim-procs 'newline newline)
 (hash-set! prim-procs 'display display)
 (hash-set! prim-procs 'load kload)
+; Time
+(hash-set! prim-procs 'time-s current-seconds)
+(hash-set! prim-procs 'time-ms current-inexact-milliseconds)
 ; Others
 (hash-set! prim-procs 'random random)
 (hash-set! prim-procs 'void void)
