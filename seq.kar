@@ -56,22 +56,26 @@
            [(equal? x (car seq)) #t]
            [else (in-seq? x (cdr seq))]))
 
-; The most important sequence function
+; This is a strict function
 (def (reduce op init seq)
     (if (null? seq)
         init
         (op (car seq)
             (reduce op init (cdr seq)))))
 
+; Could have been written using reduce, but then it wouldn't be lazy
 (def (filter pred seq)
-    (reduce (lam (x y)
-                (if (pred x) (cons x y) y))
-            null
-            seq))
+    (cond [(null? seq) null]
+          [(pred (car seq))
+           (cons (car seq)
+                 (delay (filter pred (cdr seq))))]
+          [else (filter pred (cdr seq))]))
 
-; Really?
 (def (append seq1 seq2)
-    (reduce cons seq2 seq1))
+   (cond [(null? seq1) seq2]
+         [else (cons (car seq1)
+                     (delay (append (cdr seq1)
+                                    seq2)))]))
 
 ; Mapping and reducing with append to create nested maps
 (def (flatmap proc seq)
@@ -98,17 +102,22 @@
 (def (length sequence)
     (reduce (lam (x y) (+ 1 y)) 0 sequence))
 
+; Uppser can be null, in which case the stream is infinite.
 (def (range lower upper)
-    (if (> lower upper)
-        null
-        (cons lower
-              (delay (range (+ 1 lower) upper)))))
+  (if (number? upper)
+      (if (> lower upper)
+          null
+          (cons lower
+                (delay (range (+ 1 lower) upper))))
+      (cons lower
+            (delay (range (+ 1 lower) upper)))))
 
 (def (map func L)
-    (reduce (lam (x y)
-                 (cons (func x) y))
-            null
-            L))
+  (if (null? L)
+      null
+      (cons (func (car L))
+            (delay (map func
+                        (cdr L))))))
 
 (def (wrap thing)
     (list thing))
@@ -136,8 +145,8 @@
     (def (pow-aux first pow-rest)
          (append (map (lam (pow-rest-iter)
                           (cons first pow-rest-iter))
-                      pow-rest) ; Include first
-                 pow-rest))     ; Exclude first
+                      pow-rest)                         ; Include first
+                 pow-rest))                             ; Exclude first
 
     (reduce pow-aux
             (list null)  ; Base case: the only subset of the empty set is itself
@@ -147,4 +156,4 @@
   (if (null? s1)
       s2
       (cons (car s1)
-            (interleave s2 (cdr s1)))))
+            (delay (interleave s2 (cdr s1))))))

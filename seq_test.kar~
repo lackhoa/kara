@@ -28,8 +28,8 @@
 (stdisplay-n "seq->list => Permutation for (1 2 3)")
 (seq->list permu)
 
-(stdisplay-n "seq-append: 2 -> 5 to 11 -> 14")
-(seq->list (seq-append (range 2 6) (range 11 14)))
+(stdisplay-n "append: 2 -> 5 to 11 -> 14")
+(seq->list (append (range 2 6) (range 11 14)))
 
 (stdisplay-n "Product")
 (def ingredient (list (range 0 3) (range  4 6) (range 7 10)))
@@ -37,5 +37,10 @@
 
 (stdisplay-n "Powerset of {A, B, C, D}")
 (powerset '(A B C D))
+
+(def (scale factor seq)
+    (map (lam (x) (* x factor)) seq))
+(stdisplay-n "Interleaving => (0 0 1 11 2 22 3 33 ...)")
+(interleave (range 1 9) (scale 11 (range 1 9)))
 
 "All lazy tests passed (or at least they all ran)"

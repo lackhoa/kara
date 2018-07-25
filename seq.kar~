@@ -10,17 +10,21 @@
 ; Foundation of the Stream Paradigm
 ; -----------------------------------------------
 
-; Forces the first value, if it's a promise
+; Remember that when you use `cons` with a delayed list, you're
+; actually creating an improper list.
+
+; Forces the first value, if it's a promise.
 (def (car seq)
     (force (lcar seq)))
 
-; This is kind of useful, as well
-(def (cadr seq)
-    ((car (cdr seq))))
-
-; Forces the rest of the sequence, if it's a promise
+; Forces the rest of the sequence, if it's a promise.
 (def (cdr seq)
     (force (lcdr seq)))
+
+; A useful short-hand.
+(def (cadr seq)
+    (car (cdr seq)))
+
 
 ; The empty stream is represented as the empty list.
 ; It is a unique value, not even the delayed empty list is equal
@@ -29,7 +33,7 @@
 ; list-ref must be re-design since the one in Racket
 ; is random-access
 (def (seq-ref seq index)
-    (cond [(null? seq) "Out of bound"]
+    (cond [(null? seq) (error "seq-ref" "Out of bound" (list seq index))]
           [(= index 0) (car seq)]
           [else (seq-ref (cdr seq)
                          (- index 1))]))
@@ -81,7 +85,7 @@
     ; This function sticks the x to the permutations that doesn't contain x
     (def (permute-aux x)
         (map (lam (p) (cons x p))
-            (permutations (remove x s))))
+             (permutations (remove x s))))
 
     ; Main job done here
     (if (null? s)
