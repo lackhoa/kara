@@ -447,7 +447,7 @@
     (if (null? clauses)
         ; It's still debated whether or not partial pattern matching
         ; is a thing
-        (error "analyze-match" "Matching failed" val)
+        (error "analyze-match" "Matching failed" (my-output-format val))
         (let* ([clause (car clauses)]
                [pred (car clause)]
                [vars (cadr clause)]

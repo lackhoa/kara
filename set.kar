@@ -1,4 +1,4 @@
-; Constructor for set.
+; Constructor for set, removing duplicates.
 ; Note that sequences are not in our model of types.
 (def (seq->set seq)
      (def (reduce-aux x y)

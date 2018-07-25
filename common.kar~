@@ -18,18 +18,17 @@
 ; ------------------------------------------------------------
 ; Typing
 ; ------------------------------------------------------------
-(def (typed? exp type)
-     (eq? (car exp) tag))
-
-; Used to construct a term of a type.
+; An alias used to construct a term of a type.
 (def (tag the-tag contents)
-     (cons the-tag contents))
+     (list the-tag contents))
 
+; Don't reall need these two functions since we
+; already have pattern-matching
 (def (tag-of exp)
      (car exp))
 
 (def (contents tagged)
-     (cdr tagged))
+     (cadr tagged))
 
 ; ------------------------------------------------------------                           
 ; Testing Functions

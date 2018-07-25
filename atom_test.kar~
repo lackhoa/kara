@@ -1,1 +1,7 @@
-(stdisplay-n "This is not good")
+(stdisplay-n "Implicit Atom")
+(make-implicit even)
+
+(stdisplay-n "Explicit Atom")
+(make-implicit (range ))
+
+

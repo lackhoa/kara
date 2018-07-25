@@ -10,6 +10,9 @@
 ; Foundation of the Stream Paradigm
 ; -----------------------------------------------
 
+; Remember that when you use `cons` with a delayed list, you're
+; actually creating an improper list.
+
 ; Forces the first value, if it's a promise.
 (def (car seq)
     (force (lcar seq)))

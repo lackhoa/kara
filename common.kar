@@ -4,6 +4,8 @@
 ; List
 (def null '())
 (load "seq.kar")
+; Set
+(load "set.kar")
 ; I/O
 (load "io.kar")
 
