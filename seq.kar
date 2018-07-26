@@ -63,19 +63,21 @@
         (op (car seq)
             (reduce op init (cdr seq)))))
 
-; Could have been written using reduce, but then it wouldn't be lazy
+(def (lazy-reduce op init seq)
+    (if (null? seq)
+        init
+        (op (car seq)
+            (delay (lazy-reduce op init (cdr seq))))))
+
+; Notice the force on `y` (since y was lazy)
 (def (filter pred seq)
-    (cond [(null? seq) null]
-          [(pred (car seq))
-           (cons (car seq)
-                 (delay (filter pred (cdr seq))))]
-          [else (filter pred (cdr seq))]))
+  (lazy-reduce (lam (x y)
+                 (if (pred x) (cons x y) (force y)))
+               null
+               seq))
 
 (def (append seq1 seq2)
-   (cond [(null? seq1) seq2]
-         [else (cons (car seq1)
-                     (delay (append (cdr seq1)
-                                    seq2)))]))
+   (lazy-reduce cons seq2 seq1))
 
 ; Mapping and reducing with append to create nested maps
 (def (flatmap proc seq)
@@ -113,11 +115,10 @@
             (delay (range (+ 1 lower) upper)))))
 
 (def (map func L)
-  (if (null? L)
-      null
-      (cons (func (car L))
-            (delay (map func
-                        (cdr L))))))
+  (lazy-reduce (lam (x y)
+                 (cons (func x) y))
+               null
+               L))
 
 (def (wrap thing)
     (list thing))

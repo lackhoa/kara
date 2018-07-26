@@ -24,9 +24,8 @@
                  (filter odd? seq))))
 (prod-of-squares-of-odds (list 1 2 3 4 5))
 
-(def permu (permutations (list 1 2 3)))
 (stdisplay-n "seq->list => Permutation for (1 2 3)")
-(seq->list permu)
+(seq->list (permutations (list 1 2 3)))
 
 (stdisplay-n "append: 2 -> 5 to 11 -> 14")
 (seq->list (append (range 2 6) (range 11 14)))
