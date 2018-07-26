@@ -147,7 +147,7 @@
 (def (powerset s)
     (def (pow-aux first pow-rest)
          (append (map (lam (pow-rest-iter)
-                          (cons first pow-rest-iter))
+                        (cons first pow-rest-iter))
                       pow-rest)                         ; Include first
                  pow-rest))                             ; Exclude first
 

@@ -9,22 +9,25 @@
                 (timed-stream stream new-deadline)))
             (list (tag 'Timeout continuation-point))]))
 
-(def (juggler timed-stream1 cont2)
+(def (make-cont stream)
+  (lam (dl)
+    (timed-stream stream dl)))
+
+(def (juggler s1 s2)
+  (juggler-cont (timed-stream s1 (+ (time-ms) 10))
+                (make-cont s2)))
+
+(def (juggler-cont timed-stream1 cont2)
    (if (null? timed-stream1)
        null
        (case (car timed-stream1)
          [(Val x)
           (cons x
-                (delay (juggler (cdr timed-stream1) cont2)))]
+                (delay (juggler-cont (cdr timed-stream1) cont2)))]
          [(Timeout cont1)
-          (juggler (cont2 (+ (time-ms) 10)) cont1)])))
-
-(def (juggler-starter s1 s2)
-  (juggler (timed-stream s1 (+ (time-ms) 10))
-           (lam (deadline)
-               (timed-stream s2 deadline))))
+          (juggler-cont (cont2 (+ (time-ms) 10)) cont1)])))
 
 (def s1 (filter odd? (range 0 null)))
 (def s2 (filter even? (range 0 null)))
-(display-seq (timed-stream (juggler-starter s1 s2)
-                           (+ (time-ms) 3)))
+(display-seq (timed-stream (juggler s1 s2)
+                           (+ (time-ms) 30)))
