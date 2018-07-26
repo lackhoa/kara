@@ -125,13 +125,14 @@
 
 ; params: seq (a sequence of sequences to take product).
 ; returns: a sequence of lists as products
+; This function is lazy
 (def (product seqs)
     ; The algorithm of the reduce
     (def (prod-aux first prod-rest)
         (flatmap (lam (iter-first)
-                      (map (lam (iter-prod-rest)
-                               (cons iter-first iter-prod-rest))
-                           prod-rest))
+                    (map (lam (iter-prod-rest)
+                           (cons iter-first iter-prod-rest))
+                         prod-rest))
                  first))
 
     (reduce prod-aux
@@ -142,6 +143,7 @@
 ; params s: a single sequence as a set
 ;           (although not guaranteed by the algorithm).
 ; returns: a sequence of list as subsets of the given set
+; Still lazy
 (def (powerset s)
     (def (pow-aux first pow-rest)
          (append (map (lam (pow-rest-iter)
