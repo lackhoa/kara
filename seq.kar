@@ -42,8 +42,8 @@
 (def (for-each proc s)
     (if (null? s)
         'done
-        (seq (proc (car s))
-             (for-each proc (cdr s)))))
+        (begin (proc (car s))
+               (for-each proc (cdr s)))))
 
 (def (display-seq seq)
     (for-each stdisplay-n seq))
