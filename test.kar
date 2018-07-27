@@ -15,7 +15,7 @@ a
 (if #f 1 2)
 
 (stdisplay-n "If no else => 5")
-(seq (def const 5) (if #f (def const 6) const))
+(begin (def const 5) (if #f (def const 6) const))
 
 (stdisplay-n "Conditional first => 1")
 (cond [#t 1] [#f 2] [else 3])
@@ -64,21 +64,15 @@ a
 (add3 7)
 
 (stdisplay-n "map procedure => (3...8)")
-(map add3 (list 0 1 2 3 4 5))
+(seq->list (map add3 (list 0 1 2 3 4 5)))
 
 (stdisplay-n "Sequencing => 36")
-(seq (def x 9) (* x 4))
+(begin (def x 9) (* x 4))
 
 (stdisplay-n "Factorial => 6")
 (def (fact n)
     (if (= n 1) 1 (* (fact (- n 1)) n)))
 (fact 3)
-
-(stdisplay-n "Environment request => all keys")
-(hash-keys (car (meta-env)))
-
-(stdisplay-n "Primitive => 8")
-(! '(let ((x 5)) (+ 3 x)))
 
 (stdisplay-n "Quasiquotation1 => (10 (18 18) 72)")
 (def a 9)

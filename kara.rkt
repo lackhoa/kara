@@ -16,7 +16,6 @@
     (cond
         [(self-eval? exp) (lambda (env) exp)]
         [(quoted? exp) (analyze-quoted (quoted-text exp) 1)]
-        [(primitive? exp) (analyze-primitive exp)]
         [(unquoted? exp)
             (error "analyze" "Unquote used in wrong context" exp)]
 
@@ -34,7 +33,6 @@
         [(force? exp) (analyze-force exp)]
         [(pmatch? exp) (analyze-pmatch exp)]
         ; Special commands
-        [(env-request? exp) (lambda (env) env)]
         [(trace-command? exp) (analyze-trace-command exp)]
         [(untrace-command? exp) (analyze-untrace-command exp)]
         ; Code execution is last (must be a property list)
@@ -61,11 +59,9 @@
 ; -----------------------------------------------------------
 (define KEYWORD_TAG     '~)
 (define UNNAMED_PREFIX  '$)
-(define SEQUENCE_TAG    'seq)
+(define SEQUENCE_TAG    'begin)
 (define ASGN_TAG        'set!)
 (define COND_TAG        'cond)
-(define ENV_REQUEST_TAG 'meta-env)
-(define PRIMITIVE_TAG   '!)
 
 
 
@@ -107,11 +103,6 @@
 (define (untrace-command? exp)
     (tagged? exp 'untrace))
 
-(define (env-request? exp) (tagged? exp ENV_REQUEST_TAG))
-
-(define (primitive? exp) (tagged? exp PRIMITIVE_TAG))
-(define (primitive-body exp) (cadr exp))
-
 (define (if? exp) (tagged? exp 'if))
 (define (make-if pred conse alt)
     (list 'if pred conse alt))
@@ -126,7 +117,7 @@
 (define (cond-clauses cond-exp) (cdr cond-exp))
 (define (cond-else-clause? clause) (eq? (car clause) 'else))
 (define (cond-pred clause) (car clause))
-; Note: you actually get a secret `seq` in `cond`,
+; Note: you actually get a secret `begin` in `cond`,
 ; juts like in Scheme.
 (define (cond-actions clause) (cdr clause))
 
@@ -229,7 +220,7 @@
 
 (define (seq? exp) (tagged? exp SEQUENCE_TAG))
 (define (seq-actions seq) (cdr seq))
-(define (make-seq actions) (cons 'seq actions))
+(define (make-seq actions) (cons SEQUENCE_TAG actions))
 
 (define (operator application) (car application))
 (define (operands application) (cdr application))
@@ -322,7 +313,7 @@
                 (aproc env)))))
 
 ; The heart of `cond->if`
-; Note: you actually get an implicit `seq`, juts like in Scheme.
+; Note: you actually get an implicit `begin`, juts like in Scheme.
 (define (expand-clauses clauses)
     (if (null? clauses)
         ; If null there is no else clause
@@ -409,10 +400,6 @@
         [(atom? exp) (lambda (env) exp)]
         [(null? exp) (lambda (env) (list))]
         [else (error "analyze-quoted" "What 'else' did we miss?" exp)]))
-
-; Primitives are not evaluated before fed in to Scheme.
-(define (analyze-primitive exp)
-    (lambda (env) (eval (primitive-body exp))))
 
 ; Delay will create a thunk object, containing
 ; 1. the analyzed code and,
