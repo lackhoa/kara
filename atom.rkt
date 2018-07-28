@@ -1,3 +1,7 @@
+#lang racket
+(require "lang/kara.rkt")
+(provide in-atom?)
+
 ; Atoms are like the mathematical sense of sets
 ; The atom type has two constructors:
 ; Implicit predicate

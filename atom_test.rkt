@@ -1,13 +1,14 @@
-(load "atom.kar")
+#lang racket
+(require "lang/kara.rkt"
+         "atom.rkt"
+         rackunit)
 
-(stdisplay-n "Implicit Atom => #f, #t")
 (def even-atom (tag 'Implicit even?))
-(in-atom? 89 even-atom)
-(in-atom? 74 even-atom)
+(check-equal? #f (in-atom? 89 even-atom) "Implicit atom 1")
+(check-equal? #t (in-atom? 74 even-atom) "Implicit atom 2")
 
-(stdisplay-n "Explicit Atom => #t, #f")
-(def atom-8 (tag 'Explicit (tag 'Set (range 0 8))))
-(in-atom? 8 atom-8)
-(in-atom? 59 atom-8)
+(def atom-9 (tag 'Explicit (tag 'Set (range 0 9))))
+(check-equal? #t (in-atom? 8 atom-9) "Explicit atom 2")
+(check-equal? #f (in-atom? 59 atom-9) "Explicit atom 2")
 
 
