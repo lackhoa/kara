@@ -1,19 +1,6 @@
 #lang racket
 (require "kara_macro.rkt")
-(provide display-n display-nn stdisplay stdisplay-n stdisplay-nn
-         fib square tag tag-of contents repeat)
-
-; -----------------------------------------------------------
-; I/O
-; -----------------------------------------------------------
-(def (display-n msg port)
-    (display msg port) (newline port))
-(def (display-nn msg port)
-    (display msg port) (repeat (newline port) 2))
-
-(def (stdisplay msg . obj) (display (apply format (cons msg obj)) (current-output-port)))
-(def (stdisplay-n msg . obj) (display-n (apply format (cons msg obj)) (current-output-port)))
-(def (stdisplay-nn msg . obj) (display-nn (apply format (cons msg obj)) (current-output-port)))
+(provide fib square tag tag-of contents repeat)
 
 ; -----------------------------------------------------------
 ; Functional Stuff
