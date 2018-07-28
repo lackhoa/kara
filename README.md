@@ -1,2 +1,2 @@
 # kara
-A Lisp dialect with dynamic scoping and no lambda.
+Used to be a language, but now just a macro package for Racket.

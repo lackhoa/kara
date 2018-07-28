@@ -1,13 +1,19 @@
-; Arithmetic
-(def (odd? n) (not (even? n)))
-(def (> x y) (nor (< x y) (= x y)))
-; List
-(def null '())
-(load "seq.kar")
-; Set
-(load "set.kar")
+#lang racket
+(require "kara.rkt")
+(provide display-n display-nn stdisplay stdisplay-n stdisplay-nn
+         fib square tag tag-of contents repeat)
+
+; -----------------------------------------------------------
 ; I/O
-(load "io.kar")
+; -----------------------------------------------------------
+(def (display-n msg port)
+    (display msg port) (newline port))
+(def (display-nn msg port)
+    (display msg port) (repeat (newline port) 2))
+
+(def (stdisplay msg . obj) (display (apply format (cons msg obj)) (current-output-port)))
+(def (stdisplay-n msg . obj) (display-n (apply format (cons msg obj)) (current-output-port)))
+(def (stdisplay-nn msg . obj) (display-nn (apply format (cons msg obj)) (current-output-port)))
 
 ; -----------------------------------------------------------
 ; Functional Stuff
@@ -42,5 +48,3 @@
 
 (def (square n)
     (* n n))
-
-"Common Library Loaded"

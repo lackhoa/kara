@@ -1,8 +1,0 @@
-(def (display-n msg port)
-    (display msg port) (newline port))
-(def (display-nn msg port)
-    (display msg port) (repeat (newline port) 2))
-
-(def (stdisplay msg)    (display msg (current-output-port)))
-(def (stdisplay-n msg)  (display-n msg (current-output-port)))
-(def (stdisplay-nn msg) (display-nn msg (current-output-port)))

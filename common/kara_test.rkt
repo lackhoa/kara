@@ -1,7 +1,7 @@
 #lang racket
 
 (require rackunit
-         "macro.rkt")
+         "kara_macro.rkt")
 
 (check-equal? (case '(z)
                 [(tv i) "No!"]
@@ -9,6 +9,13 @@
                 [(z) "Yes!"])
              "Yes!"
              "Three patterns")
+
+(check-equal? (case '(z)
+                [(tv i) "No!"]
+                [(S n) (+ n 5)]
+                [(z) (define a 80) a])
+             80
+             "Compound body")
 
 
 (check-equal? (case (list 'foo 5 6)
@@ -31,3 +38,7 @@
 (check-equal? (max (quote (S (S (S (z))))) (quote (S (S (S (S (z)))))))
              (quote (S (S (S (S (z))))))
              "Complex pattern 2")
+
+(check-equal? ((const "Hello everyone"))  "Hello everyone" "Constant function")
+
+"All test passed!"

@@ -1,4 +1,10 @@
-(load "io.kar")
+#lang racket
+
+(require "kara.rkt" "list_prims.rkt")
+(provide car cdr cadr seq-ref for-each in-seq? map
+         reduce strict-reduce product interleave length
+         powerset permutations flatmap seq->list range
+         append filter)
 
 ; This file focuses on the lazy way of working with sequences but all
 ; functions are suitable for strict sequences (many are as efficient).
@@ -26,7 +32,7 @@
     (car (cdr seq)))
 
 
-; The empty stream is represented as the empty list.
+; The empty stream is the same as the empty list.
 ; It is a unique value, not even the delayed empty list is equal
 (def empty-stream '())
 
@@ -38,17 +44,13 @@
           [else (seq-ref (cdr seq)
                          (- index 1))]))
 
-; The idea is like mapfx, but doesn't mix up the order
+; Like map but for side-effects
 (def (for-each proc s)
     (if (null? s)
         'done
         (begin (proc (car s))
                (for-each proc (cdr s)))))
 
-(def (display-seq seq)
-    (for-each stdisplay-n seq))
-
-; -----------------------------------------------
 ; Useful functions
 ; -----------------------------------------------
 (def (in-seq? x seq)
@@ -57,31 +59,32 @@
            [else (in-seq? x (cdr seq))]))
 
 ; This is a strict function
+(def (strict-reduce op init seq)
+    (if (null? seq)
+        init
+        (op (car seq)
+            (strict-reduce op init (cdr seq)))))
+
+; The lazy version
 (def (reduce op init seq)
     (if (null? seq)
         init
         (op (car seq)
-            (reduce op init (cdr seq)))))
-
-(def (lazy-reduce op init seq)
-    (if (null? seq)
-        init
-        (op (car seq)
-            (delay (lazy-reduce op init (cdr seq))))))
+            (delay (reduce op init (cdr seq))))))
 
 ; Notice the force on `y` (since y was lazy)
 (def (filter pred seq)
-  (lazy-reduce (lam (x y)
+  (reduce (lam (x y)
                  (if (pred x) (cons x y) (force y)))
                null
                seq))
 
 (def (append seq1 seq2)
-   (lazy-reduce cons seq2 seq1))
+   (reduce cons seq2 seq1))
 
 ; Mapping and reducing with append to create nested maps
 (def (flatmap proc seq)
-    (reduce append null (map proc seq)))
+    (strict-reduce append null (map proc seq)))
 
 (def (remove x s)
     (filter (lam (item) (not (eq? item x)))
@@ -99,26 +102,25 @@
         (flatmap permute-aux s)))
 
 (def (seq->list seq)
-    (reduce cons null seq))
+    (strict-reduce cons null seq))
 
 (def (length sequence)
-    (reduce (lam (x y) (+ 1 y)) 0 sequence))
+    (strict-reduce (lam (x y) (+ 1 y)) 0 sequence))
 
 ; Uppser can be null, in which case the stream is infinite.
 (def (range lower upper)
-  (if (number? upper)
-      (if (> lower upper)
+  (if (null? upper)
+      (cons lower
+            (delay (range (+ 1 lower) upper)))
+      (if (>= lower upper)
           null
           (cons lower
-                (delay (range (+ 1 lower) upper))))
-      (cons lower
-            (delay (range (+ 1 lower) upper)))))
+                (delay (range (+ 1 lower) upper))))))
 
 (def (map func L)
-  (lazy-reduce (lam (x y)
-                 (cons (func x) y))
-               null
-               L))
+  (reduce (lam (x y) (cons (func x) y))
+          null
+          L))
 
 (def (wrap thing)
     (list thing))
@@ -135,9 +137,9 @@
                          prod-rest))
                  first))
 
-    (reduce prod-aux
-            (list null)  ; Base case: kind of undefined?
-            seqs))
+    (strict-reduce prod-aux
+                   (list null)  ; Base case: kind of undefined?
+                   seqs))
 
 
 ; params s: a single sequence as a set
@@ -151,9 +153,9 @@
                       pow-rest)                         ; Include first
                  pow-rest))                             ; Exclude first
 
-    (reduce pow-aux
-            (list null)  ; Base case: the only subset of the empty set is itself
-            s))
+    (strict-reduce pow-aux
+                   (list null)  ; Base case: the only subset of the empty set is itself
+                   s))
 
 (def (interleave s1 s2)
   (if (null? s1)
