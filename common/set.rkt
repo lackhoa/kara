@@ -1,9 +1,16 @@
+#lang racket
+(require "kara.rkt"
+         "seq.rkt"
+         "utils.rkt")
+(provide seq->set empty-set? in-set? adjoin-set
+         union-set intersection-set)
+
 ; Constructor for set, removing duplicates.
 ; Note that sequences are not in our model of types.
 (def (seq->set seq)
      (def (reduce-aux x y)
         (if (in-seq? x y) y (cons x y)))
-     (tag 'Set (reduce reduce-aux null seq)))
+     (tag 'Set (lreduce reduce-aux null seq)))
 
 (def (empty-set? set)
      (case set
@@ -25,9 +32,8 @@
   (def (intersection-set-core sq1 sq2)
      (if (or (null? sq1) (null? sq2))
          null
-         (seq
-           (def sq1-first (car sq1))
-           (def sq1-rest (cdr sq1))
+         (let ([sq1-first (car sq1)]
+               [sq1-rest (cdr sq1)])
            (if (in-seq? sq1-first sq2)
                ; Includes sq1-first
                (cons sq1-first (intersection-set-core sq1-rest sq2)) 
@@ -40,14 +46,8 @@
 
 ; You can switch s1 and s2 and this function would still work.
 (def (union-set s1 s2)
-   (case s1 [(Set ?sq1)
-     (case s2 [(Set ?sq2)
-       (tag 'Set (append ?sq1 (filter (lam (x)
-                                        (not (in-seq? x ?sq1)))
-                                      ?sq2)))])]))
-
-
-
-
-
-
+   (case s1 [(Set sq1)
+     (case s2 [(Set sq2)
+       (tag 'Set (append sq1 (filter (lam (x)
+                                        (not (in-seq? x sq1)))
+                                      sq2)))])]))

@@ -2,7 +2,7 @@
 
 (require "kara.rkt" "list_prims.rkt")
 (provide car cdr cadr seq-ref for-each in-seq? map
-         reduce strict-reduce product interleave length
+         reduce lreduce product interleave length
          powerset permutations flatmap seq->list range
          append filter)
 
@@ -58,12 +58,14 @@
            [(equal? x (car seq)) #t]
            [else (in-seq? x (cdr seq))]))
 
-; This is a strict function
-(def (strict-reduce op init seq)
+; This is a strict version of `reduce`.
+; Not that it will create a list, but the content of `(cdr seq)`
+; is forced when executing the operation.
+(def (lreduce op init seq)
     (if (null? seq)
         init
         (op (car seq)
-            (strict-reduce op init (cdr seq)))))
+            (lreduce op init (cdr seq)))))
 
 ; The lazy version
 (def (reduce op init seq)
@@ -84,7 +86,7 @@
 
 ; Mapping and reducing with append to create nested maps
 (def (flatmap proc seq)
-    (strict-reduce append null (map proc seq)))
+    (lreduce append null (map proc seq)))
 
 (def (remove x s)
     (filter (lam (item) (not (eq? item x)))
@@ -102,10 +104,10 @@
         (flatmap permute-aux s)))
 
 (def (seq->list seq)
-    (strict-reduce cons null seq))
+    (lreduce cons null seq))
 
 (def (length sequence)
-    (strict-reduce (lam (x y) (+ 1 y)) 0 sequence))
+    (lreduce (lam (x y) (+ 1 y)) 0 sequence))
 
 ; Uppser can be null, in which case the stream is infinite.
 (def (range lower upper)
@@ -137,7 +139,7 @@
                          prod-rest))
                  first))
 
-    (strict-reduce prod-aux
+    (lreduce prod-aux
                    (list null)  ; Base case: kind of undefined?
                    seqs))
 
@@ -153,7 +155,7 @@
                       pow-rest)                         ; Include first
                  pow-rest))                             ; Exclude first
 
-    (strict-reduce pow-aux
+    (lreduce pow-aux
                    (list null)  ; Base case: the only subset of the empty set is itself
                    s))
 

@@ -1,7 +1,7 @@
 #lang racket
 
 (require rackunit
-         "kara_macro.rkt")
+         "kara.rkt")
 
 (check-equal? (case '(z)
                 [(tv i) "No!"]
@@ -40,5 +40,3 @@
              "Complex pattern 2")
 
 (check-equal? ((const "Hello everyone"))  "Hello everyone" "Constant function")
-
-"All test passed!"

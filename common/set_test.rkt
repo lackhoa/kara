@@ -1,15 +1,25 @@
-(load "set.kar")
+#lang racket
 
-(stdisplay-n "In set => #t")
-(in-set? 2 (seq->set (list 1 2 3 4)))
+(require "kara.rkt"
+         "seq.rkt"
+         "set.rkt"
+         rackunit)
 
-(stdisplay-n "In set with range => #f")
-(in-set? 5 (seq->set (range 1 4)))
+(check-equal? #t
+              (in-set? 2 (seq->set (list 1 2 3 4)))
+              "In set")
 
-(stdisplay-n "Intersection => (Set (1 2 9))")
-(seq->list (intersection-set (seq->set (range 0 10))
-                             (seq->set (list 1 2 9 11))))
+(check-equal? #f
+              (in-set? 5 (seq->set (range 1 4)))
+              "In set with range => #f")
 
-(stdisplay-n "Union => (Set (0 ... 12))")
-(seq->list (union-set (seq->set (range 3 10))
-                      (seq->set (list 0 1 2 9 11 12))))
+(check-equal? '(Set (1 2 9))
+              (intersection-set (seq->set (range 0 11))
+                                (seq->set (list 1 2 9 11)))
+              "Intersection")
+
+(def superset (union-set (seq->set (range 3 9))
+                         (seq->set (list 0 1 2 9 10 11 12))))
+(check-equal? 13
+              (case superset [(Set sq) (length sq)])
+              "Union")

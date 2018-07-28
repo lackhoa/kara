@@ -12,15 +12,15 @@
 (def new-range (range 5 10))
 (check-equal? 9 (seq-ref new-range 4) "Range and seq-ref")
 
-(check-equal? 120 (strict-reduce * 1 (list 1 2 3 4 5)) "Strict Reduce")
+(check-equal? 120 (lreduce * 1 (list 1 2 3 4 5)) "Strict Reduce")
 
 (check-equal? 81 (seq-ref (map square new-range) 4) "Mapping")
 
 (def (prod-of-squares-of-odds seq)
-    (strict-reduce *
-                   1
-                   (map square
-                        (filter odd? seq))))
+    (lreduce *
+             1
+             (map square
+                  (filter odd? seq))))
 (check-equal? 225 (prod-of-squares-of-odds (list 1 2 3 4 5)) "Reduce + map + filter")
 
 (check-equal? 6 (length (permutations (list 1 2 3))) "Permutation")
