@@ -1,6 +1,6 @@
 #lang racket
 
-(require "kara.rkt" "list_prims.rkt")
+(require "kara_macro.rkt" "list_prims.rkt")
 (provide car cdr cadr seq-ref for-each in-seq? map
          reduce lreduce product interleave length
          powerset permutations flatmap seq->list range

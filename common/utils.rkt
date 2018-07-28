@@ -1,5 +1,5 @@
 #lang racket
-(require "kara.rkt")
+(require "kara_macro.rkt")
 (provide display-n display-nn stdisplay stdisplay-n stdisplay-nn
          fib square tag tag-of contents repeat)
 

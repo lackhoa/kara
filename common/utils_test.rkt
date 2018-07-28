@@ -1,6 +1,6 @@
 #lang racket
 
-(require "kara.rkt"
+(require "kara_macro.rkt"
          "utils.rkt"
          rackunit)
 

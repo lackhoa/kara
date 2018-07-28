@@ -1,5 +1,5 @@
 #lang racket
-(require "kara.rkt")
+(require "kara_macro.rkt")
 (provide lcar lcdr llength lrange)
 ; This file preserves the list primitives that will be shadowed by seq.rkt
 

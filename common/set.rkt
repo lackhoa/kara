@@ -1,5 +1,5 @@
 #lang racket
-(require "kara.rkt"
+(require "kara_macro.rkt"
          "seq.rkt"
          "utils.rkt")
 (provide seq->set empty-set? in-set? adjoin-set
