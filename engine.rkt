@@ -15,15 +15,16 @@
               (lam (new-engine)
                 (escape (lam () (expire new-engine))))))))))
 
-(def (run resume parent-ticks child-ticks complete expire)
+(def (run resume parent-ticks current-ticks complete expire)
   (let ([ticks
-         (if (and (active?) (< parent-ticks child-ticks))
+         (if (and (active?) (< parent-ticks current-ticks))
              parent-ticks
-             child-ticks)])
+             current-ticks)])
     ; One of the residual tick values will be 0.
-    (push (- parent-ticks ticks) (- child-ticks ticks) complete expire)
+    (push (- parent-ticks ticks) (- current-ticks ticks) complete expire)
     (resume ticks)))
 
+; This function is in sole charge of starting the clock.
 (def (go ticks)
   (when (active?)
     (if (= ticks 0)
@@ -31,18 +32,22 @@
         (start-timer ticks expire-handler))))
 
 (def (do-complete value ticks-left)
-  (pop (lam (parent-ticks child-ticks complete expire)
+  (pop (lam (parent-ticks current-ticks complete expire)
+         ; The parent must still time the completion process of the child.
          (go (+ parent-ticks ticks-left))
-         (complete value (+ child-ticks ticks-left)))))
+         (complete value (+ current-ticks ticks-left)))))
 
 (def (do-expire resume)
-  (pop (lam (parent-ticks child-ticks complete expire)
-         (if (> child-ticks 0)
+  (pop (lam (parent-ticks current-ticks complete expire)
+         (if (> current-ticks 0)
+             ; This process still has time, keep looking among its ancestors.
              (do-expire (lam (ticks)
-                          (run resume ticks child-ticks complete expire)))
+                          (run resume ticks current-ticks complete expire)))
+             ; Found the process that ran out of time.
              (begin (go parent-ticks)
                     (expire (new-engine resume)))))))
 
+; How is `go` used this way??? And why?
 (def (expire-handler)
   (go (call/cc do-expire)))
 
@@ -50,6 +55,7 @@
 (def (make-engine proc)
   (new-engine
     (lam (ticks)
+      ; Note that the engine starts the clock
       (go ticks)
       (let ([value (proc)])
         (let ([ticks-left (stop-timer)])

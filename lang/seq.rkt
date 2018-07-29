@@ -4,7 +4,7 @@
 (provide car cdr cadr seq-ref for-each in-seq? map
          reduce lreduce product interleave length
          powerset permutations flatmap seq->list range
-         append filter)
+         append filter (all-from-out "list_prims.rkt"))
 
 ; This file focuses on the lazy way of working with sequences but all
 ; functions are suitable for strict sequences (many are as efficient).
