@@ -27,7 +27,8 @@
   (def (loop engine consumed-fuel)
     (engine 100
       ; Return ticks left
-      (lam (value ticks) (+ consumed-fuel (- 100 ticks)))
+      (lam (value ticks)
+        (+ consumed-fuel (- 100 ticks)))
       ; Keep looping
       (lam (new-eng)
         (loop new-eng (+ consumed-fuel 100)))))

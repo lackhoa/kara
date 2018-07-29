@@ -28,8 +28,8 @@
 (def (go ticks)
   (when (active?)
     (if (= ticks 0)
-        (expire-handler)
-        (start-timer ticks expire-handler))))
+        (timer-handler)
+        (start-timer ticks timer-handler))))
 
 (def (do-complete value ticks-left)
   (pop (lam (parent-ticks current-ticks complete expire)
@@ -47,9 +47,12 @@
              (begin (go parent-ticks)
                     (expire (new-engine resume)))))))
 
-; How is `go` used this way??? And why?
-(def (expire-handler)
-  (go (call/cc do-expire)))
+
+; This part will be an eternal mystery,
+; but I can't dismiss the `go` part.
+(def (mysterious-call) (call/cc do-expire))
+(def (timer-handler)
+  (go (mysterious-call)))
 
 ; This is the interface.
 (def (make-engine proc)
@@ -89,3 +92,6 @@
 ; procedure is invoked.
 (define-syntax-rule (tlam formals exp1 exp2 ...)
   (lam formals (check-timer) exp1 exp2 ...))
+
+(trace mysterious-call)
+(trace go)
