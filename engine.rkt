@@ -3,58 +3,81 @@
          "timer.rkt")
 (provide make-engine tlam (all-from-out "timer.rkt"))
 
-; Reminder: an Engine is a thing that takes some fuel,
-; an expire handling routine, and a completion handling routine.
+(def (new-engine resume)
+  (lam (ticks complete expire)
+    ((call/cc
+       (lam (escape)
+         (run resume
+              (stop-timer)
+              ticks
+              (lam (value ticks-left)
+                (escape (lam () (complete value ticks-left))))
+              (lam (new-engine)
+                (escape (lam () (expire new-engine))))))))))
+
+(def (run resume parent-ticks child-ticks complete expire)
+  (let ([ticks
+         (if (and (active?) (< parent-ticks child-ticks))
+             parent-ticks
+             child-ticks)])
+    ; One of the residual tick values will be 0.
+    (push (- parent-ticks ticks) (- child-ticks ticks) complete expire)
+    (resume ticks)))
+
+(def (go ticks)
+  (when (active?)
+    (if (= ticks 0)
+        (expire-handler)
+        (start-timer ticks expire-handler))))
+
+(def (do-complete value ticks-left)
+  (pop (lam (parent-ticks child-ticks complete expire)
+         (go (+ parent-ticks ticks-left))
+         (complete value (+ child-ticks ticks-left)))))
+
+(def (do-expire resume)
+  (pop (lam (parent-ticks child-ticks complete expire)
+         (if (> child-ticks 0)
+             (do-expire (lam (ticks)
+                          (run resume ticks child-ticks complete expire)))
+             (begin (go parent-ticks)
+                    (expire (new-engine resume)))))))
+
+(def (expire-handler)
+  (go (call/cc do-expire)))
+
+; This is the interface.
 (def (make-engine proc)
-  ; `do-complete` takes ticks remaining and value.
-  ; `do-expire` works with continuation.
-  (let ([do-complete #f]
-        [do-expire #f])
-    ; I wonder what the point of the second argument is,
-    ; when I replace it with some garbage, things still work fine.
-    ; Also, I don't think `(call/cc do-expire)` returns ticks, it's just
-    ; a weird way of calling function, since `start-timer` is fixed on
-    ; its arity.
-    (def (engine-expire-handler)
-      (start-timer (call/cc do-expire) engine-expire-handler))
+  (new-engine
+    (lam (ticks)
+      (go ticks)
+      (let ([value (proc)])
+        (let ([ticks-left (stop-timer)])
+          (do-complete value ticks-left))))))
 
-    (def (new-engine resume)
-      ; `user-complete-handler` works with ticks and a value
-      ; returned when a procedure completes.
-      ; `user-expire-handler` works with an engine.
-      (lam (ticks user-complete-handler user-expire-handler)
-        ; Each application of `escape` returns here, or rather,
-        ; the body of this list.
-        ((call/cc
-           ; This function sets up do-complete, do-expire
-           ; and run the procedure `resume`.
-           ; `escape` is the continuation here.
-           (lam (escape)
-             (set! do-complete
-               (lam (ticks-left value)
-                 ; Note that the code run by `user-complete-handler`
-                 ; is delayed, so that the continuation will be passed
-                 ; immediately to the one captured in `escape`.
-                 (escape (lam ()
-                           (user-complete-handler ticks-left value)))))
 
-             (set! do-expire
-               (lam (resume)
-                 (escape (lam ()
-                           (user-expire-handler (new-engine resume))))))
 
-             (resume ticks))))))
 
-    (new-engine
-      (lam (ticks)
-        ; Start the timer <could have done it before
-        ; the code is invoked <this part>>
-        (start-timer ticks engine-expire-handler)
-        ; Do the computing.
-        (let ([value (proc)])
-          ; This code will run only after `proc` returned.
-          (let ([ticks-left (stop-timer)])
-            (do-complete ticks-left value)))))))
+; --------------------------------------
+; Concerning the stack
+; --------------------------------------
+(def stack null)
+
+(def (push . items)
+  (set! stack (cons items stack)))
+
+(def (pop handler)
+  (if (null? stack)
+      (error 'engine "Attempt to return from inactive engine")
+      (let ([top (car stack)])
+        (set! stack (cdr stack))
+        (apply handler top))))
+
+(def (active?) (not (null? stack)))
+
+
+
+
 
 ; timed-lambda: The clock will be checked every time the
 ; procedure is invoked.

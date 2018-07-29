@@ -5,13 +5,13 @@
 (def eng
   (make-engine (tlam () 3)))
 
-(eng 10
+(eng 8
   ; Complete: Return ticks remaining and value.
   list
   ; Expire: Return ticks remaining.
   (lam (x) x))
 
-(define (fib n)
+(def (fib n)
   (check-timer)
   (if (< n 2)
       n
@@ -39,7 +39,7 @@
   (def (loop engine consumed-fuel)
     (engine 100
       ; Return ticks left
-      (lam (ticks value) (+ consumed-fuel (- 100 ticks)))
+      (lam (value ticks) (+ consumed-fuel (- 100 ticks)))
       ; Keep looping
       (lam (new-eng)
         (loop new-eng (+ consumed-fuel 100)))))

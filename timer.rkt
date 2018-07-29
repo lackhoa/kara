@@ -2,8 +2,8 @@
 (require "lang/kara.rkt")
 (provide start-timer stop-timer check-timer)
 
-; `null` means the clock is not on
-(def clock null)
+; ; `null` means the clock is not on
+(def clock 0)
 (def expire-handler #f)
 
 (def (start-timer initial-ticks new-expire-handler)
@@ -17,8 +17,7 @@
 
 ; Only effective when the clock is used
 (def (check-timer)
-  (when (and (number? clock)
-             (> clock 0))
+  (when (> clock 0)
     (set! clock (- clock 1))
     (when (= clock 0)
       (expire-handler))))
