@@ -16,4 +16,7 @@
         (error "pop!" "Cannot pop an empty stack!" this))
       (let ([popped-item (car content)])
         (set! content (cdr content))
-        popped-item))))
+        popped-item))
+
+    (define/public (peek)
+      (car content))))

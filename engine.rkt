@@ -19,17 +19,16 @@
       (start-timer (call/cc do-expire) engine-expire-handler))
 
     (def (new-engine resume)
-      ; `complete` works with ticks and a value
-      ; (basically what is returned when a procedure completes.)
-      ; `expire` works with an engine.
+      ; `user-complete-handler` works with ticks and a value
+      ; returned when a procedure completes.
+      ; `user-expire-handler` works with an engine.
       (lam (ticks user-complete-handler user-expire-handler)
         ; Each application of `escape` returns here, or rather,
         ; the body of this list.
         ((call/cc
            ; This function sets up do-complete, do-expire
            ; and run the procedure `resume`.
-           ; `escape` is the continuation, which is supposed
-           ; to be a function to be called (tail recursion???).
+           ; `escape` is the continuation here.
            (lam (escape)
              (set! do-complete
                (lam (ticks-left value)
@@ -54,8 +53,8 @@
         ; Do the computing.
         (let ([value (proc)])
           ; This code will run only after `proc` returned.
-          (let ([ticks (stop-timer)])
-            (do-complete ticks value)))))))
+          (let ([ticks-left (stop-timer)])
+            (do-complete ticks-left value)))))))
 
 ; timed-lambda: The clock will be checked every time the
 ; procedure is invoked.
