@@ -52,7 +52,7 @@
 
 (def (do-expire resume)
   (pop
-    (lam (parent-ticks current-ticks _complete expire)
+    (lam (parent-ticks current-ticks complete expire)
       ; we'll always resume at `timer-handler`
       (if (> current-ticks 0)
           ; Next time this gets resumed, this process will be re-spawned

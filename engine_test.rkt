@@ -3,7 +3,7 @@
          "engine.rkt")
 
 (def eng
-  (make-engine (tlam () 3)))
+  (proc->engine (tlam () 3)))
 
 "tlam () 3"
 (eng 8
@@ -20,7 +20,7 @@
          (fib (- n 2)))))
 
 (def fib-eng
-  (make-engine
+  (proc->engine
     (lam ()
       (fib 10))))
 
@@ -33,7 +33,7 @@
       ; Keep looping
       (lam (new-eng)
         (loop new-eng (+ consumed-fuel 100)))))
-  (loop (make-engine thunk) 0))
+  (loop (proc->engine thunk) 0))
 
 "Mileage of fib"
 (mileage (lam () (fib 10)))
@@ -41,12 +41,12 @@
 (def (print-even)
   (for-each (tlam (x) (printf "~s\n" x))
             (filter even? (range 0 null))))
-(def even-engine (make-engine print-even))
+(def even-engine (proc->engine print-even))
 
 (def (print-odd)
   (for-each (tlam (x) (printf "~s\n" x))
             (filter odd? (range 1 null))))
-(def odd-engine (make-engine print-odd))
+(def odd-engine (proc->engine print-odd))
 
 (def round-robin
   (lam (engs)
@@ -62,7 +62,7 @@
                  (lappend (cdr engs) (list eng)))))))))
 
 (def rr-engine
-  (make-engine (lam ()
+  (proc->engine (lam ()
                  (round-robin (list even-engine odd-engine)))))
 
 (def where-we-left-off null)
