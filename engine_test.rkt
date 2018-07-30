@@ -5,6 +5,7 @@
 (def eng
   (make-engine (tlam () 3)))
 
+"tlam () 3"
 (eng 8
   ; Complete: Return ticks remaining and value.
   list
@@ -34,6 +35,7 @@
         (loop new-eng (+ consumed-fuel 100)))))
   (loop (make-engine thunk) 0))
 
+"Mileage of fib"
 (mileage (lam () (fib 10)))
 
 (def (print-even)
@@ -64,13 +66,14 @@
                  (round-robin (list even-engine odd-engine)))))
 
 (def where-we-left-off null)
+"Nesting engines"
 (rr-engine 13
            "Done?"
            (lam (resume)
              (printf "It's not over\n")
              (set! where-we-left-off resume)))
 
-(where-we-left-off 12
+(where-we-left-off 13
                    "Done?"
                    (lam (resume)
                      (printf "Now it's really over\n")

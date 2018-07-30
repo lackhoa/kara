@@ -1,26 +1,39 @@
 #lang racket
 (require "lang/kara.rkt"
          "timer.rkt")
-(provide make-engine tlam (all-from-out "timer.rkt"))
+(provide proc->engine tlam (all-from-out "timer.rkt"))
 
-(def (new-engine resume)
-  (lam (ticks complete expire)
+; The clock always gets started by `go` RIGHT before some work gets done.
+; `resume` represents any procedure that will run in the amount of ticks
+; passed to it (and it will always start the clock when it begins).
+; Because of the complication from nesting engines, `resume` is always paired
+; with a preliminary call to `run`.
+(def (resume->engine resume)
+  (lam (new-ticks complete expire)
+    ; Why is there a `call/cc` here? Because control will be passed
+    ; to other procedures.
     ((call/cc
        (lam (escape)
-         (run resume
-              (stop-timer)
-              ticks
-              (lam (value ticks-left)
-                (escape (lam () (complete value ticks-left))))
-              (lam (new-engine)
-                (escape (lam () (expire new-engine))))))))))
+         ; Why stop the timer here? Because it will be restarted by `go` later.
+         (let ([parent-ticks (stop-timer)])
+           (run resume
+                parent-ticks
+                new-ticks
+                (lam (value ticks-left)
+                  (escape (lam () (complete value ticks-left))))
+                (lam (resume-engine)
+                  (escape (lam () (expire resume-engine)))))))))))
 
+; This procedure intelligently handles the clock (and the stack)
+; to works out the differences between parent and child
+; before `resume` starts the clock and do work.
 (def (run resume parent-ticks current-ticks complete expire)
-  (let ([ticks
-         (if (and (active?) (< parent-ticks current-ticks))
-             parent-ticks
-             current-ticks)])
-    ; One of the residual tick values will be 0.
+  (let ([ticks (if (and (active?)
+                        (< parent-ticks current-ticks))
+                   parent-ticks
+                   current-ticks)])
+    ; One of the residual tick values will be 0,
+    ; and inactive parents will have negative ticks, but that won't matter.
     (push (- parent-ticks ticks) (- current-ticks ticks) complete expire)
     (resume ticks)))
 
@@ -32,33 +45,37 @@
         (start-timer ticks timer-handler))))
 
 (def (do-complete value ticks-left)
-  (pop (lam (parent-ticks current-ticks complete expire)
+  (pop (lam (parent-ticks current-ticks complete _expire)
          ; The parent must still time the completion process of the child.
          (go (+ parent-ticks ticks-left))
          (complete value (+ current-ticks ticks-left)))))
 
 (def (do-expire resume)
-  (pop (lam (parent-ticks current-ticks complete expire)
-         (if (> current-ticks 0)
-             ; This process still has time, keep looking among its ancestors.
-             (do-expire (lam (ticks)
-                          (run resume ticks current-ticks complete expire)))
-             ; Found the process that ran out of time.
-             (begin (go parent-ticks)
-                    (expire (new-engine resume)))))))
+  (pop
+    (lam (parent-ticks current-ticks _complete expire)
+      ; we'll always resume at `timer-handler`
+      (if (> current-ticks 0)
+          ; Next time this gets resumed, this process will be re-spawned
+          ; with the same ticks, complete routine and expire routine,
+          ; which is why resume->engine isn't necessary.
+          (do-expire (lam (ticks)
+                       (run resume ticks current-ticks complete expire)))
+          ; Found the process that ran out of time.
+          ; Again, the parent must time its child's expire routine.
+          (begin (go parent-ticks)
+                 (expire (resume->engine resume)))))))
 
-
-; This part will be an eternal mystery,
-; but I can't dismiss the `go` part.
-(def (mysterious-call) (call/cc do-expire))
 (def (timer-handler)
-  (go (mysterious-call)))
+  ; Why `go`? Because we must resume the clock before returning to work.
+  ; In other words, we must transform the surrounding context to a 'resume'.
+  (go (call/cc do-expire)))
 
-; This is the interface.
-(def (make-engine proc)
-  (new-engine
+; This is the interface. Notice how the whole program logic
+; is wrapped in a procedure time-limited by `ticks`.
+(def (proc->engine proc)
+  (resume->engine
     (lam (ticks)
-      ; Note that the engine starts the clock
+      ; The engine starts the clock by itself.
       (go ticks)
       (let ([value (proc)])
         (let ([ticks-left (stop-timer)])
@@ -92,6 +109,3 @@
 ; procedure is invoked.
 (define-syntax-rule (tlam formals exp1 exp2 ...)
   (lam formals (check-timer) exp1 exp2 ...))
-
-(trace mysterious-call)
-(trace go)
