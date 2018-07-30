@@ -1,10 +1,9 @@
 #lang racket
 
-(require "kara_macro.rkt" "list_prims.rkt")
-(provide car cdr cadr seq-ref for-each in-seq? map
-         reduce lreduce product interleave length
-         powerset permutations flatmap seq->list range
-         append filter (all-from-out "list_prims.rkt"))
+(require "kara_macro.rkt"
+         "list_prims.rkt")
+(provide (all-defined-out)
+         (all-from-out "list_prims.rkt"))
 
 ; This file focuses on the lazy way of working with sequences but all
 ; functions are suitable for strict sequences (many are as efficient).
@@ -67,7 +66,7 @@
         (op (car seq)
             (lreduce op init (cdr seq)))))
 
-; The lazy version
+; The default, lazy version.
 (def (reduce op init seq)
     (if (null? seq)
         init
@@ -119,6 +118,7 @@
           (cons lower
                 (delay (range (+ 1 lower) upper))))))
 
+; Since reduce is lazy, map is lazy
 (def (map func L)
   (reduce (lam (x y) (cons (func x) y))
           null

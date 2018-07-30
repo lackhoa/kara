@@ -9,3 +9,5 @@
 (def llength length)
 (def lrange range)
 (def lappend append)
+(def lfilter filter)
+(def lmap map)

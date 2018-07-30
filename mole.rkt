@@ -1,6 +1,6 @@
 #lang racket
 (require "lang/kara.rkt")
-(provide mole%)
+(provide (all-defined-out))
 
 (def (new-mole) (tag 'Mole (make-hash)))
 
@@ -21,26 +21,28 @@
   (if (typed-atom? val)
       (atom-union (mole-ref-atom path) val)
     ; Molecule type
-    (let* ([m-focus (mole-ref path)]
-           [m-focus-mems (mole-members m-focus)]
-           [val-mems (mole-members val)]
-           [same-keys (set-union m-focus-mems val-mems)]
-           [exclusive-keys (set-symmetric-difference m-focus-mems val-mems)]
+    (let* ([pad (lam (p) (if (non-empty-string? path)
+                             (append-string path "/" p)
+                           p))]
+           [strip (lam (p)
+                    (substring p (+ (length path) 1)))]  ; '+1' for the slash
+           [mems (mole-members mole)]
+           [v-mems (map pad (mole-members val))]
            [result (make-hash)])
       (for-each (lam (p)
                   (hash-set! result
                     p
-                    (atom-union (mole-ref-atom m-focus p)
-                                (mole-ref-atom val p))))
-                same-keys)
+                    (atom-union (mole-ref-atom mole p)
+                                (mole-ref-atom val (strip p)))))
+                (set-union mems v-mems))
       (for-each (lam (p)
-                  (if (mole-member? m-focus p)
-                      (hash-set! result p (m-ref-atom m-focus p))
-                    (hash-set! result p (m-ref-atom val p))))
-                exclusive-keys)
+                  (if (mole-member? mole p)
+                      (hash-set! result p (mole-ref-atom mole p))
+                    (hash-set! result p (mole-ref-atom val (strip p)))))
+                (set-symmetric-difference mems v-mems))
       (tag 'Mole result))))
 
-(define/public (mole-ref path)
+(def (mole-ref path)
   (if (mole-member? mole path)
       ; An atom of that path is found.
       (mole-ref-atom path)
