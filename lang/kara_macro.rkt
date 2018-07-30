@@ -1,6 +1,6 @@
 #lang racket
 
-(provide lam def case const)
+(provide (all-defined-out))
 
 
 ; "lam" instead of "lambda"
@@ -10,6 +10,10 @@
 ; "def" instead of "define"
 (define-syntax-rule (def whatever ...)
   (define whatever ...))
+
+; "def*" instead of "define-values"
+(define-syntax-rule (def* (id ids ...) expr)
+  (match-define (list id ids ...) expr))
 
 ; Pattern matching
 (define-syntax case
@@ -30,6 +34,5 @@
 ; Constant functions
 (define-syntax-rule (const b)
   (lambda () b))
-
 
 
