@@ -6,15 +6,18 @@
 ; The clock always gets started by `go` RIGHT before some work gets done.
 ; `resume` represents any procedure that will run in the amount of ticks
 ; passed to it (and it will always start the clock when it begins).
-; Because of the complication from nesting engines, `resume` is always paired
-; with a preliminary call to `run`.
+; Due to the complication from nesting engines, `resume` is
+; always preceded with a call to `run`.
 (def (resume->engine resume)
   (lam (new-ticks complete expire)
-    ; Why is there a `call/cc` here? Because control will be passed
-    ; to other procedures.
+    ; Why use `call/cc` here: if we didn't, `run` will still return
+    ; the completion of `resume`. However, if the timer expires, control
+    ; will never be able to return to this procedure.
+    ; Moral of the story: The timer handler is just another procedure, and
+    ; there is no "early return" in Scheme.
     ((call/cc
        (lam (escape)
-         ; Why stop the timer here? Because it will be restarted by `go` later.
+         ; Why stop the timer here: it will be restarted by `go` later.
          (let ([parent-ticks (stop-timer)])
            (run resume
                 parent-ticks

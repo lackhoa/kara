@@ -36,7 +36,7 @@
   (loop (proc->engine thunk) 0))
 
 "Mileage of fib"
-(mileage (lam () (fib 10)))
+; (mileage (lam () (fib 10)))
 
 (def (print-even)
   (for-each (tlam (x) (printf "~s\n" x))
@@ -48,18 +48,17 @@
             (filter odd? (range 1 null))))
 (def odd-engine (proc->engine print-odd))
 
-(def round-robin
-  (lam (engs)
-    (if (null? engs)
-        null
-        (begin
-          (printf "Switching\n")
-          ((car engs) 5
-             (lam (value ticks-left)
-               (cons value (round-robin (cdr engs))))
-             (lam (eng)
-               (round-robin
-                 (lappend (cdr engs) (list eng)))))))))
+(def (round-robin engs)
+  (if (null? engs)
+      null
+      (begin
+        (printf "Switching\n")
+        ((car engs) 1
+           (lam (value ticks-left)
+             (cons value (round-robin (cdr engs))))
+           (lam (eng)
+             (round-robin
+               (lappend (cdr engs) (list eng))))))))
 
 (def rr-engine
   (proc->engine (lam ()
@@ -67,7 +66,7 @@
 
 (def where-we-left-off null)
 "Nesting engines"
-(rr-engine 13
+(rr-engine 23
            "Done?"
            (lam (resume)
              (printf "It's not over\n")

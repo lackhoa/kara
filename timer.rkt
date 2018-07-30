@@ -21,4 +21,3 @@
     (set! clock (- clock 1))
     (when (= clock 0)
       (expire-handler))))
-
