@@ -6,6 +6,7 @@
 
 (def lcar car)
 (def lcdr cdr)
+(def lcadr cadr)
 (def llength length)
 (def lrange range)
 (def lappend append)

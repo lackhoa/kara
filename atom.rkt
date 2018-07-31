@@ -1,6 +1,6 @@
 #lang racket
 (require "lang/kara.rkt")
-(provide atom-member?)
+(provide (all-defined-out))
 
 ; Atoms are like the mathematical sense of sets
 ; The atom type has two constructors:
@@ -16,18 +16,17 @@
        [(Implicit pred) (pred x)]
        [(Explicit set)  (set-member? set x)]))
 
-(def (atom-union atom1 atom2)
+(def (atom-intersect atom1 atom2)
+  ; Some molecule checking code here!!!
   (case atom1
+    [(Mole m1) atom2]
     [(Implicit pred1)
      (case atom2
-       [(Implicit pred2)
-        (tag 'Implicit (lam (x)
-                        (and (pred1 x) (pred2 x))))]
-       [(Explicit set2)
-        (tag 'Explicit (set (lfilter
-                              (lam (x) (atom-member? pred1 x)
-                              set2))))])]
+       [(Mole m2) atom1]
+       [(Implicit pred2) (tag 'Implicit (and-pred pred1 pred2))]
+       [(Explicit set2)  (tag 'Explicit (set-filter pred1 set2))])]
     [(Explicit set1)
      (case atom2
-       [(Implicit pred2) (atom-union atom2 atom1)]
-       [(Explicit set2)  (tag 'Explicit (set-union set1 set2))])]))
+       [(mole m2) atom1]
+       [(Implicit pred2) (tag 'Explicit (set-filter pred2 set1))]
+       [(Explicit set2)  (tag 'Explicit (set-intersect set1 set2))])]))

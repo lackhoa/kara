@@ -76,9 +76,21 @@
 ; Notice the force on `y` (since y was lazy)
 (def (filter pred seq)
   (reduce (lam (x y)
-                 (if (pred x) (cons x y) (force y)))
-               null
-               seq))
+            (if (pred x) (cons x y) (force y)))
+          null
+          seq))
+
+(def (exists pred seq)
+  (lreduce (lam (x y)
+             (if (pred x) #t (exists pred y)))
+           #f
+           seq))
+
+(def (forall pred seq)
+  (lreduce (lam (x y)
+             (if (pred x) (forall pred y) #f))
+           #t
+           seq))
 
 (def (append seq1 seq2)
    (reduce cons seq2 seq1))

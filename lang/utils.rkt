@@ -1,6 +1,6 @@
 #lang racket
 (require "kara_macro.rkt")
-(provide fib square tag tag-of content repeat)
+(provide (all-defined-out))
 
 ; -----------------------------------------------------------
 ; Functional Stuff
@@ -9,6 +9,23 @@
     (when (> times 0)
         (func)
         (repeat func (- times 1))))
+
+(def (and-pred . preds)
+  (if (null? preds)
+      #t
+    (lam (x)
+      (if ((car preds) x)
+          ((apply and-pred (cdr preds)) x)
+        #f))))
+
+(def (or-pred . preds)
+  (if (null? preds)
+      #f
+    (lam (x)
+      (if ((car preds) x)
+          #t
+        ((apply or-pred (cdr preds)) x)))))
+
 
 ; ------------------------------------------------------------
 ; Typing

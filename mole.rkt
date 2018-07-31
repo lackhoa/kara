@@ -1,25 +1,36 @@
 #lang racket
-(require "lang/kara.rkt")
+(require "lang/kara.rkt"
+         "atom.rkt")
 (provide (all-defined-out))
 
 (def (new-mole) (tag 'Mole (make-hash)))
 
+(def (mole-empty? mole)
+  (hash-empty? (content mole)))
+
 (def (mole-member? mole atom)
-  (let ([c-mole (content mole)])
-    (hash-has-key? c-mole atom)))
+  (hash-has-key? (content mole) atom))
 
 ; Get an atom, assuming it's in the molecule.
 (def (mole-ref-atom path)
-  (let ([c-mole (content mole)])
-    (hash-ref c-mole path)))
+  (hash-ref (content mole) path))
 
+; Get the names of all the atoms in this molecule
 (def (mole-members mole)
-  (let ([c-mole (content mole)])
-    (hash-keys c-mole)))
+  (hash-keys (content mole)))
 
+(def (mole-copy mole)
+  (let ([c-mole (content mole)]
+    (tag 'Mole (hash-copy c-mole)))))
+
+; It's like intersection, but not quite the same.
 (def (mole-update mole path val)
   (if (typed-atom? val)
-      (atom-union (mole-ref-atom path) val)
+      (let ([clone (hash-copy (content mole))]
+        (hash-set! clone
+                   path
+                   (atom-intersect (mole-ref-atom path) val))
+        (tag 'Mole clone)))
     ; Molecule type
     (let* ([pad (lam (p) (if (non-empty-string? path)
                              (append-string path "/" p)
