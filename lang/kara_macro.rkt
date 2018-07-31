@@ -1,5 +1,4 @@
 #lang racket
-
 (provide (all-defined-out))
 
 
@@ -17,19 +16,17 @@
 
 ; Pattern matching
 (define-syntax case
-  (syntax-rules ()
+  (syntax-rules (else)
+    ; Else 
+    [(_ [else e1 e2 ...]) (begin e1 e2 ...)]
     ; No cases left
-    [(_ val)
-       (error "Pattern matching" "Pattern matching failed" val)]
-
-    [(_ val
-       [(pat-con1 var1 ...) b1-first b1-rest ...]  ; At least one body
-       [(pat-con2 var2 ...) b2-first b2-rest ...] ...)
-     ; I wonder how the quotation on `pat-con1` works?
-     (if (eq? (car val) 'pat-con1)
-         (apply (lambda (var1 ...) b1-first b1-rest ...) (cdr val))
-           (case val
-             [(pat-con2 var2 ...) b2-first b2-rest ...] ...))]))
+    [(_ val) (error "Pattern matching" "Pattern matching failed" val)]
+    ; Some case left
+    [(_ val [(pat-con var ...) e1 e2 ...] rest ...)
+     ; I wonder how the quotation on `pat-con` works?
+     (if (eq? (car val) 'pat-con)
+         (apply (lambda (var ...) b1-first b1-rest ...) (cdr val))
+       (case val rest ...))]))
 
 ; Constant functions
 (define-syntax-rule (const b)
