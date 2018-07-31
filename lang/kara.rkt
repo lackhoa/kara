@@ -11,3 +11,6 @@
          (all-from-out "seq.rkt") 
          (all-from-out "stack.rkt")
          (all-from-out racket/trace))
+
+(current-prefix-in "|")
+(current-prefix-out "|")
