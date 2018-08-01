@@ -1,13 +1,13 @@
 #lang racket
 
-(require "kara_macro.rkt"
+(require "macro.rkt"
          "utils.rkt"
          "seq.rkt"
          "stack.rkt"
          "set.rkt"
          racket/trace)
 
-(provide (all-from-out "kara_macro.rkt")
+(provide (all-from-out "macro.rkt")
          (all-from-out "utils.rkt")
          (all-from-out "seq.rkt") 
          (all-from-out "stack.rkt")

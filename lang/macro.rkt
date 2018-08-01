@@ -18,18 +18,29 @@
 (define-syntax case
   (syntax-rules (else)
     ; Else 
-    [(_ [else e1 e2 ...]) (begin e1 e2 ...)]
+    [(_ val [else e1 e2 ...]) (begin e1 e2 ...)]
     ; No cases left
     [(_ val) (error "Pattern matching" "Pattern matching failed" val)]
     ; Some case left
     [(_ val [(pat-con var ...) e1 e2 ...] rest ...)
      ; I wonder how the quotation on `pat-con` works?
      (if (eq? (car val) 'pat-con)
-         (apply (lambda (var ...) b1-first b1-rest ...) (cdr val))
+         (apply (lambda (var ...) e1 e2 ...) (cdr val))
        (case val rest ...))]))
+
+; Switch
+(define-syntax switch
+  (syntax-rules (else)
+    ; Else
+    [(_ val [else e1 e2 ...]) (begin e1 e2 ...)]
+    ; No cases left
+    [(_ val) #f]
+    ; Cases left
+    [(_ val [compare e1 e2 ...] rest ...)
+     (if (eq? val 'compare)
+         (begin e1 e2 ...)
+       (switch val rest ...))]))
 
 ; Constant functions
 (define-syntax-rule (const b)
   (lambda () b))
-
-

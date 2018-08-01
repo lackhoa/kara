@@ -1,7 +1,7 @@
 ; This file preserves the list primitives that will be shadowed by "seq.rkt"
 
 #lang racket
-(require "kara_macro.rkt")
+(require "macro.rkt")
 (provide (all-defined-out))
 
 (def lcar car)

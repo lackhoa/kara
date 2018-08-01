@@ -1,5 +1,5 @@
 #lang racket
-(require "kara_macro.rkt")
+(require "macro.rkt")
 
 (provide stack%)
 

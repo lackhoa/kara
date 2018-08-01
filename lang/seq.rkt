@@ -1,6 +1,6 @@
 #lang racket
 
-(require "kara_macro.rkt"
+(require "macro.rkt"
          "list_prims.rkt")
 (provide (all-defined-out)
          (all-from-out "list_prims.rkt"))
@@ -42,13 +42,6 @@
           [(= index 0) (car seq)]
           [else (seq-ref (cdr seq)
                          (- index 1))]))
-
-; Like map but for side-effects
-(def (for-each proc s)
-    (if (null? s)
-        'done
-        (begin (proc (car s))
-               (for-each proc (cdr s)))))
 
 ; Useful functions
 ; -----------------------------------------------
@@ -133,8 +126,8 @@
 ; Since reduce is lazy, map is lazy
 (def (map func L)
   (reduce (lam (x y) (cons (func x) y))
-          null
-          L))
+                null
+                L))
 
 (def (wrap thing)
     (list thing))
