@@ -7,7 +7,7 @@
 ; ---------------------------------
 ; Atoms are like sets in the mathematical sense.
 ; The atom type has two constructors:
-; (Implicit predicate)
+; (Implicit premole-dicate)
 ; (Explicit set)
 ; Actually, empty molecules can also be considered atoms. Atoms and molecules are also called "aggregates", as they represent multiple possibilities.
 
@@ -45,67 +45,112 @@
 ; Molecules
 ; ---------------------------------
 ; Molecules are just hash tables containing atoms.
+; Also, they can have equating mole-eqs.
 
 (def (mole? exp) (tagged? exp 'Mole))
 
-(def (new-mole) (tag 'Mole (make-hash)))
+(def (make-mole ht eqs)
+  (tag 'Mole (list ht eqs)))
+
+(def (new-mole) (make-mole (make-hash) null))
+
+(def (mole-dic mole) (car  (tag-body mole)))
+(def (mole-eqs mole) (cadr (tag-body mole)))
 
 (def (mole-empty? mole)
-  (hash-empty? (content mole)))
+  (hash-empty? (mole-dic mole)))
 
 (def (mole-member? mole atom)
-  (hash-has-key? (content mole) atom))
+  (hash-has-key? (mole-dic mole) atom))
 
 ; Get an atom, assuming it's in the molecule.
 (def (mole-ref-atom path)
-  (hash-ref (content mole) path))
+  (hash-ref (mole-dic mole) path))
 
 ; Get the names of all the atoms in this molecule
 (def (mole-members mole)
-  (hash-keys (content mole)))
+  (hash-keys (mole-dic mole)))
 
 (def (mole-copy mole)
-  (let ([c-mole (content mole)]
-    (tag 'Mole (hash-copy c-mole)))))
+  (tag 'Mole (list (hash-copy (mole-dic mole))
+                   (mole-eqs mole)))
+
+(def (pad path relative)
+    (if (non-empty-string? path)
+        (append-string path "/" relative)
+      relative))
+
+(def (pad-eq path eq)
+  (lmap (lam (x) (pad path x))
+        eq))
 
 ; It's like intersection, but not quite the same.
 (def (mole-update mole path val)
   (if (typed-atom? val)
-      (let ([clone (hash-copy (content mole))]
-        (hash-set! clone
+      (let ([dic (hash-copy (mole-dic mole))]
+        (hash-set! dic
                    path
                    (atom-intersect (mole-ref-atom path) val))
-        (tag 'Mole clone)))
+        (make-mole (apply-eqs! dic
+                               (mole-eqs mole)
+                               (list path))
+                   (mole-eqs mole))))
     ; Molecule type
-    (let* ([pad (lam (p) (if (non-empty-string? path)
-                             (append-string path "/" p)
-                           p))]
-           [strip (lam (p)
+    (let* ([strip (lam (p)
                     (substring p (+ (length path) 1)))]  ; '+1' for the slash
-           [mems (mole-members mole)]
-           [v-mems (map pad (mole-members val))]
-           [result (make-hash)])
+           ; Transform the relative paths to absolute paths.
+           [v-mems (map (lam (r) (pad path r))
+                        (mole-members val))]
+           [dic (make-hash)])
+      ; Members in both molecules.
       (for-each (lam (p)
-                  (hash-set! result
+                  (hash-set! dic
                     p
-                    (atom-union (mole-ref-atom mole p)
-                                (mole-ref-atom val (strip p)))))
-                (set-union mems v-mems))
+                    (atom-intersect (mole-ref-atom mole p)
+                                    (mole-ref-atom val (strip p)))))
+                (set-intersect (mole-members mole) v-mems))
+      ; Members in only one molecule
       (for-each (lam (p)
                   (if (mole-member? mole p)
-                      (hash-set! result p (mole-ref-atom mole p))
-                    (hash-set! result p (mole-ref-atom val (strip p)))))
-                (set-symmetric-difference mems v-mems))
-      (tag 'Mole result))))
+                      (hash-set! dic p (mole-ref-atom mole p))
+                    (hash-set! dic p (mole-ref-atom val (strip p)))))
+                (set-symmetric-difference (mole-members mole) v-mems))
+      (make-mole (apply-eqs! dic
+                             (mole-eqs mole)
+                             v-mems)
+                 mole-eqs)))))
 
+; We make a choice to pass on the hashtable directly
+(def (mole-update-eqs mole path eqs)
+  (let ([new-eqs (map (lam (r) (pad-eq path r))
+                      (mole-eqs mole))])
+    (make-mole (mole-dic mole)
+               (lappend (mole-eqs mole) new-eqs))))
+
+; Mutate `dic`. It's simple because they're all equalities.
+(def (apply-eqs! dic eqs updated)
+  (for-each
+    (lam (path)
+      (when (singleton? (hash-ref dic path))
+        (for-each
+          (lam (eq)
+            (when (set-member? eq path)
+                (for-each (lam (p)
+                            (hash-set! p (atom-intersect (hash-ref dic path)
+                                                         (hash-ref dic p))))
+                          eq)))
+          eqs)))
+    updated))
+
+; QUESTIONABLE
 (def (mole-ref path)
   (if (mole-member? mole path)
       ; An atom of that path is found.
       (mole-ref-atom path)
       ; Will return a completely empty molecule if the path is found nowhere, but that's fine.
-      (let ([clone (make-hash)])
+      (let ([dic (make-hash)])
         (for-each (lam (p)
-                    (hash-set! clone p (mole-ref-atom mole p)))
+                    (hash-set! dic p (mole-ref-atom mole p)))
                   (filter (lam (s) (string-prefix? path s))
                           (mole-members mole)))
-        (tag 'Mole clone))))
+        (make-mole dic (mole-eqs mole)))))  ; Wait, what?

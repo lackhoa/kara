@@ -43,7 +43,7 @@
   (and (list? exp)
        (eq? (car exp) the-tag)))
 
-(def (content tagged)
+(def (tag-body tagged)
      (cadr tagged))
 
 ; ------------------------------------------------------------                           
