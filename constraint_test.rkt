@@ -2,36 +2,59 @@
 (require "lang/kara.rkt"
          "constraint.rkt")
 
-(def (adder a1 a2 sum)
+(def (equate . equated)
+  (when (exists has-value? equated)
+    (let ([first-value
+          (get-value (first-pass has-value? equated))])
+      (for-each (lam (x) (set-value x first-value)) equated))))
+
+(def (make-set-mem set member text)
   (def (process-new-value)
-    (cond [(and (has-value? a1) (has-value? a2))
-           (set-value! sum
-                       (+ (get-value a1) (get-value a2))
-                       me)]
-          [(and (has-value? a1) (has-value? sum))
-           (set-value! a2
-                       (- (get-value sum) (get-value a1))
-                       me)]
-          [(and (has-value? a2) (has-value? sum))
-           (set-value! a1
-                       (- (get-value sum) (get-value a2))
-                       me)]))
+    (when (all-has-value? (list set member))
+      (set-value text
+                 (format "(in ~s ~s)"
+                         (get-value set)
+                         (get-value member)))))
+  (def (me request)
+    (cond [(eq? request 'I-have-a-value)
+           (process-new-value)]
+          [else (error "SET-MEM" "Unknown request" request)]))
+  (connect set me)
+  (connect member me)
+  (connect text me))
+
+(def (make-eq first second text)
+  (def (process-new-value)
+    (when (all-has-value? (list first second))
+      (set-value text
+                 (format "(= ~s ~s)"
+                         (get-value first)
+                         (get-value second)))))
+  (def (me request)
+    (cond [(eq? request 'I-have-a-value)
+           (process-new-value)]
+          [else (error "EQ" "Unknown request" request)]))
+  (connect first me)
+  (connect second me)
+  (connect text me)
+  me)
+
+
+(def (reflexivity ante conse)
+  (def (process-new-value)
+    )
   (def (me request)
     (cond [(eq? request 'I-have-a-value)
            (process-new-value)]
           [else (error "ADDER" "Unknown request" request)]))
-  (connect a1 me)
-  (connect a2 me)
-  (connect sum me)
+  (connect ante  me)
+  (connect conse me)
   me)
 
-(def A1 (make-connector))
-(def A2 (make-connector))
+(def LS  (make-connector))
 (def SUM (make-connector))
-(adder A1 A2 SUM)
+(adder LS SUM)
 
-(probe "A1" A1)
-(probe "A2" A2)
+(probe "LS" LS)
 (probe "SUM" SUM)
-(set-value! SUM 200  'user)
-(set-value! A1  160 'user)
+(set-value! LS (list 1 2 3 99) 'user)

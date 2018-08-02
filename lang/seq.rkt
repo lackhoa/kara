@@ -85,6 +85,12 @@
            #t
            seq))
 
+(def (first-pass pred seq default)
+  (lreduce (lam (x y)
+             (if (pred x) x (exists pred y)))
+           default
+           seq))
+
 (def (append seq1 seq2)
    (reduce cons seq2 seq1))
 
