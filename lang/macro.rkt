@@ -20,7 +20,7 @@
     ; Else 
     [(_ val [else e1 e2 ...]) (begin e1 e2 ...)]
     ; No cases left
-    [(_ val) (error "Pattern matching" "Pattern matching failed" val)]
+    [(_ val) (error "Pattern matching" "No match found" val)]
     ; Some case left
     [(_ val [(pat-con var ...) e1 e2 ...] rest ...)
      ; I wonder how the quotation on `pat-con` works?
@@ -34,10 +34,10 @@
     ; Else
     [(_ val [else e1 e2 ...]) (begin e1 e2 ...)]
     ; No cases left
-    [(_ val) #f]
+    [(_ val) (error "Switch" "No match found" val)]
     ; Cases left
     [(_ val [compare e1 e2 ...] rest ...)
-     (if (eq? val 'compare)
+     (if (eq? val compare)
          (begin e1 e2 ...)
        (switch val rest ...))]))
 

@@ -46,15 +46,15 @@
               "Pattern with else")
 
 (check-equal? (switch 'Three
-                [One   1]
-                [Two   2]
-                [Three 3])
+                ['One   1]
+                ['Two   2]
+                ['Three 3])
               3
               "Switch normal")
 
 (check-equal? (switch 'Four
-                [One 1]
-                [Two 2]
+                ['One 1]
+                ['Two 2]
                 [else 4])
               4
               "Switch with else")

@@ -4,4 +4,4 @@
 (provide (all-defined-out))
 
 (def (set-filter pred set)
-  (set (lfilter pred (set->list set))))
+  (list->set (lfilter pred (set->list set))))
