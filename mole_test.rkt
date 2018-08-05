@@ -3,17 +3,27 @@
          "mole.rkt"
          rackunit)
 
+; The first hash table indicates the form,
+; The second hash table indicates the symbolic links.
+(def B1
+  (list
+    (make-hash
+      '(["" . 'eq]
+        ["lhs" . 'disjunction]
+        ["rhs" . 'disjunction]))
+    (make-hash
+      '(["lhs/fd" . "rhs/sd"]
+        ["lhs/sd" . "rhs/fd"]))))
 
-(def refl (new-mole))
-((refl 'add-slink) "conse/elem1" "ante/mem")
-((refl 'add-slink) "conse/elem2" "ante/mem")
-((refl 'add-slink) "conse/set"   "ante/set")
-
-(def (mex only)
-  (make-explicit (set only)))
-
-((refl 'update) "ante/mem"  (mex 'a))
-((refl 'update) "conse/set" (mex 'A))
-
-(check-equal? ((refl 'ref) "conse/elem1") (mex 'a))
-(check-equal? ((refl 'ref) "ante/set")    (mex 'A))
+(def B2
+  (list
+    (make-hash
+      '(["" . 'eq]
+        ["lhs" . 'disjunction]
+        ["rhs" . 'disjunction]
+        ["lhs/sd" . 'disjunction]
+        ["rhs/fd" . 'disjunction]))
+    (make-hash
+      '(["lhs/fd" . "rhs/fd/fd"]
+        ["lhs/sd/fd" . "rhs/fd/sd"]
+        ["lhs/sd/sd"] . "rhs/sd"))))

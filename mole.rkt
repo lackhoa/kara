@@ -1,22 +1,26 @@
 #lang racket
-(require "lang/kara.rkt"
-         "atom.rkt")
+(require "lang/kara.rkt")
 (provide (all-defined-out)
-         (all-from-out "atom.rkt"))
+         (all-from-out))
 
 ; ---------------------------------
 ; Molecules
 ; ---------------------------------
-; Molecules are just hash tables containing atoms.
+; Molecules are just hash tables containing symbolic values.
 ; Also, they can have symbolic links.
-
-(def (mole? exp) (tagged? exp 'Mole))
 
 (def (new-mole)
   (make-mole (make-hash) (make-hash)))
 
 (def (make-mole ht slinks)
   (let ([dic ht] [slinks slinks])
+
+    (def (follow-slink sym-link)
+      (hash-ref slinks sym-link))
+
+    (def (sym-link? path)
+      (hash-has-key? slinks path))
+
     (def (me msg)
       (switch msg
         ['dic dic]
@@ -27,34 +31,25 @@
         ['copy (make-mole (hash-copy dic)
                           (hash-copy slinks))]
 
-        ['sym-link?
-         (lam (path) (hash-has-key? slinks path))]
-
         ['add-slink
          (lam (from to) (hash-set! slinks from to))]
-
-        ['follow-slink
-         (lam (link) (hash-ref slinks link))]
-
-        ; Reference an atom, given that it's in the dictionary
+        
         ['ref
          (lam (path)
-           (if ((me 'sym-link?) path)
-               (hash-ref dic
-                         ((me 'follow-slink) path))
+           (if (sym-link? path)
+               (hash-ref dic (follow-slink path))
              (hash-ref dic path)))]
 
+        ; Returns false if there is an inconsistency
         ['update
          (lam (path val)
            (let ([my-path path])
-             (when ((me 'sym-link?) path)
+             (when (sym-link? path)
                (set! my-path
-                     ((me 'follow-slink) path)))
-             (if (hash-has-key? dic my-path)
-                 (hash-set! dic
-                   my-path
-                   (atom-intersect ((me 'ref) my-path)
-                                   val))
+                     (follow-slink path)))
+             (if (hash-contain? dic my-path)
+                 (unless (equal? (hash-ref dic my-path))
+                         #f)
                (hash-set! dic my-path val))))]
 
         [else (error "MOLECULE" "Unknown message" msg)]))
