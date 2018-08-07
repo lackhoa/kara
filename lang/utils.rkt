@@ -32,7 +32,7 @@
 ; ------------------------------------------------------------
 ; An alias used to construct a term of a type.
 (def (tag the-tag content)
-    (list the-tag content))
+    (cons the-tag content))
 
 ; Don't reall need these two functions since we
 ; already have pattern-matching
@@ -40,11 +40,11 @@
      (car exp))
 
 (def (tagged? exp the-tag)
-  (and (list? exp)
+  (and (pair? exp)
        (eq? (car exp) the-tag)))
 
 (def (tag-body tagged)
-     (cadr tagged))
+     (cdr tagged))
 
 ; ------------------------------------------------------------                           
 ; Testing Functions
