@@ -31,8 +31,11 @@
 
 ; Types are delayed
 (define-syntax-rule (type name e ...)
-  (def name
-    (delay (list e ...))))
+  (def name (delay (list e ...))))
+
+; Anonymous type
+(define-syntax-rule (union e ...)
+  (delay (list e ...)))
 
 ; -------------------------------------------------------
 ; These are the types
@@ -43,15 +46,38 @@
 
 (ctor Implication
   (rec ante wff)
-  (rec csq  wff))
+  (rec conclusion wff))
 
-(force wff)
-
-(type entailment I-Combinator)
+(type entailment I-Combinator
+                 K-Combinator
+                 Chain
+                 Modus-Ponens)
 
 (ctor I-Combinator
-  (form csq      Implication)
-  (==   csq/ante csq/csq))
+  (form conclusion Implication)
+  (==   conclusion/ante conclusion/csq))
 
-(force entailment)
+(ctor K-Combinator
+  (form conclusion      Implication)
+  (form conclusion/csq  Implication)
+  (==   conclusion/ante conclusion/csq/csq))
 
+(ctor Chain
+  (rec a=>b
+       (union I-Combinator K-Combinator))
+  (rec b=>c            entailment)
+  (rec conclusion      wff)
+  (== a=>b/conclusion
+      b=>c/prem))
+
+(ctor Modus-Ponens
+  (rec  a->b       entailment)
+  (rec  a          entailment)
+  (rec  conclusion wff)
+
+  (form a->b/conclusion Implication)
+
+  (== a->b/conclusion/ante
+      a/conclusion)
+  (== conclusion
+      a->b/conclusion/csq))
