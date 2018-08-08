@@ -50,21 +50,20 @@
            [(equal? x (car seq)) #t]
            [else (in-seq? x (cdr seq))]))
 
-; This is a strict version of `reduce`.
-; Not that it will create a list, but the content of `(cdr seq)`
-; is forced when executing the operation.
-(def (lreduce op init seq)
-    (if (null? seq)
-        init
-        (op (car seq)
-            (lreduce op init (cdr seq)))))
-
 ; The default, lazy version.
 (def (reduce op init seq)
     (if (null? seq)
         init
         (op (car seq)
             (delay (reduce op init (cdr seq))))))
+
+; This is a strict version of `reduce`.
+; Same thing as `reduce`, but the content of `(cdr seq)` is forced before executing the operation.
+(def (lreduce op init seq)
+  (reduce (lam (x y)
+            (op x (force y)))
+          init
+          seq))
 
 ; Notice the force on `y` (since y was lazy)
 (def (filter pred seq)
@@ -74,33 +73,39 @@
           seq))
 
 (def (exists pred seq)
-  (lreduce (lam (x y)
-             (if (pred x) #t (exists pred y)))
-           #f
-           seq))
+  (reduce (lam (x y)
+            (if (pred x)
+                #t
+              (exists pred (force y))))
+          #f
+          seq))
 
 (def (forall pred seq)
-  (lreduce (lam (x y)
-             (if (pred x) (forall pred y) #f))
-           #t
-           seq))
+  (reduce (lam (x y)
+            (if (pred x)
+                (forall pred (force y))
+              #f))
+          #t
+          seq))
 
 (def (first-pass pred seq default)
-  (lreduce (lam (x y)
-             (if (pred x) x (exists pred y)))
-           default
-           seq))
+  (reduce (lam (x y)
+            (if (pred x)
+                x
+              (first-pass pred (force y))))
+          default
+          seq))
 
 (def (append seq1 seq2)
    (reduce cons seq2 seq1))
 
 ; Mapping and reducing with append to create nested maps
 (def (flatmap proc seq)
-    (lreduce append null (map proc seq)))
+  (lreduce append null (map proc seq)))
 
 (def (remove x s)
-    (filter (lam (item) (not (eq? item x)))
-            s))
+  (filter (lam (item) (not (eq? item x)))
+          s))
 
 (def (permutations s)
     ; This function sticks the x to the permutations that doesn't contain x
@@ -151,8 +156,8 @@
                  first))
 
     (lreduce prod-aux
-                   (list null)  ; Base case: kind of undefined?
-                   seqs))
+             (list null)  ; Base case: kind of undefined?
+             seqs))
 
 
 ; params s: a single sequence as a set
@@ -161,14 +166,14 @@
 ; Still lazy
 (def (powerset s)
     (def (pow-aux first pow-rest)
-         (append (map (lam (pow-rest-iter)
-                        (cons first pow-rest-iter))
-                      pow-rest)                         ; Include first
-                 pow-rest))                             ; Exclude first
+      (append (map (lam (pow-rest-iter)
+                     (cons first pow-rest-iter))
+                   pow-rest)                         ; Include first
+              pow-rest))                             ; Exclude first
 
     (lreduce pow-aux
-                   (list null)  ; Base case: the only subset of the empty set is itself
-                   s))
+             (list null)  ; Base case: the only subset of the empty set is itself
+             s))
 
 (def (interleave s1 s2)
   (if (null? s1)
