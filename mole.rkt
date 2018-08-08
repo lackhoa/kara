@@ -31,16 +31,32 @@
         ['copy (make-mole (hash-copy dic)
                           (hash-copy slinks))]
 
+        ; Returns INCONSISTENT if the values are already different
         ['add-slink
-         (lam (from to) (hash-set! slinks from to))]
-        
+         (lam (path1 path2)
+           (let ([i1 ((me 'ref) from)]
+                 [i2 ((me 'ref) to)])
+             (cond [(and (eq? i1 'NOT-FOUND)
+                         (eq? i2 'NOT-FOUND))
+                    (hash-set! slinks path1 path2)]
+
+                   ; At least one of them are found
+                   [(eq? i1 'NOT-FOUND)
+                    (hash-set! slinks path1 path2)]
+                   [(eq? i2 'NOT-FOUND)
+                    (hash-set! slinks path2 path1)]
+
+                   ; Don't do anything if both values already the same
+                   [else (unless (equal? i1 i2) 'NOT-FOUND)]))]
+
+        ; Returns NOT-FOUND for unknowns
         ['ref
          (lam (path)
            (if (sym-link? path)
-               (hash-ref dic (follow-slink path))
-             (hash-ref dic path)))]
+               (hash-ref dic (follow-slink path) 'NOT-FOUND)
+             (hash-ref dic path 'NOT-FOUND)))]
 
-        ; Returns false if there is an inconsistency
+        ; Returns INCONSISTENT if there is an inconsistency
         ['update
          (lam (path val)
            (let ([my-path path])
@@ -49,7 +65,7 @@
                      (follow-slink path)))
              (if (hash-contain? dic my-path)
                  (unless (equal? (hash-ref dic my-path))
-                         #f)
+                         'INCONSISTENT)
                (hash-set! dic my-path val))))]
 
         [else (error "MOLECULE" "Unknown message" msg)]))
