@@ -14,11 +14,11 @@
   (Form (sym->str 'path) e))
 
 ; Symbolic links declaration
-(struct SLink (path1 path2))
+(struct SLink paths)
 
-(define-syntax-rule (== path1 path2)
-  (SLink (sym->str 'path1) 
-         (sym->str 'path2)))
+(define-syntax-rule (== p1 p2 ...)
+  (SLink (map sym->str
+              (list 'p1 'p2 ...))))
 
 ; Type declaration for components
 (struct Rec (component type))
@@ -134,10 +134,10 @@
 
   (form ?=>a->b/ccs
         Implication)
-
+  ; A
   (== ?=>a->b/ccs/ante
       ?=>a/ccs)
-
+  ; B
   (== ccs
       ?=>a->b/ccs/csq))
 ; Note: the conclusion (ccs) is implicit in the last link.

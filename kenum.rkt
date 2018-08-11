@@ -13,43 +13,70 @@
 (def (enum mole targets)
   (if (null? targets)
       mole
-    (let* ([t-first (car targets)]
-           [t-rest  (cdr targets)]
-           [result (advance mole t-first)])
+    (let* ([t-first (target-first targets)]
+           [t-rest  (target-rest  targets)]
+           [result  (advance mole t-first)])
       (if (eq? result 'INCONSISTENT)
           null
-        (multitask
-          (for-each
-            (lam (result-iter)
-              (enqueue the new targets)
-              (enum result-mole targets))
-            result))))))
+        (for-each
+          (lam (result-iter)
+            (add-targets (t-rest))
+            (enum result-mole targets))
+          result)))))
 
-; Output: a list of molecules, or INCONSISTENT error flag
+; Output: a list of molecules, or INCONSISTENT error flags
 (def (advance mole target)
-  (if (target has type)
-      (map (lam (ctor)
-             (work-with-ctor (mole 'copy) ctor))
-           type-of-target)
-    (work-with-ctor mole (mole-ref target-path))))
+  (let* ([tpath (target-path target)]
+         [ttype (target-type target)]
+         [val   ((mole 'ref) tpath)])
+    (if (eq? val 'NOT-FOUND)
+        (remove 'INCONSISTENT
+          (map (lam (ttype-iter)
+                 (work-with-ctor (mole 'copy)
+                                 ttype-iter))
+               (force ttype)))
+      ; We already have a constructor
+      (work-with-ctor tpath mole val))))
 
 ; Will modify mole to expand a specific ctor
-(def (work-with-ctor mole ctor)
+(def (work-with-ctor rpath mole ctor)
+  ; We will be working under a relative path
+  (def (padder p)
+    (pad rpath p))
+
+  (def targets null)
+
   (call/cc
     (lam (k)
       (for-each
         (lam (ctor-iter)
           (match ctor-iter
-            [(form path constructor)
+            [(Form path constructor)
              (when (eq? 'INCONSISTENT
-                        ((mole 'update) path constructor))
+                        ((mole 'update) (padder path) constructor))
                    (k 'INCONSISTENT))]
-            [(slink path1 path2)
-             (when (eq? 'INCONSISTENT
-                        ((mole 'add-slink) path1 path2))
-                   (K 'INCONSISTENT))]
-            [(rec name type)
-             (unless (the path is in the slt)
-               (add that target somewhere to return later))]))
+            [(SLink paths)
+             (for-each
+               (lam (path-pair)
+                 (when
+                   (eq? 'INCONSISTENT
+                        ((mole 'add-slink) (padder (car path-pair))
+                                           (padder (cdr path-pair))))
+                   (k 'INCONSISTENT)))
+               (pair-iter paths))]
+            [(Rec component type)
+             (unless ((mole 'link?) (padder component))
+               (set! targets
+                     (cons (Target (padder component) type)
+                           targets)))]))
         ctor)
-      (Return the molecule and the targets))))
+      (cons mole targets))))
+
+(def (pair-iter ls)
+  (foldr (lam (x y)
+           (if (null? y)
+               null
+             (cons (cons x (car y))
+                   y)))
+         null
+         ls))

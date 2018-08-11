@@ -26,6 +26,10 @@
         ['dic dic]
         ['slinks slinks]
 
+        ['link?
+         (lam (path)
+           (hash-contain? slinks path))]
+
         ['members (hash-keys dic)]
 
         ['copy (make-mole (hash-copy dic)
