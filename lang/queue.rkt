@@ -21,12 +21,16 @@
   (let ([new-pair (cons item null)])
     (if (empty-queue? queue)
         (begin (set-front-ptr! queue new-pair)
-               (set-rear-ptr! queue new-pair))   
+               (set-rear-ptr! queue new-pair)
+               queue)   
       (begin (set-cdr! (rear-ptr queue) new-pair)
-             (set-rear-ptr! queue new-pair))))) 
+             (set-rear-ptr! queue new-pair)
+             queue)))) 
 
 (def (dequeue! queue)
   (if (empty-queue? queue)
       (error "DELETE! called with an empty queue" queue)
-    (set-front-ptr! queue
-                    (cdr (front-ptr queue)))))
+    (begin
+      (set-front-ptr! queue
+                      (cdr (front-ptr queue)))
+      queue)))

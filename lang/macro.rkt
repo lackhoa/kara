@@ -40,7 +40,3 @@
      (if (eq? val compare)
          (begin e1 e2 ...)
        (switch val rest ...))]))
-
-; Constant functions
-(define-syntax-rule (const b)
-  (lambda () b))

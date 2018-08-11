@@ -10,10 +10,22 @@
           (enqueue! (new-queue) (Target ""))])
     (enum mole targets)))
 
+; The target queue strategy
+(struct Queue-Targets (queue)
+  #:methods gen:targets
+  [(define (targets-next targets)
+     (front-queue (targets-queue queue)))
+   (define (targets-rest targets)
+     (dequeue! (targets-queue targets))
+     targets)
+   (define (targets-add targets)
+     (enqueue! (targets-queue queue)))])
+
+; Returns: a stream of molecules
 (def (enum mole targets)
   (if (null? targets)
       mole
-    (let* ([t-first (target-first targets)]
+    (let* ([t-first (target-next targets)]
            [t-rest  (target-rest  targets)]
            [result  (advance mole t-first)])
       (if (eq? result 'INCONSISTENT)
@@ -24,7 +36,7 @@
             (enum result-mole targets))
           result)))))
 
-; Output: a list of molecules, or INCONSISTENT error flags
+; Output: a list of molecules
 (def (advance mole target)
   (let* ([tpath (target-path target)]
          [ttype (target-type target)]
