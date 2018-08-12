@@ -2,9 +2,9 @@
 (require "lang/kara.rkt"
          "engine.rkt"
          racket/generator)
-(provide gen-interleave)
+(provide gen-robin)
 
-(def (gen-interleave gens)
+(def (gen-robin gens)
   (generator ()
     (let loop ([engs (map proc->engine gens)])
       (if (null? engs)
@@ -37,33 +37,31 @@
 
 
 ;; Testingu!
-(def (fib n)
-  (check-timer)
-  (if (< n 2)
-      n
-    (+ (fib (- n 1))
-       (fib (- n 2)))))
+;; (def (fib n)
+;;   (check-timer)
+;;   (if (< n 2)
+;;       n
+;;     (+ (fib (- n 1))
+;;        (fib (- n 2)))))
 
-(def fib-gen1
-  (generator ()
-    (let loop ([n 4])
-      (yield (fib n))
-      (if (<= n 11)
-          (loop (+ n 1))
-        'DONE))))
+;; (def fib-gen1
+;;   (generator ()
+;;     (let loop ([n 4])
+;;       (yield (fib n))
+;;       (if (<= n 11)
+;;           (loop (+ n 1))
+;;         'DONE))))
 
-(def fib-gen2
-  (generator ()
-    (let loop ([n 10])
-      (yield (fib n))
-      (if (>= n 4)
-          (loop (- n 1))
-        'DONE))))
+;; (def fib-gen2
+;;   (generator ()
+;;     (let loop ([n 10])
+;;       (yield (fib n))
+;;       (if (>= n 4)
+;;           (loop (- n 1))
+;;         'DONE))))
 
-(def g (gen-interleave (list fib-gen2 fib-gen1)))
-(g) (g) (g) (g) (g) (g) (g) (g)
-(g) (g) (g) (g) (g) (g) (g) (g)
-(g) (g) (g) (g) (g) (g) (g) (g)
-(g) (g) (g) (g) (g) (g) (g) (g)
-
-;; (for/list ([i (in-producer (gen-interleave (list fib-gen1 fib-gen2)) 'DONE)]) i)
+;; (def g (gen-robin (list fib-gen2 fib-gen1)))
+;; (g) (g) (g) (g) (g) (g) (g) (g)
+;; (g) (g) (g) (g) (g) (g) (g) (g)
+;; (g) (g) (g) (g) (g) (g) (g) (g)
+;; (g) (g) (g) (g) (g) (g) (g) (g)

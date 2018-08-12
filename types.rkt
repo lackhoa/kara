@@ -14,7 +14,7 @@
   (Form (sym->str 'path) e))
 
 ; Symbolic links declaration
-(struct SLink paths)
+(struct SLink (paths))
 
 (define-syntax-rule (== p1 p2 ...)
   (SLink (map sym->str

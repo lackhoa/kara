@@ -28,7 +28,7 @@
 
         ['link?
          (lam (path)
-           (hash-contain? slinks path))]
+           (hash-has-key? slinks path))]
 
         ['members (hash-keys dic)]
 
@@ -38,8 +38,8 @@
         ; Returns INCONSISTENT if the values are already different
         ['add-slink
          (lam (path1 path2)
-           (let ([i1 ((me 'ref) from)]
-                 [i2 ((me 'ref) to)])
+           (let ([i1 ((me 'ref) path1)]
+                 [i2 ((me 'ref) path2)])
              (cond [(and (eq? i1 'NOT-FOUND)
                          (eq? i2 'NOT-FOUND))
                     (hash-set! slinks path1 path2)]
@@ -51,7 +51,8 @@
                     (hash-set! slinks path2 path1)]
 
                    ; Don't do anything if both values already the same
-                   [else (unless (equal? i1 i2) 'NOT-FOUND)]))]
+                   [else
+                    (unless (equal? i1 i2) 'NOT-FOUND)])))]
 
         ; Returns NOT-FOUND for unknowns
         ['ref
@@ -67,7 +68,7 @@
              (when (sym-link? path)
                (set! my-path
                      (follow-slink path)))
-             (if (hash-contain? dic my-path)
+             (if (hash-has-key? dic my-path)
                  (unless (equal? (hash-ref dic my-path))
                          'INCONSISTENT)
                (hash-set! dic my-path val))))]
