@@ -6,53 +6,87 @@
 ; ---------------------------------
 ; Molecules
 ; ---------------------------------
-; Molecules are just hash tables containing symbolic values.
-; Also, they can have symbolic links.
+(def (make-new-mole) null)
 
-(def (new-mole)
-  (make-mole (make-hash) (make-hash)))
+(def (mole-lookup mole path)
+  (let loop ([ls mole])
+    (if (null? ls)
+        'NOT-FOUND
+      (let ([focus (car ls)])
+        (if (set-member? focus path)
+            path
+          (loop (cdr mole)))))))
+
+(def (mole-ref mole path)
+  (let ([lookup (mole-lookup mole path)])
+    (if (eq? lookup 'NOT-FOUND)
+        'UNKNOWN
+      lookup)))
+
+; Returns the tail when `prefix` is in `path`, otherwise #f
+(def (prefix pre path)
+  (let-values ([(x y)
+                (drop-common-prefix pre path)])
+    (if (null? x) y #f)))
+
+(def (pad pre path)
+  (append pre path))
+
+; Add an equality from `x` to `y` in `mole`
+(def (add-eq mole x y)
+  (def (weed key)
+    (let ([ls-key (set->list key)])
+      (let loop ([ls ls-key] [dx null] [dy null])
+        (if (null? ls)
+            (values dx dy)
+          (let ([px (prefix x first)])
+            (if px
+                (loop (cdr ls)
+                      (cons px dx)
+                      dy)
+              (let ([py (prefix y first)])
+                (if py
+                    (loop (cdr ls)
+                          dx
+                          (cons py dy))
+                  (loop (cdr ls)
+                        dx
+                        dy)))))))))
+
+  (let loop ([cur-mole (make-new-mole)]
+             [ls mole])
+    (if (null? ls)
+        mole
+      (let*-values ([(new-mole cur-mole)]
+                    [(e-focus) (car ls)]
+                    [(dx dy) (weed (car e-focus))])
+        (def (equate pre ls)
+          (let loop ([ls ls])
+            (unless (null? ls)
+              (let* ([t (car ls)]
+                     [kt (pad pre t)])
+                (let ([lookup (mole-lookup new-mole kt)])
+                  (if (eq? lookup 'NOT-FOUND)
+                      (set! new-mole
+                            (cons (add-to-key (car new-mole)
+                                              kt)
+                                  (cdr new-mole)))
+                    (if (not (equal? (cdr lookup)
+                                     (mole-ref new-mole kt)))
+                        (Yeah I don't know what the fuck to do...)
+                      (begin)))
+                  (loop (cdr ls)))))))
+        (equate dx x)
+        (equate dy y)
+        (loop new-mole (cdr ls))))))
 
 (def (make-mole ht slinks)
   (let ([dic ht] [slinks slinks])
-
-    (def (follow-slink sym-link)
-      (hash-ref slinks sym-link))
-
-    (def (sym-link? path)
-      (hash-has-key? slinks path))
-
     (def (me msg)
       (switch msg
-        ['dic dic]
-        ['slinks slinks]
-
-        ['link?
-         (lam (path)
-           (hash-has-key? slinks path))]
-
-        ['members (hash-keys dic)]
-
-        ['copy (make-mole (hash-copy dic)
-                          (hash-copy slinks))]
 
         ; Returns INCONSISTENT if the values are already different
-        ['add-slink
-         (lam (path1 path2)
-           (let ([i1 ((me 'ref) path1)]
-                 [i2 ((me 'ref) path2)])
-             (cond [(and (eq? i1 'NOT-FOUND)
-                         (eq? i2 'NOT-FOUND))
-                    (hash-set! slinks path1 path2)]
-
-                   ; At least one of them are found
-                   [(eq? i1 'NOT-FOUND)
-                    (hash-set! slinks path1 path2)]
-                   [(eq? i2 'NOT-FOUND)
-                    (hash-set! slinks path2 path1)]
-
-                   ; Don't do anything if both values already the same
-                   [else
-                    (unless (equal? i1 i2) 'NOT-FOUND)])))]
+        
 
         ; Returns NOT-FOUND for unknowns
         ['ref
