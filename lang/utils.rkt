@@ -26,25 +26,11 @@
           #t
         ((apply or-pred (cdr preds)) x)))))
 
+(def (unequal? x y)
+  (not (equal? x y)))
 
-; ------------------------------------------------------------
-; Typing
-; ------------------------------------------------------------
-; An alias used to construct a term of a type.
-(def (tag the-tag content)
-    (cons the-tag content))
-
-; Don't reall need these two functions since we
-; already have pattern-matching
-(def (tag-of exp)
-     (car exp))
-
-(def (tagged? exp the-tag)
-  (and (pair? exp)
-       (eq? (car exp) the-tag)))
-
-(def (tag-body tagged)
-     (cdr tagged))
+(def (uneq? x y)
+  (not (eq? x y)))
 
 ; ------------------------------------------------------------                           
 ; Testing Functions

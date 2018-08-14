@@ -42,6 +42,16 @@
       (stream-cons (car s1)
                    (interleave s2 (cdr s1)))))
 
+(def (remove-pos ls pos)
+  (cond [(= pos 0) (drop ls 1)]
+        [(> pos 0) (append (take ls pos)
+                           (drop ls (+ pos 1)))]
+        [else (error "REMOVE-POS" "Invalid position" pos)]))
+
+; Just add an item to the end of a list
+(def (append1 ls single-item)
+  (append ls (list single-item)))
+
 ;; (def (permutations s)
 ;;   ; This function sticks the x to the permutations that doesn't contain x
 ;;   (def (permute-aux x)

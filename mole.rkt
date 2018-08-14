@@ -7,21 +7,25 @@
 ; Molecules
 ; ---------------------------------
 (def (make-new-mole) null)
+(def (make-entry path val)
+  (cons path val))
 
+; Returns the index and the entry containing `path`
+; Returns two values of NOT-FOUND if not found
 (def (mole-lookup mole path)
-  (let loop ([ls mole])
+  (let loop ([ls mole] [id 0])
     (if (null? ls)
-        'NOT-FOUND
-      (let ([focus (car ls)])
-        (if (set-member? focus path)
-            path
-          (loop (cdr mole)))))))
+        (values 'NOT-FOUND 'NOT-FOUND)
+      (let ([e-focus (car ls)])
+        (if (set-member? (car e-focus) path)
+            (values id e-focus)
+          (loop (cdr ls) (+ id 1)))))))
 
 (def (mole-ref mole path)
-  (let ([lookup (mole-lookup mole path)])
-    (if (eq? lookup 'NOT-FOUND)
+  (let-values ([(_ entry) (mole-lookup mole path)])
+    (if (eq? entry 'NOT-FOUND)
         'UNKNOWN
-      lookup)))
+      (cdr entry))))
 
 ; Returns the tail when `prefix` is in `path`, otherwise #f
 (def (prefix pre path)
@@ -32,87 +36,104 @@
 (def (pad pre path)
   (append pre path))
 
-; Add an equality from `x` to `y` in `mole`
+(def (dab-all post st-key)
+  (set-map st-key
+           ((lam (item) (pad item post)))))
+
+; Add an equality from `x` to `y` to `mole`
+; Returns: the new molecule
 (def (add-eq mole x y)
   (def (weed key)
-    (let ([ls-key (set->list key)])
-      (let loop ([ls ls-key] [dx null] [dy null])
-        (if (null? ls)
-            (values dx dy)
-          (let ([px (prefix x first)])
-            (if px
-                (loop (cdr ls)
-                      (cons px dx)
-                      dy)
-              (let ([py (prefix y first)])
-                (if py
-                    (loop (cdr ls)
-                          dx
-                          (cons py dy))
-                  (loop (cdr ls)
-                        dx
-                        dy)))))))))
+    (let ([ls-key (set->list key)]
+          [dx null] [dy null])
+      (for-each
+        (lam (item)
+          (let ([px (prefix x first)]
+                [py (delay (prefix y first))])
+            (cond [px         (set! dx (cons px dx))]
+                  [(force py) (set! dy (cons py dy))])))
+        ls-key)
+      (values dx dy)))
 
-  (let loop ([cur-mole (make-new-mole)]
-             [ls mole])
-    (if (null? ls)
-        mole
-      (let*-values ([(new-mole cur-mole)]
-                    [(e-focus) (car ls)]
-                    [(dx dy) (weed (car e-focus))])
-        (def (equate pre ls)
-          (let loop ([ls ls])
-            (unless (null? ls)
-              (let* ([t (car ls)]
-                     [kt (pad pre t)])
-                (let ([lookup (mole-lookup new-mole kt)])
-                  (if (eq? lookup 'NOT-FOUND)
-                      (set! new-mole
-                            (cons (add-to-key (car new-mole)
-                                              kt)
-                                  (cdr new-mole)))
-                    (if (not (equal? (cdr lookup)
-                                     (mole-ref new-mole kt)))
-                        (Yeah I don't know what the fuck to do...)
-                      (begin)))
-                  (loop (cdr ls)))))))
-        (equate dx x)
-        (equate dy y)
-        (loop new-mole (cdr ls))))))
+  (let/ec return  ; Escape point for inconsistencies
+    (def new-mole (make-new-mole))
+    (for-each
+      ; We add in each entry from the `mole` to `new-mole`
+      (lam (e-mole-itr)
+        ; This function mutates `e-mole-itr`
+        (def (equate pre other-pre ls-post)
+          (for-each
+            (lam (t)  ; `t` is the postfix
+              (def kt (pad other-pre t))  ; `kt` is `xt` or `yt`
+              (define-values (id e)
+                (mole-lookup new-mole kt))
+              (cond
+                [(eq? e 'NOT-FOUND)
+                 ; Add `kt` in
+                 (set-add! (car e-mole-itr) kt)]
 
-(def (make-mole ht slinks)
-  (let ([dic ht] [slinks slinks])
-    (def (me msg)
-      (switch msg
+                ; Error if the available value is different
+                [(unequal? (cdr e)
+                           (cdr e-mole-itr))
+                 (return 'INCONSISTENT)]
 
-        ; Returns INCONSISTENT if the values are already different
-        
+                ; Merge the entries if consistent
+                [else
+                 ; Delete the entry `e`
+                 (set! new-mole
+                       (remove-pos new-mole id))
+                 ; Add all the keys from `e` to the key
+                 (set-union! (car e-mole-itr) (car e))]))
+            ls-post))
 
-        ; Returns NOT-FOUND for unknowns
-        ['ref
-         (lam (path)
-           (if (sym-link? path)
-               (hash-ref dic (follow-slink path) 'NOT-FOUND)
-             (hash-ref dic path 'NOT-FOUND)))]
+        (let* ([(dx dy) (weed key)])
+          (equate x y dx)
+          (equate y x dy)
+          (set! new-mole
+            (cons e-mole-itr new-mole))))
+      mole)
+    ; If x and y are not in `new-mole`, then we must state
+    ; explicitly that they are equal
+    (when (and (eq? (mole-ref new-mole x) 'UNKNOWN)
+               (eq? (mole-ref new-mole y) 'UNKNOWN))
+        (set! new-mole
+          (cons (cons (set x y) 'UNKNOWN)
+                new-mole)))
+    new-mole))
 
-        ; Returns INCONSISTENT if there is an inconsistency
-        ['update
-         (lam (path val)
-           (let ([my-path path])
-             (when (sym-link? path)
-               (set! my-path
-                     (follow-slink path)))
-             (if (hash-has-key? dic my-path)
-                 (unless (equal? (hash-ref dic my-path))
-                         'INCONSISTENT)
-               (hash-set! dic my-path val))))]
+; Return all splits of a path, starting with
+; `(path, null)` and NOT ending with `(null, path)`
+(def (all-splits path)
+  (let loop ([accum (list (cons path null))]
+             [pre null] [post path])
+    (if (null? post)
+        accum
+      (let ([new-pre (append1 pre (car post))]
+            [new-post (cdr post)]
+            [pair (cons pre post)])
+        (loop (cons pair accum)
+              new-pre
+              new-post)))))
 
-        [else (error "MOLECULE" "Unknown message" msg)]))
-    me))
+(def (mole-update mole path value)
+  (let/ec return
+    (for-each
+      (lam (pre-post)
+        (def focus (car pre-post))
+        (def post (cdr pre-post))
+       (let-values ([(_ e)
+                     (mole-lookup mole focus)])
+         (unless (eq? e 'NOT-FOUND)
+           (if (null? post)
+               ; The focus is `path`
+               (when (unequal? (cdr e) value)
+                 (return 'INCONSISTENT))
+             (return (cons (make-entry (dab-all (car e))
+                                       (cdr e))
+                           mole))))))
+      (all-splits path))
 
-; This is meant for updating according to a model
-; with relative paths
-(def (pad path rel)
-    (if (non-empty-string? path)
-        (string-append path "/" rel)
-      path))
+    ; If the code ever gets here, then `path` has
+    ; no linked ancestor, including itself.
+    (cons (make-entry (set path) value)
+          mole)))

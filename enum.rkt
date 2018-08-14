@@ -1,6 +1,5 @@
 #lang racket
 (require "lang/kara.rkt"
-         racket/generic
          "engine.rkt"
          "gen_robin.rkt"
          "mole.rkt"
