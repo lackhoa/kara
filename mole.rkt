@@ -14,8 +14,9 @@
 
     (def data data-i)
     (def children children-i)
-    ; The sync list is always synced
-    (def synced synced-i)
+    ; The sync list is synced, too
+    ; Everything is equal to itself
+    (def synced (cons this synced-i))
 
     (define/public (get-data)
       data)
@@ -39,12 +40,13 @@
     (def (expand path val)
       (if (null? path)
           (set! data val)
-        (let ([role (car path)]
-              [new-child
-               ; Cascade the syncing
-               (new mole% [synced-i
-                           (map (lam (p) (append1 p role))
-                                synced)])])
+        (let* ([role (car path)]
+               [pad-synced
+                (map (lam (p) (append1 p role))
+                     synced)]
+               [new-child
+                ; Cascade the syncing
+                (new mole% [synced-i pad-synced])])
           (set! chilren
             (cons (cons role new-child)
                   children))
@@ -64,42 +66,39 @@
                   just-update (cdr path) val)
           (expand path val))))
 
-    (define/public (update path val)
-      (let/ec return
-        (def m-lu
-          (delay (assq (car path) data)))
-
-        (if (null? path)
-            (cond [(eq? data 'UNKNOWN)
-                   (set! data val)]
-                  [(uneq? data val)
-                   (return 'INCONSISTENT)]
-                  [else (return 'NOT-CHANGED)])
-          (if (force m-lu)
+    (define/public (update path val fail-con)
+      (if (and (null? path))
+          (when (uneq? data val)
+            (if (eq? data 'UNKNOWN)
+                (begin (set! data val)
+                       (inform))
+              (fail-con)))
+        (let ([m-lu
+               (assq (car path) data)])
+          (if (m-lu)
               ; There is a child of that role
               (send m-lu
                     update (cdr path)
                            val
                            fail-con)
-            ; There is no child of that role yet
-            (expand path val)))
+            ; If no, then we add the child
+            (begin (expand path val)
+                   (inform))))
+
         ; Inform others about the update to do the same,
         ; but without the error-handling and informing.
-        (for-each
-          (lam (subject)
-            (send subject
-                  just-update path val))
-          (set-subtract synced exclude))))
+        (def (inform)
+          (for-each
+            (lam (subject)
+              (send subject
+                    just-update path val))
+            (set-subtract synced exclude)))))
 
-    (define/public (sync-with m-other)
-      (let/ec return
-        (when (eq? m-other this)
-          (return 'SELF-SYNC))
-
-        (when (set-member? synced m-other)
-          (return 'ALREADY-SYNCED))
-        ; If not, then the two sync sets are mutually exclusive
-
+    (define/public (sync-with m-other fail-con)
+      (if (set-member? synced m-other)
+          ; Note that everything is synced with itself.
+          (return 'ALREADY-SYNCED)
+        ; Fact: The two sync sets are mutually exclusive
         ; Start out with syncing data
         (def other-data
              (send m-other get-data))
@@ -110,13 +109,13 @@
           [(eq? data 'UNKNOWN)
            (update null
                    other-data
-                   (lam () (return 'INCONSISTENT)))]
+                   fail-con)]
           ; We have new intel for `m-other`
           [(eq? m-other UNKNOWN)
            (send m-other
                  update null
                         data
-                        (lam () return 'INCONSISTENT))])
+                        fail-con)])
 
         ; Then we move on to syncing children
       (set-add! synced m-other)))))
