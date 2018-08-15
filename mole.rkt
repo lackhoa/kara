@@ -31,12 +31,11 @@
 
     ; Reference a child.
     (define/public (ref role)
-      (let ([mlu (assq role data)])
-        (if mlu mlu 'NOT-FOUND)))
+      (let ([lu (assq role children)])
+        (if lu (cdr lu) 'NOT-FOUND)))
 
     ; Update a value to a child that we don't have yet.
-    ; What about the sync list?
-    (def (expand path val)
+    (define/public (expand path val)
       (if (null? path)
           (set! data val)
         (let* ([role (car path)]
@@ -73,10 +72,9 @@
                     (expand path val)
                     (inform-update path val)
                     ; Cascade the sync list AFTER
-                    ; the nodes were added
-                    (send (ref (car path))
-                      cascade sync-ls
-                              (car path)))
+                    ; the nodes were added, otherwise
+                    ; no references can be made.
+                    (cascade))
                 ; Delegate task to child
                 (send m-lu
                   update (cdr path)
@@ -85,26 +83,41 @@
       (when (eq? result 'CONFLICT)
         (fail-con)))
 
-    ; Only used in `cascade`
-    (define/public (just-cascade sync-list role)
-      (set! sync-ls
-        (map (lam (mole) (send mole ref role))
-             sync-list)))
+    ; Only used in `cascade`.
+    (define/public (just-cascade)
+      ; First cascade down the immediate children.
+      (for-each (lam (role)
+                  (let ([child (ref role)])
+                    (send child
+                      set-sync-ls (map (lam (mole)
+                                         (send mole ref role))
+                                       sync-ls))
+                    ; Then let them carry over.
+                    (send child cascade)))
+                (get-roles)))
 
-    (define/public (cascade sync-list role)
-      (just-cascade sync-list role)
-      (for-each (lam (new-role)
-                  (send (ref new-role)
-                    cascade sync-ls new-role))
-                (get-roles))
+    (define/public (set-sync-ls value)
+      (just-set-sync-ls value)
+      (inform-set-sync-ls))
+
+    (define/public (inform-set-sync-ls)
+      (for-each (lam (subject)
+                  (send subject
+                    just-set-sync-ls sync-ls))
+                (remq this sync-ls)))
+
+    (define/public (just-set-sync-ls value)
+       (set! sync-ls value))
+
+    ; Flush the sync list down to the descendants
+    (define/public (cascade)
+      (just-cascade)
       (inform-cascade))
 
-    (define/public (inform-cascade sync-list role)
-      (for-each
-        (lam (subject)
-          (send subject
-            just-cascade sync-list role))
-        (remq this sync-ls)))
+    (define/public (inform-cascade)
+      (for-each (lam (subject)
+                  (send subject just-cascade))
+                (remq this sync-ls)))
 
     ; Only used in `update`
     (define/public (inform-update path val)
@@ -114,16 +127,15 @@
             just-update path val))
         (remq this sync-ls)))
 
-    (define/public (update-sync-ls sync-list)
+    (define/public (set-sync-ls sync-list)
       (set! sync-ls sync-list)
-      (inform-sync-ls)
       (cascade))
 
     ; Only used in udpate-sync-ls
     (define/public (inform-sync-ls)
       (for-each
         (lam (subject)
-          (send subject update-sync-ls sync-ls))
+          (send subject set-sync-ls sync-ls))
         (remq this sync-ls)))
 
     ; Sync up two molecules that haven't been synced before
@@ -147,7 +159,7 @@
                        other-data
                        (lam () (escape 'CONFLICT)))]
               ; We have new intel for `m-other`
-              [(eq? m-other 'UNKNOWN)
+              [(eq? other-data 'UNKNOWN)
                (send m-other
                  update null
                         data
@@ -175,9 +187,9 @@
             (let ([merge-sync-ls
                    (append sync-ls
                            (send m-other get-sync-ls))])
-              (update-sync-ls merge-sync-ls))
+              (set-sync-ls merge-sync-ls))
 
-            ; Recursively let all the children sync
+            ; Our work is over: Recursively let all the children sync.
             (for-each
               (lam (role)
                 (send (ref role)
