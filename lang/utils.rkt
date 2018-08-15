@@ -10,10 +10,10 @@
         (func)
         (repeat func (- times 1))))
 
-(def (unequal? x y)
+(def (nequal? x y)
   (not (equal? x y)))
 
-(def (uneq? x y)
+(def (neq? x y)
   (not (eq? x y)))
 
 ; ------------------------------------------------------------
