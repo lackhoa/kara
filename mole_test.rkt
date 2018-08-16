@@ -9,23 +9,21 @@
 (check-eq? (send m1 get-data)
            'gaylord)
 
-(send m1 expand '(d) 'w)
+(send m1 update '(d) 'W (lam () "ain't gonna fail"))
 
 (def d (send m1 ref 'd))
 
-(check-eq? (send d get-data) 'w)
+(check-eq? (send d get-data) 'W)
 
 (send m1
-  update '(a)
-         'x
-         (lam () "How the heck did I fail?"))
+  update '(a) 'X (lam () "How the heck did I fail?"))
 
 (check-equal? (send m1 get-roles)
               '(a d))
 
 (def a (send m1 ref 'a))
 
-(check-equal? (send a get-data) 'x)
+(check-equal? (send a get-data) 'X)
 
 (check-equal? (send a get-sync-ls)
               (list a))
@@ -38,5 +36,42 @@
 (def a-clone (send m1 ref 'a-clone))
 
 (send a-clone
-  sync a
-       (lam () "Won't fail, for sure"))
+  sync a (lam () "Won't fail, for sure"))
+
+; Now we update a
+(send a
+  update '(ad) 'X (lam () "Won't fail"))
+
+(def a-ad (send a ref 'ad))
+
+(check-eq? (send a-ad get-data)
+           'X)
+
+; See what happens to a-clone
+(def a-clone-ad (send a-clone ref 'ad))
+(check-eq? (send a-clone-ad get-data)
+           'X)
+
+; adnother harder example:
+(send a update '(b) 'Y (lam () "Impossible"))
+
+(send a update '(b d) 'W (lam () "Definitely"))
+
+(send a update '(c) 'Z (lam () "No fail"))
+
+(send a update '(c e) 'V (lam () "Nope"))
+
+(check-equal?
+ (send (send a ref 'b)
+   sync (send a ref 'c) (lam () "Will fail!"))
+ "Will fail!")
+
+; Let's go again with the sync
+(send a update '(f) 'Y (lam () "No fail"))
+
+(send a update '(f g) 'V (lam () "Nope"))
+
+(send (send a ref 'b)
+   sync (send a ref 'f) (lam () "Can't be real!"))
+
+(send a repr)
