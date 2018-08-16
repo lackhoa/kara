@@ -6,18 +6,28 @@
 ; ---------------------------------
 ; Molecules
 ; ---------------------------------
+; Naming convention:
+; * roles are lowercase,
+; * data are capitalized.
+
 (def mole%
   (class object%
+    ; Initializer
+    (super-new)
+
+    ; Initialization parameters
     (init [data-i 'UNKNOWN])
     (init [children-i null])
     (init [sync-ls-i null])
 
+    ; Fields
     (def data data-i)
     (def children children-i)
     ; The sync list is synced, too
     ; Everything is also synced to itself
     (def sync-ls (cons this sync-ls-i))
 
+    ; Getters
     (define/public (get-children)
       children)
     (define/public (get-data)
@@ -27,7 +37,12 @@
     (define/public (get-sync-ls)
       sync-ls)
 
-    (super-new)
+    ; Setters
+    (define/public (set-data val)
+      (set! data val))
+    (define/public (set-sync-ls value)
+       (set! sync-ls value))
+
 
     (define/public (repr)
       (cons data (map (lam (c)
@@ -67,59 +82,50 @@
           (task role (ref role)))
         (get-roles)))
 
-    ; Update without error-handling and informing
-    (define/public (just-update path val)
-      (if (null? path)
-          (set! data val)
-        (let* ([role (car path)]
-               [new-child (new mole%)])
-          (set! children
-            (cons (cons role new-child)
-                  children))
-          ; Recursively let the child do the work
-          (send new-child
-            just-update (cdr path) val))))
 
-    ; Update the data at `path`.
-    ; `fail-con`: the function to in case of inconsistency
-    ; New molecules created are synced.
-    (define/public (update path val fail-con)
-      (def result
-        (let/ec escape
-          (unless (symbol? val)
-            (error "UPDATE" "Invalid value" val))
-          (if (null? path)
-              (when (neq? data val)
-                (if (eq? data 'UNKNOWN)
-                    (begin
-                      (set! data val)
-                      (inform
-                        (lam (m)
-                          (send m just-update null val))))
-                  ; Conflict: available data is not equal.
-                  (escape 'CONFLICT)))
-            (let* ([m-lu (ref (car path))]
-                   [not-found? (eq? m-lu 'NOT-FOUND)])
-              (if not-found?
-                  ; add the child, then tell others
-                  (begin
-                    (just-update path val)
-                    (inform (lam (m)
-                              (send m just-update
-                                path val)))
-                    ; Cascade the sync list AFTER
-                    ; the nodes were added, otherwise
-                    ; no references can be made.
-                    (cascade)
-                    (inform (lam (m)
-                              (send m cascade))))
-                ; Not our problem: Delegate task to child
-                (send m-lu
-                  update (cdr path)
-                         val
-                         (lam () (escape 'CONFLICT))))))))
-      (when (eq? result 'CONFLICT)
-        (fail-con)))
+    (define/public (just-expand path)
+      (unless (null? path)
+        (let* ([role (car path)]
+               [lu (assq role children)])
+          (if lu
+              (send (cdr lu) expand (cdr path))
+            (let ([new-child (new mole%)])
+              (set! children (cons (cons role new-child)
+                                   children))
+              (send new-child just-expand (cdr path)))))))
+
+    (define/public (expand path)
+      (just-expand path)
+      (inform (lam (m)
+                (send m just-expand path)))
+      ; The ordering is important here: we must add
+      ; all the components before referencing in the sync list.
+      (cascade)
+      (inform (lam (m)
+                (send m cascade))))
+
+    ; Updating and syncing the data.
+    ; `fail-con`: the function to in case of inconsistency.
+    (define/public (update val fail-con)
+      (unless (symbol? val)
+        (error "UPDATE" "Invalid value" val))
+      (when (neq? data val)
+        (if (eq? data 'UNKNOWN)
+            (begin
+              (set! data val)
+              (inform
+                (lam (m)
+                  (send m set-data val))))
+          ; Conflict: available data is not equal.
+          (fail-con))))
+
+    ; Just a convenience function
+    (define/public (update-path path val fail-con)
+      (when (eq? (ref path)
+                 'NOT-FOUND)
+        (expand path))
+      (send (ref path)
+        update val (lam () (fail-con))))
 
     ; Flush the sync list down to the descendants
     (define/public (cascade)
@@ -133,8 +139,6 @@
           ; Then let them carry over.
           (send c cascade))))
 
-    (define/public (set-sync-ls value)
-       (set! sync-ls value))
 
     ; Sync up two molecules that haven't been synced before
     (define/public (sync m-other fail-con)
@@ -157,14 +161,12 @@
                (void)]
               ; `m-other` has new intel for us
               [(eq? data 'UNKNOWN)
-               (update null
-                       other-data
+               (update other-data
                        (lam () (raise "Can't fail 1")))]
               ; We have new intel for `m-other`
               [(eq? other-data 'UNKNOWN)
                (send m-other
-                 update null
-                        data
+                 update data
                         (lam () (raise "Can't fail 2")))]
               ; Nope, the data are inconsistent.
               [else (escape 'CONFLICT)])
@@ -176,18 +178,18 @@
               (set-subtract their-roles
                             our-roles)
               (lam (role)
-                (update (list role)
-                        'UNKNOWN
-                        (lam () (raise "Can't fail 3")))))
+                (update-path (list role)
+                             'UNKNOWN
+                             (lam () (raise "Can't fail 3")))))
             ; Same thing
             (set-for-each
               (set-subtract our-roles
                             their-roles)
               (lam (role)
                 (send m-other
-                  update (list role)
-                         'UNKNOWN
-                         (lam () (raise "Can't fail 4")))))
+                  update-path (list role)
+                              'UNKNOWN
+                              (lam () (raise "Can't fail 4")))))
 
             ; Establish the connection among the top-level.
             (let ([merge
