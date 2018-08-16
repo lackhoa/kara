@@ -74,4 +74,35 @@
 (send (send a ref 'b)
    sync (send a ref 'f) (lam () "Can't be real!"))
 
-(send a repr)
+(displayln "These two should be the same")
+(send (send a ref 'b) repr)
+(send (send a ref 'f) repr)
+
+; Try modifying f from somewhere else
+(def m2 (new mole%))
+(send m2 sync (send a ref 'b) (lam () "Can't fail"))
+(send m2 update '(h i) 'T (lam () "Failure not an option"))
+(displayln "These three should be the same")
+(send (send a ref 'b) repr)
+(send m2 repr)
+(send (send a ref 'f) repr)
+
+; Try a fail update
+(send m2 update '(h) 'R (lam () "Not fail yet"))
+(check-equal? (send m2 update '(h) 'RR (lam () "Now we fail"))
+              "Now we fail")
+
+; Sync from the upper level and change on the lower level
+(def m3 (new mole%))
+(send m3 update '(tir) 'X (lam () "No"))
+(send m3 update '(tal) 'UNKNOWN (lam () "No"))
+(def m4 (new mole%))
+(send m4 update '(eth) 'Y (lam () "No"))
+(send m4 update '(el) 'Z (lam () "No"))
+(send m4 update '(tir) 'UNKNOWN (lam () "No"))
+(send m4 update '(tal) 'UNKNOWN (lam () "No"))
+(send m3 sync m4 (lam () "Still No"))
+(send (send m3 ref 'tal)
+  update null 'S (lam () "Nope"))
+(check-eq? (send (send m4 ref 'tal) get-data)
+           'S)

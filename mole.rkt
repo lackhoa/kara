@@ -170,22 +170,22 @@
               [else (escape 'CONFLICT)])
 
             ; Add the missing children
-            (def our-roles (get-roles))
-            (def their-roles (send m-other get-roles))
+            (def our-roles   (list->seteq (get-roles)))
+            (def their-roles (list->seteq (send m-other get-roles)))
             (set-for-each
-              (set-subtract (seteq their-roles)
-                            (seteq our-roles))
-              (lam (p)
-                (update p
+              (set-subtract their-roles
+                            our-roles)
+              (lam (role)
+                (update (list role)
                         'UNKNOWN
                         (lam () (raise "Can't fail 3")))))
             ; Same thing
             (set-for-each
-              (set-subtract (seteq our-roles)
-                            (seteq their-roles))
-              (lam (p)
+              (set-subtract our-roles
+                            their-roles)
+              (lam (role)
                 (send m-other
-                  update p
+                  update (list role)
                          'UNKNOWN
                          (lam () (raise "Can't fail 4")))))
 
