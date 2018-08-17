@@ -13,6 +13,7 @@
 
 (def d (send m1 ref 'd))
 
+
 (check-eq? (send d get-data) 'W)
 
 (send m1
@@ -61,10 +62,10 @@
 
 (send a update-path '(c e) 'V (lam () "Nope"))
 
-(check-equal?
- (send (send a ref 'b)
-   sync (send a ref 'c) (lam () "Will fail!"))
- "Will fail!")
+;; (check-equal?
+ ;; (send (send a ref 'b)
+   ;; sync (send a ref 'c) (lam () "Will fail!"))
+ ;; "Will fail!")
 
 ; Let's go again with the sync
 (send a update-path '(f) 'Y (lam () "No fail"))
@@ -74,23 +75,27 @@
 (send (send a ref 'b)
    sync (send a ref 'f) (lam () "Can't be real!"))
 
-(displayln "These two should be the same")
-(send (send a ref 'b) repr)
-(send (send a ref 'f) repr)
+;; (displayln "These two should be the same")
+;; (send (send a ref 'b) repr)
+;; (send (send a ref 'f) repr)
 
 ; Try modifying f from somewhere else
 (def m2 (new mole%))
 (send m2 sync (send a ref 'b) (lam () "Can't fail"))
 (send m2 update-path '(h i) 'T (lam () "Failure not an option"))
-(displayln "These three should be the same")
-(send (send a ref 'b) repr)
-(send m2 repr)
-(send (send a ref 'f) repr)
+
+; Here is where it fails, WTF, right?
+(send (send m1 copy) repr)
+
+;; (displayln "These three should be the same")
+;; (send (send a ref 'b) repr)
+;; (send m2 repr)
+;; (send (send a ref 'f) repr)
 
 ; Try a fail update-path
-(send m2 update-path '(h) 'R (lam () "Not fail yet"))
-(check-equal? (send m2 update-path '(h) 'RR (lam () "Now we fail"))
-              "Now we fail")
+;; (send m2 update-path '(h) 'R (lam () "Not fail yet"))
+;; (check-equal? (send m2 update-path '(h) 'RR (lam () "Now we fail"))
+              ;; "Now we fail")
 
 ; Sync from the upper level and change on the lower level
 (def m3 (new mole%))
@@ -109,41 +114,24 @@
 
 ; Cloning
 ;; (pretty-print (send m1 repr))
-;; (def m5 (send m1 clone-map))
-;; (hash-for-each m5
-;;                (lam (orig clone)
-;;                  (displayln "Original")
-;;                  (displayln (send orig repr))
-;;                  (displayln "Clone")
-;;                  (displayln (send clone repr))))
 ;; (def m5 (send m1 copy))
 ;; (send m5 repr)
 
-(def test (new mole%))
-(def cp (send test copy))
-(check-equal? (send cp get-sync-ls) (list cp))
-(send cp update 'L (lam () "Won't fail"))
-(check-eq? (send cp get-data) 'L)
-(check-eq? (send test get-data) 'UNKNOWN)
-(send cp update-path '(j) 'K (lam () 'NotGonnaHappen))
-(def cpcp (send cp copy))
-(check-eq? (send (send cpcp ref 'j) get-data)
-           'K)
-(send cp update-path '(k) 'K (lam () 'NotGonnaHappen))
-; Now let's try the syncing
-(send (send cp ref 'j)
-  sync (send cp ref 'k) (lam x x))
+;; (def test (new mole%))
+;; (def cp (send test copy))
+;; (check-equal? (send cp get-sync-ls) (list cp))
+;; (send cp update 'L (lam () "Won't fail"))
+;; (check-eq? (send cp get-data) 'L)
+;; (check-eq? (send test get-data) 'UNKNOWN)
+;; (send cp update-path '(j) 'K (lam () 'NotGonnaHappen))
+;; (def cpcp (send cp copy))
+;; (check-eq? (send (send cpcp ref 'j) get-data)
+;;            'K)
+;; (send cp update-path '(k) 'K (lam () 'NotGonnaHappen))
+;; ; Now let's try the syncing
+;; (send (send cp ref 'j)
+;;   sync (send cp ref 'k) (lam x x))
 ;; (def cnop (send cp copy))
 ;; (send cnop update-path '(j i) 'R (lam () "Damn"))
-;; (send cp repr)
-; Then we discovered the bug
-;; (send cnop repr)
-;; (send cnop update-path '(k i) 'Z (lam () "Shit!"))
-;; (send cnop repr)
-
-; Let's see what happens to the original
-(send cp update-path '(j i) 'R (lam () "Damn"))
-(send cp repr)
-(send (send cp ref '(j i)) get-sync-ls)
-(send (send cp ref '(k i)) get-sync-ls)
-(send cp repr)
+;; (check-eq? (send (send cnop ref '(j i)) get-data)
+;;            (send (send cnop ref '(k i)) get-data))

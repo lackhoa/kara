@@ -4,6 +4,7 @@
 (provide (all-defined-out)
          (all-from-out))
 
+(def out null)
 ; ---------------------------------
 ; Molecules
 ; ---------------------------------
@@ -91,9 +92,8 @@
     ; By 'the originals', I mean every single node in the tree.
     (define/public (clone-map)
       ; `env` holds the result.
-      (let ([env null]
-            [new-me
-             (new mole% [data-i data])])
+      (let ([env null] [new-me
+                        (new mole% [data-i data])])
         ; Add the children
         (for-each
           (lam (pair)
@@ -124,7 +124,6 @@
               ; This part won't work if the system isn't closed,
               ; i.e., this molecule is linked to something else.
               set-sync-ls (map (lam (m)
-                                 ;; (displayln (send m repr))
                                  (cdr (assq m cns)))
                                (send orig get-sync-ls))))
           cns)
