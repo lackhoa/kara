@@ -1,10 +1,15 @@
 #lang racket
 (require "lang/kara.rkt"
-         racket/hash)
+         racket/hash
+         rackunit)
 (provide (all-defined-out)
          (all-from-out))
 
 (def out null)
+
+(define-simple-check (check-class obj class)
+  (is-a? obj class))
+
 ; ---------------------------------
 ; Molecules
 ; ---------------------------------
@@ -41,9 +46,13 @@
 
     ; Setters
     (define/public (set-data val)
+      (check-pred symbol? val)
       (set! data val))
     (define/public (set-sync-ls value)
-       (set! sync-ls value))
+      (check-pred pair?
+                  value
+                  "Sync list must a non-empty")
+      (set! sync-ls value))
 
     (define/public (repr)
       (cons data (map (lam (c)
@@ -67,9 +76,9 @@
               [else  'NOT-FOUND])))
 
     ; Tell those in the sync list to do something.
-    ; `task` takes a molecule.
-    ; `task` takes a molecule.
+    ; `task` is a function takes a molecule.
     (def (inform task)
+      (check-pred procedure? task)
       (for-each
         (lam (subject)
           (task subject))
@@ -84,6 +93,9 @@
         (get-roles)))
 
     (define/public (add-child role mole)
+      (check-pred symbol? role)
+      (check-class mole mole%
+        "Invalid child")
       (set! children
         (cons (cons role mole) children)))
 
@@ -92,17 +104,20 @@
     ; By 'the originals', I mean every single node in the tree.
     (define/public (clone-map)
       ; `env` holds the result.
-      (let ([env null] [new-me
-                        (new mole% [data-i data])])
+      (let ([env null]
+            [new-me
+             (new mole% [data-i data])])
         ; Add the children
         (for-each
           (lam (pair)
             (let* ([role (car pair)]
                    [child (cdr pair)]
                    [cp-res (send child clone-map)])
-              (send new-me
-                add-child role
-                          (cdr (assq child cp-res)))
+              (let ([lu (assq child cp-res)])
+                (check-not-false lu
+                  "`clone-map` does not include root")
+                (send new-me
+                  add-child role (cdr lu)))
               ; Since molecules are trees,
               ; there won't be any conflict.
               (set! env (append env cp-res))))
@@ -123,9 +138,15 @@
               ; to the copied version.
               ; This part won't work if the system isn't closed,
               ; i.e., this molecule is linked to something else.
-              set-sync-ls (map (lam (m)
-                                 (cdr (assq m cns)))
-                               (send orig get-sync-ls))))
+              set-sync-ls
+                (map
+                  (lam (m)
+                    (let ([lu (assq m cns)])
+                      (check-not-false lu
+                        "Sync list contains a non-child \
+                         (maybe you're copying a non-root?)")
+                      (cdr lu)))
+                  (send orig get-sync-ls))))
           cns)
         ; This will return the copy.
         (cdr (assq this cns))))
@@ -134,11 +155,14 @@
       (unless (null? path)
         (let* ([role (car path)]
                [lu (assq role children)])
+          (check-pred symbol? role)
           (if lu
-              (send (cdr lu) expand (cdr path))
+              (send (cdr lu)
+                expand (cdr path))
             (let ([new-child (new mole%)])
               (add-child role new-child)
-              (send new-child just-expand (cdr path)))))))
+              (send new-child
+                just-expand (cdr path)))))))
 
     (define/public (expand path)
       (just-expand path)
@@ -153,8 +177,8 @@
     ; Updating and syncing the data.
     ; `fail-con`: the function to in case of inconsistency.
     (define/public (update val fail-con)
-      (unless (symbol? val)
-        (error "UPDATE" "Invalid value" val))
+      (check-pred symbol? val
+        "Invalid value")
       (when (neq? data val)
         (if (eq? data 'UNKNOWN)
             (begin
@@ -167,34 +191,47 @@
 
     ; Just a convenience function
     (define/public (update-path path val fail-con)
+      (check-pred list? path
+        "Invalid path")
       (when (eq? (ref path)
                  'NOT-FOUND)
         (expand path))
-      (send (ref path)
-        update val (lam () (fail-con))))
+      (let ([m (ref path)])
+        (check-class m mole%
+          "Something is wrong with `expand`?")
+        (send m
+          update val (lam () (fail-con)))))
+
+    ; Short-hand for the short-hand that is update-path.
+    (define/public (update-role role val fail-con)
+      (update-path (list role)
+                   val
+                   fail-con))
 
     ; Flush the sync list down to the new descendants.
     (define/public (cascade)
       (recur
         (lam (role c)
-          ; First cascade down the immediate children.
-          ; If the child is new, its sync list only contains itself.
-          (when (equal? (send c get-sync-ls)
-                        (list c))
+          ; First cascade down the immediate children,
+          ; if the child is new (when its sync list only has itself).
+          (when (< (length (send c get-sync-ls))
+                   (length sync-ls))
             (send c
-              set-sync-ls (map (lam (sy-i)
-                                 (send sy-i ref role))
-                               sync-ls)))
+              set-sync-ls
+                (map (lam (sy-i)
+                       (let ([corres (send sy-i ref role)])
+                         (check-class corres mole%)
+                         corres))
+                     sync-ls)))
           ; Then let them carry over.
           (send c cascade))))
 
     ; Sync up two molecules that haven't been synced before
     (define/public (sync m-other fail-con)
+      (check-class m-other mole%
+        "Expected a molecule")
       (def result
         (let/ec escape
-          (unless (is-a? m-other mole%)
-            (error "SYNC" "Expected a molecule" m-other))
-
           (when (memq m-other sync-ls)
             (escape 'ALREADY-SYNCED))
 
@@ -220,13 +257,15 @@
               [else (escape 'CONFLICT)])
 
             ; Add the missing children
-            (def our-roles   (list->seteq (get-roles)))
-            (def their-roles (list->seteq (send m-other get-roles)))
+            (def our-roles
+              (list->seteq (get-roles)))
+            (def their-roles
+              (list->seteq (send m-other get-roles)))
             (set-for-each
               (set-subtract their-roles
                             our-roles)
               (lam (role)
-                (update-path (list role)
+                (update-role role
                              'UNKNOWN
                              (lam () (raise "Can't fail 3")))))
             ; Same thing
@@ -235,7 +274,7 @@
                             their-roles)
               (lam (role)
                 (send m-other
-                  update-path (list role)
+                  update-role role
                               'UNKNOWN
                               (lam () (raise "Can't fail 4")))))
 
@@ -250,10 +289,10 @@
                         (send m set-sync-ls merge))))
 
             ; Our work is over: Recursively let all the children sync.
-            ; Assert that all the components are the same.
-            (unless (= (length (get-roles))
-                       (length (send m-other get-roles)))
-              (raise "Something is wrong"))
+            (check-eqv? (length (get-roles))
+                        (length (send m-other get-roles))
+                        "The components are not the same, \
+                         something is wrong with the code")
 
             (recur
               (lam (role c)
