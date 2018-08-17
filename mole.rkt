@@ -1,5 +1,6 @@
 #lang racket
-(require "lang/kara.rkt")
+(require "lang/kara.rkt"
+         racket/hash)
 (provide (all-defined-out)
          (all-from-out))
 
@@ -43,7 +44,6 @@
     (define/public (set-sync-ls value)
        (set! sync-ls value))
 
-
     (define/public (repr)
       (cons data (map (lam (c)
                         (cons (car c)
@@ -82,6 +82,54 @@
           (task role (ref role)))
         (get-roles)))
 
+    (define/public (add-child role mole)
+      (set! children
+        (cons (cons role mole) children)))
+
+    ; Returns a mapping of the originals to their copies,
+    ; without the sync list.
+    ; By 'the originals', I mean every single node in the tree.
+    (define/public (clone-map)
+      ; `env` holds the result.
+      (let ([env null]
+            [new-me
+             (new mole% [data-i data])])
+        ; Add the children
+        (for-each
+          (lam (pair)
+            (let* ([role (car pair)]
+                   [child (cdr pair)]
+                   [cp-res (send child clone-map)])
+              (send new-me
+                add-child role
+                          (cdr (assq child cp-res)))
+              ; Since molecules are trees,
+              ; there won't be any conflict.
+              (set! env (append env cp-res))))
+          children)
+        ; Don't forget to map itself.
+        (cons (cons this new-me)
+              env)))
+
+    ; The complete cloning interface (works for the root)
+    (define/public (copy)
+      (let ([cns (clone-map)])
+        (for-each
+          (lam (pair)
+            (def orig (car pair))
+            (def clone (cdr pair))
+            (send clone
+              ; Translate the entire sync list
+              ; to the copied version.
+              ; This part won't work if the system isn't closed,
+              ; i.e., this molecule is linked to something else.
+              set-sync-ls (map (lam (m)
+                                 ;; (displayln (send m repr))
+                                 (cdr (assq m cns)))
+                               (send orig get-sync-ls))))
+          cns)
+        ; This will return the copy.
+        (cdr (assq this cns))))
 
     (define/public (just-expand path)
       (unless (null? path)
@@ -90,8 +138,7 @@
           (if lu
               (send (cdr lu) expand (cdr path))
             (let ([new-child (new mole%)])
-              (set! children (cons (cons role new-child)
-                                   children))
+              (add-child role new-child)
               (send new-child just-expand (cdr path)))))))
 
     (define/public (expand path)
@@ -127,18 +174,20 @@
       (send (ref path)
         update val (lam () (fail-con))))
 
-    ; Flush the sync list down to the descendants
+    ; Flush the sync list down to the new descendants.
     (define/public (cascade)
       (recur
         (lam (role c)
           ; First cascade down the immediate children.
-          (send c
-            set-sync-ls (map (lam (sy-i)
-                               (send sy-i ref role))
-                              sync-ls))
+          ; If the child is new, its sync list only contains itself.
+          (when (equal? (send c get-sync-ls)
+                        (list c))
+            (send c
+              set-sync-ls (map (lam (sy-i)
+                                 (send sy-i ref role))
+                               sync-ls)))
           ; Then let them carry over.
           (send c cascade))))
-
 
     ; Sync up two molecules that haven't been synced before
     (define/public (sync m-other fail-con)
@@ -192,6 +241,8 @@
                               (lam () (raise "Can't fail 4")))))
 
             ; Establish the connection among the top-level.
+            ; Note that we don't cascade here,
+            ; to preserve symmetry the recursive calls.
             (let ([merge
                    (append sync-ls
                            (send m-other get-sync-ls))])

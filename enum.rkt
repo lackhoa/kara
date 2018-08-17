@@ -12,102 +12,73 @@
   (enum mole
         (QTars (list (Target root-type)))))
 
-(define-generics targets
-  ; Returns the next target
-  (tar-next targets)
-  ; Discard the next target (returns same interface)
-  (tar-rest targets)
-  (tar-add targets new-targets))
-
-(define-struct QTars (lineup)
-  #:methods gen:targets
-  [(def (tar-next q)
-     (car (QTars-lineup q)))
-
-   (def (tar-rest q)
-     (QTars (cdr (QTars-lineup q))))
-
-   (def (tar-add q new-targets)
-     (QTars (append (QTars-lineup q)
-                    new-targets)))])
-
 ; Returns: a generator of complete molecules
 (def (enum mole targets)
   (generator ()
     (if (null? targets)
         (begin (yield mole)
                (yield 'DONE))
-      (let* ([t-first (tar-next targets)]
-             [t-rest  (tar-rest targets)]
-             [result  (advance mole t-first)])
-        (if (eq? result 'INCONSISTENT)
-            'DONE
-          ; Multitask all the different branches
-          (gen-robin
-            (map (lam (result-iter)
-                   (let ([new-mole    (car result-iter)]
-                         [new-targets (cdr result-iter)])
-                     (enum new-mole targets)))
-                  result)))))))
+      (let* ([t-first (cons targets)]
+             [t-rest  (cdr targets)]
+             [adv     (advance mole t-first)])
+        ; Multitask all the different branches
+        (gen-robin
+          (map (lam (adv-iter)
+                 (let ([new-mole    (car adv-iter)]
+                       [new-targets (cdr adv-iter)])
+                   ; `enum` returns a generator
+                   (enum new-mole
+                         (append t-rest new-targets))))
+               adv))))))
 
-; Output: a list of molecules
+; Output: a list of molecule-targets pairs.
 (def (advance mole target)
   (let* ([tpath (Target-path target)]
          [ttype (Target-type target)]
-         [val   ((mole 'ref) tpath)])
-    (if (eq? val 'NOT-FOUND)
-        (remove 'INCONSISTENT
-          (map (lam (ttype-iter)
-                 (work-with-ctor (mole 'copy)
-                                 ttype-iter))
+         [lu    (send mole ref tpath)])
+    (if (eq? lu 'NOT-FOUND)
+        (remove 'CONFLICT
+          (map (lam (ctor)
+                 (process-ctor (send mole copy)
+                                 ctor))
                (force ttype)))
       ; We already have a constructor
-      (work-with-ctor tpath mole val))))
+      (list (process-ctor tpath mole val)))))
 
 ; Will modify mole to expand a specific ctor.
 ; Returns: a pair containing the modified molecule
 ; and a list of new targets.
-(def (work-with-ctor rpath mole ctor)
+(def (process-ctor rpath mole ctor)
   (check-timer)
 
   ; We will be working under a relative path
-  (def (padder p) (pad rpath p))
+  (def (pad p) (append rpath p))
   (def targets null)
 
-  ; call/cc here for early escape from inconsistency
-  (call/cc
-    (lam (k)
-      (for-each
-        (lam (ctor-iter)
-          (match ctor-iter
-            [(Form path constructor)
-             (when (eq? 'INCONSISTENT
-                        ((mole 'update) (padder path)
-                                        constructor))
-                   (k 'INCONSISTENT))]
-            [(SLink paths)
-             (for-each
-               (lam (path-pair)
-                 (when
-                   (eq? 'INCONSISTENT
-                        ((mole 'add-slink) (padder (car path-pair))
-                                           (padder (cdr path-pair))))
-                   (k 'INCONSISTENT)))
-               (pair-iter paths))]
-            [(Rec component type)
-             ; If it's a link then it's not a target
-             (unless ((mole 'link?) (padder component))
-               (set! targets
-                     (cons (Target (padder component) type)
-                           targets)))]))
-        ctor)
-      (cons mole targets))))
+  (let/cc escape
+    (for-each
+      (lam (ctor-iter)
+        (match ctor-iter
+          [(Form path constructor)
+           (send mole
+             update-path (pad path)
+                         constructor
+                         (lam () (escape 'CONFLICT)))]
 
-(def (pair-iter ls)
-  (foldr (lam (first rest)
-           (if (null? rest)
-               null
-             (cons (cons first (car rest))
-                   rest)))
-         null
-         ls))
+          ; This part assumes that the molecules are present.
+          [(SLink p1 p2)
+           (send (send mole ref (pad p1))
+             sync (send mole ref (pad p2))
+                  (lam () (escape 'CONFLICT)))]
+
+          [(Rec component type)
+           (set! targets
+             (cons (Target (padder component) type)
+                   targets))]
+
+          [else
+           (error "process-ctor"
+                  "Invalid constructor term"
+                  ctor-iter)]))
+      (Ctor-body ctor))
+    (cons mole targets)))

@@ -106,3 +106,44 @@
   update-path null 'S (lam () "Nope"))
 (check-eq? (send (send m4 ref 'tal) get-data)
            'S)
+
+; Cloning
+;; (pretty-print (send m1 repr))
+;; (def m5 (send m1 clone-map))
+;; (hash-for-each m5
+;;                (lam (orig clone)
+;;                  (displayln "Original")
+;;                  (displayln (send orig repr))
+;;                  (displayln "Clone")
+;;                  (displayln (send clone repr))))
+;; (def m5 (send m1 copy))
+;; (send m5 repr)
+
+(def test (new mole%))
+(def cp (send test copy))
+(check-equal? (send cp get-sync-ls) (list cp))
+(send cp update 'L (lam () "Won't fail"))
+(check-eq? (send cp get-data) 'L)
+(check-eq? (send test get-data) 'UNKNOWN)
+(send cp update-path '(j) 'K (lam () 'NotGonnaHappen))
+(def cpcp (send cp copy))
+(check-eq? (send (send cpcp ref 'j) get-data)
+           'K)
+(send cp update-path '(k) 'K (lam () 'NotGonnaHappen))
+; Now let's try the syncing
+(send (send cp ref 'j)
+  sync (send cp ref 'k) (lam x x))
+;; (def cnop (send cp copy))
+;; (send cnop update-path '(j i) 'R (lam () "Damn"))
+;; (send cp repr)
+; Then we discovered the bug
+;; (send cnop repr)
+;; (send cnop update-path '(k i) 'Z (lam () "Shit!"))
+;; (send cnop repr)
+
+; Let's see what happens to the original
+(send cp update-path '(j i) 'R (lam () "Damn"))
+(send cp repr)
+(send (send cp ref '(j i)) get-sync-ls)
+(send (send cp ref '(k i)) get-sync-ls)
+(send cp repr)

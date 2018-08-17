@@ -2,39 +2,48 @@
 (require "lang/kara.rkt")
 (provide (all-defined-out))
 
-(def sym->str symbol->string)
+; Turn a symbolic path into a normalized path-list.
+(def (path-proc path)
+  (map string->symbol
+       (string-split (symbol->string path)
+                     "_")))
 
 ; -------------------------------------------------------
-; Macros for Declaring Types
+; Macros for Type Declaration
 ; -------------------------------------------------------
-; Constructor declaration for components
+; Constructor declaration for components.
 (struct Form (path ctor))
 
 (define-syntax-rule (form path e)
-  (Form (sym->str 'path) e))
+  (Form (path-proc 'path) e))
 
-; Symbolic links declaration
-(struct SLink (paths))
+; Symbolic links declaration.
+(struct SLink (p1 p2))
 
-(define-syntax-rule (== p1 p2 ...)
-  (SLink (map sym->str
-              (list 'p1 'p2 ...))))
+(define-syntax --
+  (syntax-rules ()
+    [(_ p1 p2)
+     (list (SLink (path-proc 'p1)
+                  (path-proc 'p2)))]
+    [(_ p1 p2 rest ...)
+     (cons (SLink (path-proc 'p1)
+                  (path-proc 'p2))
+           (-- p2 rest ...))]))
 
-; Type declaration for components
-(struct Rec (component type))
+; Type declaration for components.
+(struct Rec (role type))
 
-(define-syntax-rule (rec component type)
-  (Rec (sym->str 'component)
-       type))
+(define-syntax-rule (rec role type)
+  (Rec 'role type))
 
-; Constructors
+; Constructors: body is a list of Form, Rec, and Slinks.
 (struct Ctor (name body))
 
 (define-syntax-rule (ctor name e ...)
   (def name
-    (Ctor 'name (list e ...))))
+    (Ctor 'name (flatten (list e ...)))))  ; `flatten` since SLinks may be grouped
 
-; Types are delayed
+; Types are delayed list of constructors.
 (struct Type (body))
 
 (define-syntax-rule (type name e ...)
@@ -58,86 +67,85 @@
   (rec ccs wf))
 
 ; Logical Entailment
-(type entailment AI AK AS AB AC
-                 Modus-Ponens)
+(type entailment
+  AI AK AS AB AC MP)
 
 ; => A->A
 (ctor AI
-  (form ccs Implication)
+  (form ccs  Implication)
 
-  (== ccs/ante ccs/csq))
+  (-- ccs_ante ccs_csq))
 
 ; => (A->B)->A
 (ctor AK
   (form ccs     Implication)
-  (form ccs/csq Implication)
+  (form ccs_csq Implication)
 
-  (== ccs/ante ccs/csq/csq))
+  (-- ccs_ante ccs_csq_csq))
 
 ; => (A->(B->C)) -> ((A->B)->(A->C))
 (ctor AS
   (form ccs          Implication)
-  (form ccs/ante     Implication)
-  (form ccs/csq      Implication)
-  (form ccs/ante/csq Implication)
-  (form ccs/csq/ante Implication)
-  (form ccs/csq/csq  Implication)
+  (form ccs_ante     Implication)
+  (form ccs_csq      Implication)
+  (form ccs_ante_csq Implication)
+  (form ccs_csq_ante Implication)
+  (form ccs_csq_csq  Implication)
   ; A
-  (== ccs/ante/ante
-      ccs/csq/ante/ante
-      ccs/csq/csq/ante)
+  (-- ccs_ante_ante
+      ccs_csq_ante_ante
+      ccs_csq_csq_ante)
   ; B
-  (== ccs/ante/csq/ante
-      ccs/csq/ante/csq)
+  (-- ccs_ante_csq_ante
+      ccs_csq_ante_csq)
   ; C
-  (== ccs/ante/csq/csq
-      ccs/csq/csq/csq))
+  (-- ccs_ante_csq_csq
+      ccs_csq_csq_csq))
 
 ; => (B->C) -> ((A->B) -> (A->C))
 (ctor AB
   (form ccs          Implication)
-  (form ccs/ante     Implication)
-  (form ccs/csq      Implication)
-  (form ccs/csq/ante Implication)
-  (form ccs/csq/csq  Implication)
+  (form ccs_ante     Implication)
+  (form ccs_csq      Implication)
+  (form ccs_csq_ante Implication)
+  (form ccs_csq_csq  Implication)
   ; A
-  (== ccs/csq/ante/ante
-      ccs/csq/csq/ante)
+  (-- ccs_csq_ante_ante
+      ccs_csq_csq_ante)
   ; B
-  (== ccs/ante/ante
-      ccs/csq/ante/csq)
+  (-- ccs_ante_ante
+      ccs_csq_ante_csq)
   ; C
-  (== ccs/ante/csq
-      ccs/csq/csq/csq))
+  (-- ccs_ante_csq
+      ccs_csq_csq_csq))
 
 ; => (A->(B->C)) -> (B->(A->C))
 (ctor AC
   (form ccs          Implication)
-  (form ccs/ante     Implication)
-  (form ccs/csq      Implication)
-  (form ccs/ante/csq Implication)
-  (form ccs/csq/csq  Implication)
+  (form ccs_ante     Implication)
+  (form ccs_csq      Implication)
+  (form ccs_ante_csq Implication)
+  (form ccs_csq_csq  Implication)
   ; A
-  (== ccs/ante/ante
-      ccs/csq/csq/ante)
+  (-- ccs_ante_ante
+      ccs_csq_csq_ante)
   ; B
-  (== ccs/ante/csq/ante
-      ccs/csq/ante)
+  (-- ccs_ante_csq_ante
+      ccs_csq_ante)
   ; C
-  (== ccs/ante/csq/csq
-      ccs/csq/csq/csq))
+  (-- ccs_ante_csq_csq
+      ccs_csq_csq_csq))
 
 ; A, A->B => B
-(ctor Modus-Ponens
+(ctor MP
   (rec ?=>a    entailment)
   (rec ?=>a->b entailment)
 
-  (form ?=>a->b/ccs
-        Implication)
+  (form ?=>a->b_ccs  Implication)
   ; A
-  (== ?=>a->b/ccs/ante
-      ?=>a/ccs)
+  (-- ?=>a->b_ccs_ante
+      ?=>a_ccs)
   ; B
-  (== ccs
-      ?=>a->b/ccs/csq))
+  (-- ccs
+      ?=>a->b_ccs_csq))
 ; Note: the conclusion (ccs) is implicit in the last link.
