@@ -11,6 +11,11 @@
 ; * roles (and paths) are lowercase,
 ; * data are capitalized.
 
+; The failure continuation that you're
+; confident not gonna be called.
+(def (no-fail)
+  (raise "I did not expect this to fail..."))
+
 (def mole%
   (class object%
     ; Initializer
@@ -238,12 +243,12 @@
               ; `m-other` has new intel for us
               [(eq? data 'UNKNOWN)
                (update other-data
-                       (lam () (raise "Can't fail 1")))]
+                       no-fail)]
               ; We have new intel for `m-other`
               [(eq? other-data 'UNKNOWN)
                (send m-other
                  update data
-                        (lam () (raise "Can't fail 2")))]
+                        no-fail)]
               ; Nope, the data are inconsistent.
               [else (escape 'CONFLICT)])
 
@@ -258,7 +263,7 @@
               (lam (role)
                 (update-role role
                              'UNKNOWN
-                             (lam () (raise "Can't fail 3")))))
+                             no-fail)))
             ; Same thing
             (set-for-each
               (set-subtract our-roles
@@ -267,7 +272,7 @@
                 (send m-other
                   update-role role
                               'UNKNOWN
-                              (lam () (raise "Can't fail 4")))))
+                              no-fail)))
 
             ; Establish the connection among the top-level.
             ; Note that we don't cascade here,

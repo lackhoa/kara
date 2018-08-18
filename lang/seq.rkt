@@ -1,9 +1,9 @@
 #lang racket
 
 (require "macro.rkt"
-         "list_prims.rkt")
+         "list-prims.rkt")
 (provide (all-defined-out)
-         (all-from-out "list_prims.rkt"))
+         (all-from-out "list-prims.rkt"))
 
 ; This file focuses on the lazy way of working with sequences
 ; The terminology is like this:

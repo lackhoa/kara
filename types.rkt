@@ -37,7 +37,10 @@
   (Rec 'role type))
 
 ; Constructors: body is a list of Form, Rec, and Slinks.
-(struct Ctor (name body))
+(struct Ctor (name body)
+        #:methods gen:custom-write
+        [(def (write-proc Ctor port mode)
+           (display (Ctor-name Ctor) port))])
 
 (define-syntax-rule (ctor name e ...)
   (def name
@@ -58,6 +61,7 @@
 ; Type Definitions
 ; -------------------------------------------------------
 ; Well-formed Formula
+;; (type wf A B C Implication)
 (type wf A B C Implication)
 
 (ctor A) (ctor B) (ctor C)

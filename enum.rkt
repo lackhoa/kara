@@ -1,7 +1,7 @@
 #lang racket
 (require "lang/kara.rkt"
          "engine.rkt"
-         "gen_robin.rkt"
+         "gen-robin.rkt"
          "mole.rkt"
          "types.rkt")
 (provide (all-defined-out)
@@ -20,24 +20,29 @@
 
 ; Returns: a generator of complete molecules
 (def (enum mole targets)
-  (if (null? targets)
-      (generator ()
-        (yield mole)
-        'DONE)
-    (let* ([t-first (car targets)]
-           [t-rest  (cdr targets)]
-           [adv     (advance mole t-first)])
-      ; Multitask all the different branches.
-      (gen-robin
-        (map
-          (lam (adv-iter)
-            (let ([new-mole    (car adv-iter)]
-                  [new-targets (cdr adv-iter)])
-              ; Remember: `enum` returns a generator
-              (enum new-mole
-                    (append t-rest new-targets))))
-          adv)))))
-(trace enum)
+  (generator ()
+    (if (null? targets)
+        (begin (yield mole)
+               'DONE)
+      (let* ([t-first (car targets)]
+             [t-rest  (cdr targets)]
+             [adv     (advance mole t-first)])
+        ; Multitask all the different branches.
+        (def multitasker
+          (gen-robin
+            (map
+              (lam (adv-iter)
+                (let ([new-mole    (car adv-iter)]
+                      [new-targets (cdr adv-iter)])
+                  ; Remember: `enum` returns a generator
+                  (enum new-mole
+                        (append t-rest new-targets))))
+              adv)))
+        ; Now, multitasker is a generator, the job now
+        ; is just return any value that it returns.
+        (let loop ()
+          (yield (multitasker))
+          (loop))))))
 
 ; Output: a (possibly empty) list of
 ; consistent molecule-targets pairs.
@@ -52,9 +57,12 @@
             (map (lam (ctor)
                   (match ctor
                     [(Ctor name body)
-                     (process-ctor tpath
-                                   (send mole copy)
-                                   body)]))
+                     (let* ([mclone (send mole copy)])
+                       (send mclone
+                         update ctor no-fail)
+                       (process-ctor tpath
+                                     mclone
+                                     body))]))
               (match ttype
                 [(Type body) (force body)]))))
 
@@ -65,7 +73,7 @@
      (match (send m get-data)
        ['UNKNOWN (explore-type)]
 
-       ; We already have chosen tthe constructor.
+       ; We already have chosen the constructor.
        [(Ctor name body)
         (match (process-ctor tpath
                              mole

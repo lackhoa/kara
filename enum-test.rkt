@@ -6,7 +6,11 @@
 (test-case
   "Just enumerate something"
   (def m (new mole%))
-  (get-one m wf))
+  (def g (kick-start m wf))
+  (displayln (send (g) repr))
+  (displayln (send (g) repr))
+  (displayln (send (g) repr))
+  (displayln (send (g) repr)))
 
 ;; (test-case
 ;;   "Trying to prove A->A"
