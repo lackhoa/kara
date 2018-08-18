@@ -19,7 +19,7 @@
             ; If there's no saved progress then ignore it
             (begin (set! saved focus)
                    (set! gen   focus)))
-            (saved 2
+            (saved 1
               (lam (value ticks)
                 (if (eq? 'DONE value)
                     (loop others)
@@ -32,32 +32,3 @@
                 (loop (append others
                               (list (cons resume-eng
                                           gen)))))))))))
-
-
-
-;; Testingu!
-;; (def (fib n)
-;;   (check-timer)
-;;   (if (< n 2)
-;;       n
-;;     (+ (fib (- n 1))
-;;        (fib (- n 2)))))
-
-;; (def fib-gen1
-;;   (generator ()
-;;     (let loop ([n 4])
-;;       (yield (fib n))
-;;       (if (<= n 11)
-;;           (loop (+ n 1))
-;;         'DONE))))
-
-;; (def fib-gen2
-;;   (generator ()
-;;     (let loop ([n 10])
-;;       (yield (fib n))
-;;       (if (>= n 4)
-;;           (loop (- n 1))
-;;         'DONE))))
-
-;; (def g (gen-robin (list fib-gen2 fib-gen1)))
-;; (gen-get g 15)

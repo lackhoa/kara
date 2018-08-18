@@ -62,7 +62,7 @@
 ; -------------------------------------------------------
 ; Well-formed Formula
 ;; (type wf A B C Implication)
-(type wf A B C Implication)
+(type wf A)
 
 (ctor A) (ctor B) (ctor C)
 
