@@ -59,7 +59,9 @@
                     [(Ctor name body)
                      (let* ([mclone (send mole copy)])
                        (send mclone
-                         update ctor no-fail)
+                         update-path tpath
+                                     ctor
+                                     no-fail)
                        (process-ctor tpath
                                      mclone
                                      body))]))

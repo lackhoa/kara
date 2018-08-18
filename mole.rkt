@@ -17,7 +17,7 @@
   (raise "I did not expect this to fail..."))
 
 (def mole%
-  (class object%
+  (class* object% (writable<%>)
     ; Initializer
     (super-new)
 
@@ -53,11 +53,11 @@
                   "Sync list must a non-empty")
       (set! sync-ls value))
 
-    (define/public (repr)
-      (cons data (map (lam (c)
-                        (cons (car c)
-                              (send (cdr c) repr)))
-                      children)))
+    (define/public (custom-display port)
+      (display (cons data children) port))
+
+    (define/public (custom-write port)
+      (write (cons data children) port))
 
     ; Reference a child.
     (define/public (ref role/path)
