@@ -40,12 +40,12 @@
 
 (def (print-even)
   (for-each (tlam (x) (printf "~s\n" x))
-            (filter even? (range 0 null))))
+            (filter even? (range 0 100))))
 (def even-engine (proc->engine print-even))
 
 (def (print-odd)
   (for-each (tlam (x) (printf "~s\n" x))
-            (filter odd? (range 1 null))))
+            (filter odd? (range 1 100))))
 (def odd-engine (proc->engine print-odd))
 
 (def (round-robin engs)
