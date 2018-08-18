@@ -26,3 +26,7 @@
      (if (eq? val compare)
          (begin e1 e2 ...)
        (switch val rest ...))]))
+
+; Add an element to the beginning of the list.
+(define-syntax-rule (cons! item ls)
+  (set! ls (cons item ls)))

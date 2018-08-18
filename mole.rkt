@@ -1,20 +1,14 @@
 #lang racket
 (require "lang/kara.rkt"
-         racket/hash
-         rackunit)
+         racket/hash)
 (provide (all-defined-out)
          (all-from-out))
-
-(def out null)
-
-(define-simple-check (check-class obj class)
-  (is-a? obj class))
 
 ; ---------------------------------
 ; Molecules
 ; ---------------------------------
 ; Naming convention:
-; * roles are lowercase,
+; * roles (and paths) are lowercase,
 ; * data are capitalized.
 
 (def mole%
@@ -30,9 +24,10 @@
     ; Fields
     (def data data-i)
     (def children children-i)
-    ; The sync list is synced, too
-    ; Everything is also synced to itself
-    (def sync-ls (cons this sync-ls-i))
+    ; The sync list is synced among its items,
+    ; and everything is synced wiht itself.
+    (def sync-ls
+      (cons this sync-ls-i))
 
     ; Getters
     (define/public (get-children)
@@ -46,7 +41,6 @@
 
     ; Setters
     (define/public (set-data val)
-      (check-pred symbol? val)
       (set! data val))
     (define/public (set-sync-ls value)
       (check-pred pair?
@@ -73,7 +67,7 @@
                ; `(cdr (force lu))` is a child
                (send (cdr (force lu))
                  ref (cdr path))]
-              [else  'NOT-FOUND])))
+              [else  #f])))
 
     ; Tell those in the sync list to do something.
     ; `task` is a function takes a molecule.
@@ -96,8 +90,8 @@
       (check-pred symbol? role)
       (check-class mole mole%
         "Invalid child")
-      (set! children
-        (cons (cons role mole) children)))
+      (cons! (cons role mole)
+             children))
 
     ; Returns a mapping of the originals to their copies,
     ; without the sync list.
@@ -177,8 +171,6 @@
     ; Updating and syncing the data.
     ; `fail-con`: the function to in case of inconsistency.
     (define/public (update val fail-con)
-      (check-pred symbol? val
-        "Invalid value")
       (when (neq? data val)
         (if (eq? data 'UNKNOWN)
             (begin
@@ -193,8 +185,7 @@
     (define/public (update-path path val fail-con)
       (check-pred list? path
         "Invalid path")
-      (when (eq? (ref path)
-                 'NOT-FOUND)
+      (unless (ref path)
         (expand path))
       (let ([m (ref path)])
         (check-class m mole%
@@ -300,4 +291,15 @@
                   sync (send m-other ref role)
                        (lam () (escape 'CONFLICT))))))))
       (when (eq? result 'CONFLICT)
-        (fail-con)))))
+        (fail-con)))
+
+    ; Sync two descendants of this molecules.
+    ; If they don't exist, expand them.
+    (define/public (sync-path p1 p2 fail-con)
+      (unless (ref p1)
+        (expand p1))
+      (unless (ref p2)
+        (expand p2))
+
+      (send (ref p1)
+        sync (ref p2) fail-con))))

@@ -4,56 +4,83 @@
          "gen_robin.rkt"
          "mole.rkt"
          "types.rkt")
+(provide (all-defined-out)
+         (all-from-out "types.rkt")
+         (all-from-out "mole.rkt"))
 
 (struct Target (path type))
 
 ; start enumerating with the root as the target
 (def (kick-start mole [root-type 'NOT-NEEDED])
   (enum mole
-        (QTars (list (Target root-type)))))
+        (list (Target null root-type))))
+
+(def (get-one mole [root-type 'NOT-NEEDED])
+  ((kick-start mole root-type)))
 
 ; Returns: a generator of complete molecules
 (def (enum mole targets)
-  (generator ()
-    (if (null? targets)
-        (begin (yield mole)
-               (yield 'DONE))
-      (let* ([t-first (cons targets)]
-             [t-rest  (cdr targets)]
-             [adv     (advance mole t-first)])
-        ; Multitask all the different branches
-        (gen-robin
-          (map (lam (adv-iter)
-                 (let ([new-mole    (car adv-iter)]
-                       [new-targets (cdr adv-iter)])
-                   ; `enum` returns a generator
-                   (enum new-mole
-                         (append t-rest new-targets))))
-               adv))))))
+  (if (null? targets)
+      (generator ()
+        (yield mole)
+        'DONE)
+    (let* ([t-first (car targets)]
+           [t-rest  (cdr targets)]
+           [adv     (advance mole t-first)])
+      ; Multitask all the different branches.
+      (gen-robin
+        (map
+          (lam (adv-iter)
+            (let ([new-mole    (car adv-iter)]
+                  [new-targets (cdr adv-iter)])
+              ; Remember: `enum` returns a generator
+              (enum new-mole
+                    (append t-rest new-targets))))
+          adv)))))
+(trace enum)
 
-; Output: a list of molecule-targets pairs.
+; Output: a (possibly empty) list of
+; consistent molecule-targets pairs.
 (def (advance mole target)
-  (let* ([tpath (Target-path target)]
-         [ttype (Target-type target)]
-         [lu    (send mole ref tpath)])
-    (if (eq? lu 'NOT-FOUND)
-        (remove 'CONFLICT
-          (map (lam (ctor)
-                 (process-ctor (send mole copy)
-                                 ctor))
-               (force ttype)))
-      ; We already have a constructor
-      (list (process-ctor tpath mole val)))))
+  (def tpath
+    (Target-path target))
+  (def ttype
+    (Target-type target))
 
-; Will modify mole to expand a specific ctor.
+  (def (explore-type)
+    (remq* '(CONFLICT)
+            (map (lam (ctor)
+                  (match ctor
+                    [(Ctor name body)
+                     (process-ctor tpath
+                                   (send mole copy)
+                                   body)]))
+              (match ttype
+                [(Type body) (force body)]))))
+
+  (match (send mole ref tpath)
+    [#f (explore-type)]
+
+    [(? (curryr is-a? mole%) m)
+     (match (send m get-data)
+       ['UNKNOWN (explore-type)]
+
+       ; We already have chosen tthe constructor.
+       [(Ctor name body)
+        (match (process-ctor tpath
+                             mole
+                             body)
+          ['CONFLICT null]
+          [result (list result)])])]))
+
 ; Returns: a pair containing the modified molecule
 ; and a list of new targets.
-(def (process-ctor rpath mole ctor)
-  (check-timer)
+(def (process-ctor rpath mole ctor-body)
+  (check-timer)  ; This is a major time waster
 
   ; We will be working under a relative path
   (def (pad p) (append rpath p))
-  (def targets null)
+  (def new-targets null)
 
   (let/cc escape
     (for-each
@@ -65,20 +92,15 @@
                          constructor
                          (lam () (escape 'CONFLICT)))]
 
-          ; This part assumes that the molecules are present.
           [(SLink p1 p2)
-           (send (send mole ref (pad p1))
-             sync (send mole ref (pad p2))
-                  (lam () (escape 'CONFLICT)))]
+           (send mole
+             sync-path (pad p1)
+                       (pad p2)
+                       (lam () (escape 'CONFLICT)))]
 
-          [(Rec component type)
-           (set! targets
-             (cons (Target (padder component) type)
-                   targets))]
-
-          [else
-           (error "process-ctor"
-                  "Invalid constructor term"
-                  ctor-iter)]))
-      (Ctor-body ctor))
-    (cons mole targets)))
+          [(Rec role type)
+           (cons! (Target (pad (list role))
+                          type)
+                  new-targets)]))
+      ctor-body)
+    (cons mole new-targets)))

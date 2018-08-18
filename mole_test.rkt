@@ -134,3 +134,19 @@
     update-path '(j i) 'R (lam () "Damn"))
   (check-eq? (send (send cnop ref '(j i)) get-data)
              (send (send cnop ref '(k i)) get-data)))
+
+(test-case
+  "Telekinesis"
+  (def m1 (new mole%))
+  (def m2 (new mole%))
+  (send m1 update-path '(d) 'UNKNOWN "Fuckit")
+  (send m1 update-path '(d a) 'UNKNOWN "Fuckit")
+  (send m1 update-path '(d b) 'UNKNOWN "Fuckit")
+  (send m1 sync-path '(d a) '(d b) "Fuckit")
+  (send m1 sync m2 "Fuckit")
+  (send m2 update-path '(d b) 'TELE "Fuckit")
+  (check-eq? (send (send m1 ref '(d a)) get-data)
+             'TELE)
+  (check-eqv? (length (send (send m1 ref '(d a))
+                        get-sync-ls))
+              4))

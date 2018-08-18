@@ -55,7 +55,7 @@
   (Type (delay (list e ...))))
 
 ; -------------------------------------------------------
-; Types
+; Type Definitions
 ; -------------------------------------------------------
 ; Well-formed Formula
 (type wf A B C Implication)
@@ -66,7 +66,7 @@
   (rec ante wf)
   (rec ccs wf))
 
-; Logical Entailment
+; Logical Entailment: only conclusion (ccs) is necessary.
 (type entailment
   AI AK AS AB AC MP)
 

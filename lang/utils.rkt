@@ -1,5 +1,6 @@
 #lang racket
-(require "macro.rkt")
+(require "macro.rkt"
+         rackunit)
 (provide (all-defined-out))
 
 ; -----------------------------------------------------------
@@ -26,3 +27,9 @@
 
 (def (square n)
     (* n n))
+
+; ------------------------------------------------------------
+; Assertions
+; ------------------------------------------------------------
+(define-simple-check (check-class obj class)
+  (is-a? obj class))

@@ -1,7 +1,6 @@
 #lang racket
 (require "lang/kara.rkt"
-         "engine.rkt"
-         racket/generator)
+         "engine.rkt")
 (provide gen-robin)
 
 (def (gen-robin gens)
