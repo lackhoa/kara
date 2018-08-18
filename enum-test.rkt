@@ -7,10 +7,7 @@
   "Just enumerate something"
   (def m (new mole%))
   (def g (kick-start m wf))
-  (displayln (send (g) repr))
-  (displayln (send (g) repr))
-  (displayln (send (g) repr))
-  (displayln (send (g) repr)))
+  (gen-get g 10))
 
 ;; (test-case
 ;;   "Trying to prove A->A"

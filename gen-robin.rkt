@@ -60,6 +60,4 @@
 ;;         'DONE))))
 
 ;; (def g (gen-robin (list fib-gen2 fib-gen1)))
-;; (g) (g) (g) (g) (g) (g) (g) (g)
-;; (g) (g) (g) (g) (g) (g) (g) (g)
-;; (g) (g) (g) (g) (g) (g) (g) (g)
+;; (gen-get g 15)

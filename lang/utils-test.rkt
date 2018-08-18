@@ -2,7 +2,8 @@
 
 (require "macro.rkt"
          "utils.rkt"
-         rackunit)
+         rackunit
+         racket/generator)
 
-(check-equal? '(S z) (tag 'S 'z) "Tagging")
-
+(def g (generator () (yield 1) (yield 2) 3))
+(gen-get g 3)

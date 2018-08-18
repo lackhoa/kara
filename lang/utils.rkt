@@ -1,6 +1,7 @@
 #lang racket
 (require "macro.rkt"
-         rackunit)
+         rackunit
+         racket/generator)
 (provide (all-defined-out))
 
 ; -----------------------------------------------------------
@@ -33,3 +34,24 @@
 ; ------------------------------------------------------------
 (define-simple-check (check-class obj class)
   (is-a? obj class))
+
+; ------------------------------------------------------------
+; Generators
+; ------------------------------------------------------------
+(def (gen-get gen
+              [num 10]
+              [func displayln])
+  (cond [(not (number? num))
+         (raise "Expected a number")]
+
+        [(= num 0) (void)]
+
+        [(> num 0)
+         (match (gen)
+           ['DONE (void)]
+           [val (func val)
+                (gen-get gen
+                         (- num 1)
+                         func)])]
+
+        [else (raise "Invalid number")]))
