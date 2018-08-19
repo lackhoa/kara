@@ -50,7 +50,7 @@
     (define/public (set-sync-ls value)
       (check-pred pair?
                   value
-                  "Sync list must a non-empty")
+                  "Sync list must be non-empty")
       (set! sync-ls value))
 
     (define (repr)
@@ -119,7 +119,7 @@
                    [cp-res (send child clone-map)])
               (let ([lu (assq child cp-res)])
                 (check-not-false lu
-                  "`clone-map` does not include root")
+                  "`clone-map` does include the root.")
                 (send new-me
                   add-child role (cdr lu)))
               ; Since molecules are trees,
@@ -147,36 +147,36 @@
                   (lam (m)
                     (let ([lu (assq m cns)])
                       (check-not-false lu
-                        "Sync list contains a non-child \
-                         (maybe you're copying a non-root?)")
+                        "Sync list contains only \
+                         descendants of this molecule.")
                       (cdr lu)))
                   (send orig get-sync-ls))))
           cns)
         ; This will return the copy.
         (cdr (assq this cns))))
 
+    ; Keep adding new children
+    ; until the path is exhausted.
     (define/public (just-expand path)
       (unless (null? path)
-        (let* ([role (car path)]
-               [lu (assq role children)])
-          (check-pred symbol? role)
-          (if lu
-              (send (cdr lu)
-                expand (cdr path))
-            (let ([new-child (new mole%)])
-              (add-child role new-child)
-              (send new-child
-                just-expand (cdr path)))))))
+        (let ([new-child (new mole%)])
+          (add-child (car path) new-child)
+          (send new-child
+            just-expand (cdr path)))))
 
     (define/public (expand path)
-      (just-expand path)
-      (inform (lam (m)
-                (send m just-expand path)))
-      ; The ordering is important here: we must add
-      ; all the components before referencing in the sync list.
-      (cascade)
-      (inform (lam (m)
-                (send m cascade))))
+      (let ([lu (ref (car path))])
+        (match lu
+          [#f
+           (just-expand path)
+           (inform (lam (m) (send m just-expand path)))
+           ; The order is important: we must add all
+           ; components to refer to them in the sync list.
+           (cascade path)
+           (inform (lam (m) (send m cascade path)))]
+
+          [child
+           (send child expand (cdr path))])))
 
     ; Updating and syncing the data.
     ; `fail-con`: the function to in case of inconsistency.
@@ -202,7 +202,7 @@
         (expand path))
       (let ([m (ref path)])
         (check-class m mole%
-          "Something is wrong with `expand`?")
+          "Expand gave us a reference to the path.")
         (send m
           update val (lam () (fail-con)))))
 
@@ -215,22 +215,23 @@
                    fail-con))
 
     ; Flush the sync list down to the new descendants.
-    (define/public (cascade)
-      (recur
-        (lam (role c)
-          ; First cascade down the immediate children,
-          ; if the child is new (when its sync list only has itself).
-          (when (< (length (send c get-sync-ls))
-                   (length sync-ls))
-            (send c
-              set-sync-ls
-                (map (lam (sy-i)
-                       (let ([corres (send sy-i ref role)])
-                         (check-class corres mole%)
-                         corres))
-                     sync-ls)))
+    (define/public (cascade path)
+      ; Only work when we have something in the sync list.
+      (when (and (not (null? path))
+                 (> (length sync-ls) 1))
+        (let* ([role (car path)]
+               [c    (ref role)])
+          (check-class c mole%
+                       "We have this path")
+          (check-eqv? (length (send c get-sync-ls))
+                      1
+                      "This child is new")
+          (send c
+            set-sync-ls
+              (map (lam (sy-i) (send sy-i ref role))
+                   sync-ls))
           ; Then let them carry over.
-          (send c cascade))))
+          (send c cascade (cdr path)))))
 
     ; Sync up two molecules that haven't been synced before
     (define/public (sync m-other
@@ -244,24 +245,20 @@
 
           ; Fact: The two sync sets are mutually exclusive
           ; Start out with syncing data
-          (begin
-            (def other-data
-              (send m-other get-data))
-            (cond
-              ; No on the top level
-              [(eq? data other-data)
-               (void)]
-              ; `m-other` has new intel for us
-              [(eq? data 'UNKNOWN)
-               (update other-data
-                       no-fail)]
-              ; We have new intel for `m-other`
-              [(eq? other-data 'UNKNOWN)
-               (send m-other
-                 update data
-                        no-fail)]
-              ; Nope, the data are inconsistent.
-              [else (escape 'CONFLICT)])
+          (def other-data
+            (send m-other get-data))
+          (cond
+            ; No on the top level
+            [(eq? data other-data)
+             (void)]
+            ; `m-other` has new intel for us
+            [(eq? data 'UNKNOWN)
+             (update other-data)]
+            ; We have new intel for `m-other`
+            [(eq? other-data 'UNKNOWN)
+             (send m-other update data)]
+            ; Nope, the data are inconsistent.
+            [else (escape 'CONFLICT)])
 
             ; Add the missing children
             (def our-roles
@@ -269,21 +266,15 @@
             (def their-roles
               (list->seteq (send m-other get-roles)))
             (set-for-each
-              (set-subtract their-roles
-                            our-roles)
+              (set-subtract their-roles our-roles)
               (lam (role)
-                (update-role role
-                             'UNKNOWN
-                             no-fail)))
+                (update-role role 'UNKNOWN)))
             ; Same thing
             (set-for-each
-              (set-subtract our-roles
-                            their-roles)
+              (set-subtract our-roles their-roles)
               (lam (role)
                 (send m-other
-                  update-role role
-                              'UNKNOWN
-                              no-fail)))
+                  update-role role 'UNKNOWN)))
 
             ; Establish the connection among the top-level.
             ; Note that we don't cascade here,
@@ -292,20 +283,17 @@
                    (append sync-ls
                            (send m-other get-sync-ls))])
               (set-sync-ls merge)
-              (inform (lam (m)
-                        (send m set-sync-ls merge))))
+              (inform (lam (m) (send m set-sync-ls merge))))
 
             ; Our work is over: Recursively let all the children sync.
             (check-eqv? (length (get-roles))
                         (length (send m-other get-roles))
-                        "The components are not the same, \
-                         something is wrong with the code")
-
+                        "The structures are synced.")
             (recur
               (lam (role c)
                 (send c
                   sync (send m-other ref role)
-                       (lam () (escape 'CONFLICT))))))))
+                       (lam () (escape 'CONFLICT)))))))
       (when (eq? result 'CONFLICT)
         (fail-con)))
 
