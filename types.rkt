@@ -61,8 +61,7 @@
 ; Type Definitions
 ; -------------------------------------------------------
 ; Well-formed Formula
-;; (type wf A B C Implication)
-(type wf A)
+(type wf A B C Implication)
 
 (ctor A) (ctor B) (ctor C)
 
