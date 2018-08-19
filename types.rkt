@@ -11,144 +11,202 @@
 ; -------------------------------------------------------
 ; Macros for Type Declaration
 ; -------------------------------------------------------
-; Constructor declaration for components.
+
+; Constructors
+(struct Ctor (repr recs forms slinks))
+
+; Short-hand for defining new construtors
+(define-syntax-rule (def-ctor name repr recs forms slinks)
+  (def name
+    (Ctor repr recs forms slinks)))
+
+; Form declaration
 (struct Form (path ctor))
 
-(define-syntax-rule (form path e)
-  (Form (path-proc 'path) e))
+(define-syntax-rule (single-form path c)
+  (Form (path-proc 'path) c))
 
-; Symbolic links declaration.
-(struct SLink (p1 p2))
+(define-syntax-rule (macro-forms (path c) ...)
+  (list (single-form path c) ...))
 
-(define-syntax --
+; Link declaration
+(struct SLink (path1 path2))
+
+(define-syntax single-link
   (syntax-rules ()
     [(_ p1 p2)
-     (list (SLink (path-proc 'p1)
-                  (path-proc 'p2)))]
+     (list
+       (SLink (path-proc 'p1)
+              (path-proc 'p2)))]
+
     [(_ p1 p2 rest ...)
      (cons (SLink (path-proc 'p1)
                   (path-proc 'p2))
-           (-- p2 rest ...))]))
+           (single-link p2 rest ...))]))
 
-; Type declaration for components.
+(define-syntax-rule (macro-links (p1 p2 rest ...) ...)
+  (append (single-link p1 p2 rest ...) ...))
+
+; Recursive component declaration
 (struct Rec (role type))
 
-(define-syntax-rule (rec role type)
+(define-syntax-rule (single-rec role type)
   (Rec 'role type))
 
-; Constructors: body is a list of Form, Rec, and Slinks.
-(struct Ctor (name body)
-        #:methods gen:custom-write
-        [(def (write-proc Ctor port mode)
-           (display (Ctor-name Ctor) port))])
+(define-syntax-rule (macro-recs (role type) ...)
+  (list (single-rec role type) ...))
 
-(define-syntax-rule (ctor name e ...)
-  (def name
-    (Ctor 'name (flatten (list e ...)))))  ; `flatten` since SLinks may be grouped
+; Representation
+(struct Repr (leader paths))
 
-; Types are delayed list of constructors.
-(struct Type (body))
+(define-syntax macro-repr
+  (syntax-rules ()
+    [(_ (leader paths ...))
+     (Repr 'leader (map path-proc
+                        (list 'paths ...)))]
 
-(define-syntax-rule (type name e ...)
-  (def name
-    (Type (delay (list e ...)))))
+    [(_ symbol) (Repr 'symbol null)]))
 
-; Anonymous type
-(define-syntax-rule (union e ...)
-  (Type (delay (list e ...))))
+; Union: a delayed list of constructors.
+(struct Union (ctors))
+
+(define-syntax-rule (macro-union ctors ...)
+  (Union (delay (list ctors ...))))
+
+; Symbol: construtor with just a representation.
+(define (Symbol s)
+  (Ctor [macro-repr s] null null null))
 
 ; -------------------------------------------------------
 ; Type Definitions
 ; -------------------------------------------------------
 ; Well-formed Formula
-(type wf A B C Implication)
+(def wf (macro-union A-Sym
+                     B-Sym
+                     C-Sym
+                     Implication))
 
-(ctor A) (ctor B) (ctor C)
+(def A-Sym (Symbol 'A))
+(def B-Sym (Symbol 'B))
+(def C-Sym (Symbol 'C))
 
-(ctor Implication
-  (rec ante wf)
-  (rec ccs wf))
+(def-ctor Implication
+  [macro-repr (=> ccs)]
+  [macro-recs (ante wf) (ccs wf)]
+  null
+  null)
 
 ; Logical Entailment: only conclusion (ccs) is necessary.
-(type entailment
-  AI AK AS AB AC MP)
+(def entailment
+  (macro-union AI AK AS AB AC MP))
 
 ; => A->A
-(ctor AI
-  (form ccs  Implication)
+(def-ctor AI
+  [macro-repr (=> ccs)]
 
-  (-- ccs_ante ccs_csq))
+  null
+
+  [macro-forms
+   (ccs  Implication)]
+
+  [macro-links
+   (ccs_ante ccs_csq)])
 
 ; => (A->B)->A
-(ctor AK
-  (form ccs     Implication)
-  (form ccs_csq Implication)
+(def-ctor AK
+  [macro-repr (=> ccs)]
 
-  (-- ccs_ante ccs_csq_csq))
+  null
+
+  [macro-forms
+   (ccs      Implication)
+   (ccs_csq  Implication)]
+
+  [macro-links
+   (ccs_ante ccs_csq_csq)])
 
 ; => (A->(B->C)) -> ((A->B)->(A->C))
-(ctor AS
-  (form ccs          Implication)
-  (form ccs_ante     Implication)
-  (form ccs_csq      Implication)
-  (form ccs_ante_csq Implication)
-  (form ccs_csq_ante Implication)
-  (form ccs_csq_csq  Implication)
+(def-ctor AS
+  [macro-repr (=> ccs)]
+
+  null
+
+  [macro-forms
+   (ccs          Implication)
+   (ccs_ante     Implication)
+   (ccs_csq      Implication)
+   (ccs_ante_csq Implication)
+   (ccs_csq_ante Implication)
+   (ccs_csq_csq  Implication)]
+
   ; A
-  (-- ccs_ante_ante
-      ccs_csq_ante_ante
-      ccs_csq_csq_ante)
-  ; B
-  (-- ccs_ante_csq_ante
-      ccs_csq_ante_csq)
-  ; C
-  (-- ccs_ante_csq_csq
-      ccs_csq_csq_csq))
+  [macro-links
+   (ccs_ante_ante
+    ccs_csq_ante_ante
+    ccs_csq_csq_ante)
+   ; B
+   (ccs_ante_csq_ante
+    ccs_csq_ante_csq)
+   ; C
+   (ccs_ante_csq_csq
+    ccs_csq_csq_csq)])
 
 ; => (B->C) -> ((A->B) -> (A->C))
-(ctor AB
-  (form ccs          Implication)
-  (form ccs_ante     Implication)
-  (form ccs_csq      Implication)
-  (form ccs_csq_ante Implication)
-  (form ccs_csq_csq  Implication)
-  ; A
-  (-- ccs_csq_ante_ante
-      ccs_csq_csq_ante)
-  ; B
-  (-- ccs_ante_ante
-      ccs_csq_ante_csq)
-  ; C
-  (-- ccs_ante_csq
-      ccs_csq_csq_csq))
+(def-ctor AB
+  [macro-repr (=> ccs)]
+
+  null
+
+  [macro-forms
+   (ccs          Implication)
+   (ccs_ante     Implication)
+   (ccs_csq      Implication)
+   (ccs_csq_ante Implication)
+   (ccs_csq_csq  Implication)]
+
+  [macro-links
+   ; A
+   (ccs_csq_ante_ante ccs_csq_csq_ante)
+   ; B
+   (ccs_ante_ante ccs_csq_ante_csq)
+   ; C
+   (ccs_ante_csq ccs_csq_csq_csq)])
 
 ; => (A->(B->C)) -> (B->(A->C))
-(ctor AC
-  (form ccs          Implication)
-  (form ccs_ante     Implication)
-  (form ccs_csq      Implication)
-  (form ccs_ante_csq Implication)
-  (form ccs_csq_csq  Implication)
-  ; A
-  (-- ccs_ante_ante
-      ccs_csq_csq_ante)
-  ; B
-  (-- ccs_ante_csq_ante
-      ccs_csq_ante)
-  ; C
-  (-- ccs_ante_csq_csq
-      ccs_csq_csq_csq))
+(def-ctor AC
+  [macro-repr (=> ccs)]
+
+  null
+
+  [macro-forms
+   (ccs          Implication)
+   (ccs_ante     Implication)
+   (ccs_csq      Implication)
+   (ccs_ante_csq Implication)
+   (ccs_csq_csq  Implication)]
+
+  [macro-links
+   ; A
+   (ccs_ante_ante ccs_csq_csq_ante)
+   ; B
+   (ccs_ante_csq_ante ccs_csq_ante)
+   ; C
+   (ccs_ante_csq_csq ccs_csq_csq_csq)])
 
 ; A, A->B => B
-(ctor MP
-  (rec ?=>a    entailment)
-  (rec ?=>a->b entailment)
+(def-ctor MP
+  [macro-repr (=> ?=>a ?=>a->b ccs)]
 
-  (form ?=>a->b_ccs  Implication)
-  ; A
-  (-- ?=>a->b_ccs_ante
-      ?=>a_ccs)
-  ; B
-  (-- ccs
-      ?=>a->b_ccs_csq))
+  [macro-recs
+   (?=>a     entailment)
+   (?=>a->b  entailment)]
+
+  [macro-forms
+   (?=>a->b_ccs  Implication)]
+
+  [macro-links
+   ; A
+   (?=>a->b_ccs_ante  ?=>a_ccs)
+   ; B
+   (ccs  ?=>a->b_ccs_csq)])
 ; Note: the conclusion (ccs) is implicit in the last link.

@@ -53,17 +53,17 @@
     (remq* '(CONFLICT)
             (map (lam (ctor)
                   (match ctor
-                    [(Ctor name body)
+                    [(Ctor _ recs forms links)
                      (let* ([mclone (send mole copy)])
                        (send mclone
-                         update-path tpath
-                                     ctor
-                                     no-fail)
+                         update-path tpath ctor)
                        (process-ctor tpath
                                      mclone
-                                     body))]))
+                                     recs
+                                     forms
+                                     links))]))
               (match ttype
-                [(Type body) (force body)]))))
+                [(Union ctors) (force ctors)]))))
 
   (match (send mole ref tpath)
     [#f (explore-type)]
@@ -73,16 +73,22 @@
        ['UNKNOWN (explore-type)]
 
        ; We already have chosen the constructor.
-       [(Ctor name body)
+       [(Ctor _ recs forms links)
         (match (process-ctor tpath
                              mole
-                             body)
+                             recs
+                             forms
+                             links)
           ['CONFLICT null]
           [result (list result)])])]))
 
 ; Returns: a pair containing the modified molecule
 ; and a list of new targets.
-(def (process-ctor rpath mole ctor-body)
+(def (process-ctor rpath
+                   mole
+                   recs
+                   forms
+                   links)
   (check-timer)  ; This is a major time waster
 
   ; We will be working under a relative path
@@ -91,23 +97,31 @@
 
   (let/cc escape
     (for-each
-      (lam (ctor-iter)
-        (match ctor-iter
-          [(Form path constructor)
-           (send mole
-             update-path (pad path)
-                         constructor
-                         (lam () (escape 'CONFLICT)))]
-
-          [(SLink p1 p2)
-           (send mole
-             sync-path (pad p1)
-                       (pad p2)
-                       (lam () (escape 'CONFLICT)))]
-
+      (lam (recs-iter)
+        (match recs-iter
           [(Rec role type)
            (cons! (Target (pad (list role))
                           type)
                   new-targets)]))
-      ctor-body)
+      recs)
+
+    (for-each
+      (lam (forms-iter)
+        (match forms-iter
+          [(Form path constructor)
+           (send mole
+             update-path (pad path)
+                         constructor
+                         (lam () (escape 'CONFLICT)))]))
+      forms)
+
+    (for-each
+      (lam (links-iter)
+        (match links-iter
+          [(SLink p1 p2)
+           (send mole
+             sync-path (pad p1)
+                       (pad p2)
+                       (lam () (escape 'CONFLICT)))]))
+      links)
     (cons mole new-targets)))
