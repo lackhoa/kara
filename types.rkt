@@ -158,7 +158,7 @@
 
 ; => (B->C) -> ((A->B) -> (A->C))
 (def-ctor AB
-  [macro-repr (=> ccs)]
+  [macro-repr (AB=> ccs)]
 
   null
 
@@ -179,7 +179,7 @@
 
 ; => (A->(B->C)) -> (B->(A->C))
 (def-ctor AC
-  [macro-repr (=> ccs)]
+  [macro-repr (AC=> ccs)]
 
   null
 
@@ -200,7 +200,7 @@
 
 ; A, A->B => B
 (def-ctor MP
-  [macro-repr (=> ?=>a->b ?=>a ccs)]
+  [macro-repr (MP=> ?=>a->b ?=>a ccs)]
 
   [macro-recs
    (?=>a     entailment)
