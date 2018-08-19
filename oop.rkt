@@ -3,7 +3,7 @@
 
 (def fish%
   (class* object% (writable<%>)
-    (init size)                ; initialization argument
+    (init size)
 
     (define/public (custom-display port)
       (display "I'm a fish" port))
@@ -11,9 +11,16 @@
     (define/public (custom-write port)
       (display "I'm a fish" port))
 
-    (define current-size size) ; field
+    (define current-size size)
 
-    (super-new)                ; superclass initialization
+    ; This won't work as you intended
+    (define double-size
+      (* 2 current-size))
+
+    (define/public (get-double-size)
+      double-size)
+
+    (super-new)
 
     (define/public (get-size)
       current-size)
@@ -25,4 +32,7 @@
       (grow (send other-fish get-size)))))
 
 (def f (new fish% [size 5]))
-(display f)
+(displayln f)
+(send f grow 6)
+(send f get-size)
+(send f get-double-size)

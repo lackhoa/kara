@@ -53,11 +53,16 @@
                   "Sync list must a non-empty")
       (set! sync-ls value))
 
+    (define (repr)
+      (if (null? children)
+          data
+        (cons data children)))
+
     (define/public (custom-display port)
-      (display (cons data children) port))
+      (display (repr) port))
 
     (define/public (custom-write port)
-      (write (cons data children) port))
+      (write (repr) port))
 
     ; Reference a child.
     (define/public (ref role/path)
@@ -175,7 +180,8 @@
 
     ; Updating and syncing the data.
     ; `fail-con`: the function to in case of inconsistency.
-    (define/public (update val fail-con)
+    (define/public (update val
+                           [fail-con no-fail])
       (when (neq? data val)
         (if (eq? data 'UNKNOWN)
             (begin
@@ -187,7 +193,9 @@
           (fail-con))))
 
     ; Just a convenience function
-    (define/public (update-path path val fail-con)
+    (define/public (update-path path
+                                val
+                                [fail-con no-fail])
       (check-pred list? path
         "Invalid path")
       (unless (ref path)
@@ -199,7 +207,9 @@
           update val (lam () (fail-con)))))
 
     ; Short-hand for the short-hand that is update-path.
-    (define/public (update-role role val fail-con)
+    (define/public (update-role role
+                                val
+                                [fail-con no-fail])
       (update-path (list role)
                    val
                    fail-con))
@@ -223,7 +233,8 @@
           (send c cascade))))
 
     ; Sync up two molecules that haven't been synced before
-    (define/public (sync m-other fail-con)
+    (define/public (sync m-other
+                         [fail-con no-fail])
       (check-class m-other mole%
         "Expected a molecule")
       (def result
@@ -300,7 +311,9 @@
 
     ; Sync two descendants of this molecules.
     ; If they don't exist, expand them.
-    (define/public (sync-path p1 p2 fail-con)
+    (define/public (sync-path p1
+                              p2
+                              [fail-con no-fail])
       (unless (ref p1)
         (expand p1))
       (unless (ref p2)

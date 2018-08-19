@@ -15,9 +15,6 @@
   (enum mole
         (list (Target null root-type))))
 
-(def (get-one mole [root-type 'NOT-NEEDED])
-  ((kick-start mole root-type)))
-
 ; Returns: a generator of complete molecules
 (def (enum mole targets)
   (generator ()

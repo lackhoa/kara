@@ -3,25 +3,22 @@
 (require "lang/kara.rkt"
          "enum.rkt")
 
-(test-case
-  "Just enumerate something"
+(def (enum1)
   (def m (new mole%))
   (def g (kick-start m wf))
   (gen-get g 10))
 
-;; (test-case
-;;   "Trying to prove A->A"
-;;   (def m (new mole%))
-;;   (send m
-;;     update-role 'ccs
-;;                 Implication
-;;                 (const "No way"))
-;;   (send m
-;;     update-path '(ccs ante)
-;;                 A
-;;                 (const "No way"))
-;;   (send m
-;;     update-path '(ccs csq)
-;;                 A
-;;                 (const "No way"))
-;;   (get-one m entailment))
+;; (enum1)
+
+(def (proof1)
+  (def m (new mole%))
+  (send m
+    update-role 'ccs Implication)
+  (send m
+    update-path '(ccs ante) A)
+  (send m
+    update-path '(ccs csq) A)
+  (def g (kick-start m entailment))
+  (gen-get g 3))
+
+(proof1)

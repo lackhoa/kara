@@ -40,7 +40,9 @@
 ; ------------------------------------------------------------
 (def (gen-get gen
               [num 10]
-              [func displayln])
+              [func (lam (x)
+                      (pretty-display x)
+                      (newline))])
   (cond [(not (number? num))
          (raise "Expected a number")]
 
