@@ -1,8 +1,8 @@
 #lang racket
 (require "lang/kara.rkt"
+         "types.rkt"
          racket/hash)
-(provide (all-defined-out)
-         (all-from-out))
+(provide (all-defined-out))
 
 ; ---------------------------------
 ; Molecules
@@ -53,16 +53,26 @@
                   "Sync list must be non-empty")
       (set! sync-ls value))
 
-    (define (repr)
-      (if (null? children)
-          data
-        (cons data children)))
+    (define/public (get-repr)
+      (match data
+        ['UNKNOWN (cons '? children)]
+        [(Ctor repr _ _ _)
+         (match repr
+           [(Repr leader paths)
+            (if (null? paths)
+                leader
+              (cons leader
+                    (map (lam (path)
+                           (match (ref path)
+                             [#f '?]
+                             [child (send child get-repr)]))
+                         paths)))])]))
 
     (define/public (custom-display port)
-      (display (repr) port))
+      (display (get-repr) port))
 
     (define/public (custom-write port)
-      (write (repr) port))
+      (write (get-repr) port))
 
     ; Reference a child.
     (define/public (ref role/path)

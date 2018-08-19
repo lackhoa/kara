@@ -8,7 +8,7 @@
   (def g (kick-start m wf))
   (gen-get g 10))
 
-(enum1)
+;; (enum1)
 
 (def (proof1)
   (def m (new mole%))
@@ -19,6 +19,6 @@
   (send m
     update-path '(ccs csq) A-Sym)
   (def g (kick-start m entailment))
-  (gen-get g 1))
+  (gen-get g 3))
 
-;; (proof1)
+(proof1)

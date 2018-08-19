@@ -13,7 +13,10 @@
 ; -------------------------------------------------------
 
 ; Constructors
-(struct Ctor (repr recs forms slinks))
+(struct Ctor (repr recs forms slinks)
+  #:methods gen:custom-write
+  [(define (write-proc arg-ctor port mode)
+     (display (Ctor-repr arg-ctor) port))])
 
 ; Short-hand for defining new construtors
 (define-syntax-rule (def-ctor name repr recs forms slinks)
@@ -57,15 +60,17 @@
   (list (single-rec role type) ...))
 
 ; Representation
-(struct Repr (leader paths))
+(struct Repr (leader paths)
+  #:methods gen:custom-write
+  [(define (write-proc arg-repr port mode)
+     (display (cons (Repr-leader arg-repr)
+                    (Repr-paths arg-repr))
+              port))])
 
 (define-syntax macro-repr
   (syntax-rules ()
-    [(_ (leader paths ...))
-     (Repr 'leader (map path-proc
-                        (list 'paths ...)))]
-
-    [(_ symbol) (Repr 'symbol null)]))
+    [(_ (leader roles ...))
+     (Repr 'leader (list 'roles ...))]))
 
 ; Union: a delayed list of constructors.
 (struct Union (ctors))
@@ -74,8 +79,8 @@
   (Union (delay (list ctors ...))))
 
 ; Symbol: construtor with just a representation.
-(define (Symbol s)
-  (Ctor [macro-repr s] null null null))
+(define-syntax-rule (Symbol s)
+  (Ctor [macro-repr (s)] null null null))
 
 ; -------------------------------------------------------
 ; Type Definitions
@@ -86,13 +91,13 @@
                      C-Sym
                      Implication))
 
-(def A-Sym (Symbol 'A))
-(def B-Sym (Symbol 'B))
-(def C-Sym (Symbol 'C))
+(def A-Sym (Symbol A))
+(def B-Sym (Symbol B))
+(def C-Sym (Symbol C))
 
 (def-ctor Implication
-  [macro-repr (=> ccs)]
-  [macro-recs (ante wf) (ccs wf)]
+  [macro-repr (-> ante csq)]
+  [macro-recs (ante wf) (csq wf)]
   null
   null)
 
@@ -102,7 +107,7 @@
 
 ; => A->A
 (def-ctor AI
-  [macro-repr (=> ccs)]
+  [macro-repr (AI=> ccs)]
 
   null
 
@@ -114,7 +119,7 @@
 
 ; => (A->B)->A
 (def-ctor AK
-  [macro-repr (=> ccs)]
+  [macro-repr (AK=> ccs)]
 
   null
 
@@ -127,7 +132,7 @@
 
 ; => (A->(B->C)) -> ((A->B)->(A->C))
 (def-ctor AS
-  [macro-repr (=> ccs)]
+  [macro-repr (AS=> ccs)]
 
   null
 
@@ -195,7 +200,7 @@
 
 ; A, A->B => B
 (def-ctor MP
-  [macro-repr (=> ?=>a ?=>a->b ccs)]
+  [macro-repr (=> ?=>a->b ?=>a ccs)]
 
   [macro-recs
    (?=>a     entailment)

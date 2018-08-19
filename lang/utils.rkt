@@ -41,7 +41,8 @@
 (def (gen-get gen
               [num 10]
               [func (lam (x)
-                      (pretty-display x)
+                      (parameterize ([pretty-print-columns 50])
+                        (pretty-display x))
                       (newline))])
   (cond [(not (number? num))
          (raise "Expected a number")]
