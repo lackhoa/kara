@@ -12,12 +12,11 @@
 
 (def (proof1)
   (def m (new mole%))
-  (send m
-    update-role 'ccs Implication)
-  (send m
-    update-path '(ccs ante) A-Sym)
-  (send m
-    update-path '(ccs csq) A-Sym)
+  (update-macro m
+    (ccs_csq A-Sym)
+    (ccs_ante A-Sym)
+    (ccs Implication))
+
   (def g (kick-start m entailment))
   (gen-get g 3))
 
@@ -26,24 +25,17 @@
 ;(A -> (A -> B)) -> (A -> B)
 (def (AW-proof)
   (def m (new mole%))
-  (send m
-    update-role 'ccs Implication)
-  (send m
-    update-path '(ccs ante) Implication)
-  (send m
-    update-path '(ccs ante ante) A-Sym)
-  (send m
-    update-path '(ccs ante csq) Implication)
-  (send m
-    update-path '(ccs ante csq ante) A-Sym)
-  (send m
-    update-path '(ccs ante csq csq) B-Sym)
-  (send m
-    update-path '(ccs csq) Implication)
-  (send m
-    update-path '(ccs csq ante) A-Sym)
-  (send m
-    update-path '(ccs csq csq) B-Sym)
+  (update-macro m
+    (ccs               Implication)
+    (ccs_ante          Implication)
+    (ccs_ante_ante     A-Sym)
+    (ccs_ante_csq      Implication)
+    (ccs_ante_csq_ante A-Sym)
+    (ccs_ante_csq_csq  B-Sym)
+    (ccs_csq           Implication)
+    (ccs_csq_ante      A-Sym)
+    (ccs_csq_csq       B-Sym))
   (def g (kick-start m entailment))
   (gen-get g 1))
+
 (AW-proof)

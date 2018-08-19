@@ -1,7 +1,6 @@
 #lang racket
 (require "lang/kara.rkt"
-         "types.rkt"
-         racket/hash)
+         "types.rkt")
 (provide (all-defined-out))
 
 ; ---------------------------------
@@ -319,3 +318,14 @@
 
       (send (ref p1)
         sync (ref p2) fail-con))))
+
+
+; Update multiple paths of a molecule.
+(define-syntax update-macro
+  (syntax-rules ()
+    [(_ mole) (void)]
+
+    [(_ mole (path ctor) rest ...)
+     (begin (send mole
+              update-path (path-proc 'path) ctor)
+            (update-macro mole rest ...))]))
