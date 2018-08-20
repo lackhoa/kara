@@ -53,19 +53,56 @@
       (set! sync-ls value))
 
     (define/public (get-repr)
+      (car (tech-get-repr null)))
+
+    ; env: technical parameter to name free variables,
+    ; it is a mapping of sync lists to variable names.
+    ; Returns: the representation and the new environment.
+    (define/public (tech-get-repr env)
       (match data
-        ['UNKNOWN (cons '? children)]
+        ['UNKNOWN
+         (cons (cons '? children)
+               env)]
+
+        ['ANY
+         (check-eq? children null)
+         ; Check if this is already in any sync list.
+         (match (memf (lam (pair)
+                        (assq this (car pair)))
+                      env)
+           ; No: get a new name and change the environment.
+           [#f
+            (let* ([next-name
+                    (string->symbol
+                      (number->string (length env)))]
+                   [new-env
+                    (cons (cons sync-ls next-name)
+                          env)])
+
+              (cons next-name new-env))]
+           ; There is already a name, use it.
+           [(list first _) (cons (cdr first)
+                                 env)])]
+
         [(Ctor repr _ _ _)
          (match repr
            [(Repr leader paths)
             (if (null? paths)
-                leader
-              (cons leader
-                    (map (lam (path)
-                           (match (ref path)
-                             [#f '?]
-                             [child (send child get-repr)]))
-                         paths)))])]))
+                (cons leader env)
+              ; new-env keeps the state of the environment.
+              ; as we cycle through each components.
+              (let ([new-env env])
+                (cons (cons leader
+                            (map (lam (path)
+                                   (match (ref path)
+                                     [#f (cons '? new-env)]
+                                     [child
+                                      (let ([return (send child
+                                                      get-repr new-env)])
+                                        (set! new-env (cdr return))
+                                        (car return))]))
+                                 paths))
+                      new-env)))])]))
 
     (define/public (custom-display port)
       (display (get-repr) port))

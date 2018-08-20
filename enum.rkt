@@ -66,7 +66,9 @@
                                    links))]))
               (force ctors)))]
       ; If the type is unenumerable then we just ignore it.
-      ['ANY (send mole update-path tpath 'UNKNOWN)]))
+      ['ANY
+       (send mole
+         update-path tpath 'ANY)]))
 
   (match (send mole ref tpath)
     [#f (explore-type)]
@@ -74,6 +76,7 @@
     [(? (curryr is-a? mole%) m)
      (match (send m get-data)
        ['UNKNOWN (explore-type)]
+       ['ANY     (explore-type)]
 
        ; We already have chosen the constructor.
        [(Ctor _ recs forms links)
