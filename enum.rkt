@@ -50,20 +50,23 @@
     (Target-type target))
 
   (def (explore-type)
-    (remq* '(CONFLICT)
-            (map (lam (ctor)
-                  (match ctor
-                    [(Ctor _ recs forms links)
-                     (let* ([mclone (send mole copy)])
-                       (send mclone
-                         update-path tpath ctor)
-                       (process-ctor tpath
-                                     mclone
-                                     recs
-                                     forms
-                                     links))]))
-              (match ttype
-                [(Union ctors) (force ctors)]))))
+    (match ttype
+      [(Union ctors)
+       (remq* '(CONFLICT)
+         (map (lam (ctor)
+                (match ctor
+                  [(Ctor _ recs forms links)
+                   (let* ([mclone (send mole copy)])
+                     (send mclone
+                       update-path tpath ctor)
+                     (process-ctor tpath
+                                   mclone
+                                   recs
+                                   forms
+                                   links))]))
+              (force ctors)))]
+      ; If the type is unenumerable then we just ignore it.
+      ['ANY (send mole update-path tpath 'UNKNOWN)]))
 
   (match (send mole ref tpath)
     [#f (explore-type)]

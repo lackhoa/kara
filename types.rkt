@@ -79,21 +79,32 @@
   (Union (delay (list ctors ...))))
 
 ; Symbol: construtor with just a representation.
-(define-syntax-rule (Symbol s)
+(define-syntax-rule (Sym s)
   (Ctor [macro-repr (s)] null null null))
 
 ; -------------------------------------------------------
-; Type Definitions
+; Deduction System
 ; -------------------------------------------------------
 ; Well-formed Formula
-(def wf (macro-union A-Sym
-                     B-Sym
-                     C-Sym
-                     Implication))
+(def wf
+  (macro-union Implication Symbol))
 
-(def A-Sym (Symbol A))
-(def B-Sym (Symbol B))
-(def C-Sym (Symbol C))
+(def Symbol Unknown)
+
+; This constructor means: anything suffices.
+(def Unknown
+  (Ctor [macro-repr (Unknown)]
+        null
+        null
+        null))
+
+; Symbols are for grounding in problem-solving.
+(def symbol
+  (union A-Sym B-Sym C-Sym))
+
+(def A-Sym (Sym A))
+(def B-Sym (Sym B))
+(def C-Sym (Sym C))
 
 (def-ctor Implication
   [macro-repr (-> ante csq)]
@@ -215,3 +226,32 @@
    ; B
    (ccs  ?=>a->b_ccs_csq)])
 ; Note: the conclusion (ccs) is implicit in the last link.
+
+; -------------------------------------------------------
+; Category Theory
+; -------------------------------------------------------
+
+(def object
+  (Union (list Unknown)))
+
+(def map
+  (Union (list Map)))
+
+(def-ctor Map
+  [macro-repr (-> src targ)]
+
+  [macro-recs
+   (src  object)
+   (targ object)]
+
+  null null)
+
+(def-ctor map-op
+  [macro-repr (∘ g f)]
+
+  [macro-recs
+   (f map)
+   (g map)]
+
+  null
+  null)

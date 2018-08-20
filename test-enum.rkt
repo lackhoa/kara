@@ -38,4 +38,4 @@
   (def g (kick-start m entailment))
   (gen-get g 1))
 
-(AW-proof)
+;; (AW-proof)
