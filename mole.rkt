@@ -21,31 +21,48 @@
     (super-new)
 
     ; Initialization parameters
-    (init [data-i 'UNKNOWN])
-    (init [children-i null])
+    (init [data-i '?DATA])
+    (init [kids-i ?KIDS])
     (init [sync-ls-i null])
 
     ; Fields
-    (def data data-i)
-    (def children children-i)
+    (def data
+      (cond [(null? kids-i) data-i]
+            [else
+             (check-eq? data-i 'NO-DATA
+               "Cannot have both data and kids")
+             'NO-DATA]))
+
+    (def kids
+      (cond [(eq? '?NO-DATA data-i) kids-i]
+            [else
+             (check-eq? kids-i 'NO-KIDS
+               "Cannot have both data and kids")
+             'NO-KIDS]))
+
     ; The sync list is synced among its items,
-    ; and everything is synced wiht itself.
+    ; and everything is synced with itself.
     (def sync-ls
       (cons this sync-ls-i))
 
     ; Getters
-    (define/public (get-children)
-      children)
+    (define/public (get-kids)
+      kids)
     (define/public (get-data)
       data)
     (define/public (get-roles)
-      (map car children))
+      (map car kids))
     (define/public (get-sync-ls)
       sync-ls)
 
     ; Setters
     (define/public (set-data val)
-      (set! data val))
+      (match kids
+        ['NO-KIDS (set! data val)]
+        ['?KIDS
+         (set! data val)
+         (set! kids 'NO-KIDS)]
+        [else (raise "Cannot set data of composites")]))
 
     (define/public (set-sync-ls value)
       (check-pred pair?
@@ -62,11 +79,11 @@
     (define/public (tech-get-repr env)
       (match data
         ['UNKNOWN
-         (cons (cons '? children)
+         (cons (cons '? kids)
                env)]
 
         ['ANY
-         (check-eq? children null)
+         (check-eq? kids null)
          ; Check if this is already in any sync list.
          (match (memf (lam (pair)
                         (assq this (car pair)))
@@ -106,10 +123,10 @@
                       new-env)))])]
         [(Union ctors)
          (cons (cons (force ctors)
-                     children)
+                     kids)
                env)]
 
-        [other (cons (cons other children)
+        [other (cons (cons other kids)
                      env)]))
 
     (define/public (custom-display port)
@@ -135,7 +152,7 @@
     (define/public (refr role)
       (check-pred symbol? role)
 
-      (let ([lu (assq role children)])
+      (let ([lu (assq role kids)])
         (cond [lu (cdr lu)]
               [else #f])))
 
@@ -159,7 +176,7 @@
           (task subject))
         (remq this sync-ls)))
 
-    ; Order the children to do something.
+    ; Order the kids to do something.
     ; `task` takes a role and a molecule
     (define-syntax-rule (recur task)
       (for-each
@@ -172,7 +189,7 @@
       (check-class mole mole%
         "Invalid child")
       (cons! (cons role mole)
-             children))
+             kids))
 
     ; Returns a mapping of the originals to their copies,
     ; without the sync list.
@@ -182,7 +199,7 @@
       (let ([env null]
             [new-me
              (new mole% [data-i data])])
-        ; Add the children
+        ; Add the kids
         (for-each
           (lam (pair)
             (let* ([role (car pair)]
@@ -196,7 +213,7 @@
               ; Since molecules are trees,
               ; there won't be any conflict.
               (set! env (append env cp-res))))
-          children)
+          kids)
         ; Don't forget to map itself.
         (cons (cons this new-me)
               env)))
@@ -226,7 +243,7 @@
         ; This will return the copy.
         (cdr (assq this cns))))
 
-    ; Keep adding new children
+    ; Keep adding new kids
     ; until the path is exhausted.
     (define/public (just-expand path)
       (unless (null? path)
@@ -355,7 +372,7 @@
             ; Nope, the data are inconsistent.
             [else (escape 'CONFLICT)])
 
-            ; Add the missing children
+            ; Add the missing kids
             (def our-roles
               (list->seteq (get-roles)))
             (def their-roles
@@ -380,7 +397,7 @@
               (set-sync-ls merge)
               (inform (lam (m) (send m set-sync-ls merge))))
 
-            ; Our work is over: Recursively let all the children sync.
+            ; Our work is over: Recursively let all the kids sync.
             (check-eqv? (length (get-roles))
                         (length (send m-other get-roles))
                         "The structures are synced.")
@@ -406,12 +423,14 @@
         sync (ref p2) fail-con))))
 
 
-; Update multiple paths of a molecule.
-(define-syntax update-macro
+; Update the constructor of multiple paths of a molecule.
+(define-syntax update-ctors
   (syntax-rules ()
     [(_ mole) (void)]
 
     [(_ mole (path ctor) rest ...)
      (begin (send mole
-              update-path (path-proc 'path) ctor)
+              update-path (append1 (path-proc 'path)
+                                   'ctor)
+                          ctor)
             (update-macro mole rest ...))]))

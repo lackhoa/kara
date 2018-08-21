@@ -41,22 +41,19 @@
                    (not (equal? item x)))
                  s))
 
-(def (stream-interleave2 s1 s2)
-  (if (stream-empty? s1)
-      s2
-      (stream-cons (stream-first s1)
-                   (stream-interleave2 s2 (stream-rest s1)))))
-
 ; `ls`: a list of streams.
 (def (stream-interleave ls)
   (match ls
     ['() empty-stream]
     [(list s) s]
-    [(list s1 s2)
-     (stream-interleave2 s1 s2)]
-    [three-or-more
-     (stream-interleave (car three-or-more)
-                        (stream-interleave (cdr three-or-more)))]))
+    [ls
+     (let ([first (car ls)]
+           [rest  (cdr ls)])
+       (if (stream-empty? first)
+           (stream-interleave (cdr ls))
+         (stream-cons (stream-first first)
+                      (stream-interleave (append1 rest
+                                                  (stream-rest first))))))]))
 
 (def (remove-pos ls pos)
   (cond [(= pos 0) (drop ls 1)]

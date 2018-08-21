@@ -11,25 +11,27 @@
 ; Returns: a generator of complete molecules
 (def (enum mole targets)
   ; We keep track of the molecules we've worked on
-  ; by tagging them with the "expandd" role.
+  ; by tagging them with the "expand" role.
   ; `p` is a path.
-  (def (expandd? p)
+  (def (expanded? p)
     (send mole
-      ref (append1 p 'expandd)))
+      ref (append1 p 'expanded)))
 
   ; Returns: a stream of paths.
   (def (level-iter m [relative null])
     (stream-cons
       relative
-      (stream-interleave (map (lam (role)
-                                (level-iter (send m ref role)
-                                            (append1 relative role)))
-                              (send m get-roles)))))
+      (stream-interleave
+       (map (lam (role)
+              (level-iter (send m ref role)
+                          (append1 relative role)))
+            (send m get-roles)))))
 
   ; Find a molecule to work with.
   ; Returns: a molecule, or #f if m is complete.
-  (def find-target
-    (let loop ([lvl-stream (level-iter mole)])
+  (def next-target
+    (let loop ([lvl-stream
+                (level-iter mole)])
       (def (recur)
         (loop (stream-rest lvl-stream)))
 
@@ -41,12 +43,12 @@
                    ref-data (append1 focus 'ctor))
             [(Union _) focus]
             [(Ctor _ _ _ _)
-             (cond [(expandd focus) (recur)]
+             (cond [(expand focus) (recur)]
                    [else focus])]
             [(or 'UNKNOWN 'ANY) (recur)])))))
 
   (generator ()
-    (match find-target
+    (match next-target
       ['NO-MORE-TARGETS
        (yield mole) 'DONE]
 
@@ -58,7 +60,7 @@
              (lam (new-mole)
                ; Tag it.
                (send new-mole
-                 update-role 'expandd #t)
+                 update-role 'expanded #t)
                ; Remember: `enum` returns a generator
                (enum new-mole))
              (expand mole target))))])))
@@ -131,4 +133,5 @@
              sync-path p1
                        p2
                        (lam () (escape 'CONFLICT)))]))
-      links)))
+      links))
+  'OK)
