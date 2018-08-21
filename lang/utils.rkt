@@ -58,3 +58,12 @@
                          func)])]
 
         [else (raise "Invalid number")]))
+
+; The impersonator pattern: yield all
+; values that `gen` yields.
+(define-syntax-rule (gen-impersonate gen)
+  ; `g` stops the generator from being re-defined every loop
+  (let ([g gen])
+    (let loop ()
+      (yield (g))
+      (loop))))

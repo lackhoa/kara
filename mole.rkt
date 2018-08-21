@@ -46,6 +46,7 @@
     ; Setters
     (define/public (set-data val)
       (set! data val))
+
     (define/public (set-sync-ls value)
       (check-pred pair?
                   value
@@ -73,7 +74,7 @@
            ; No: get a new name and change the environment.
            [#f
             (let* ([next-name
-                    (string->symbol
+                    (string-append "?"
                       (number->string (length env)))]
                    [new-env
                     (cons (cons sync-ls next-name)
@@ -102,7 +103,14 @@
                                         (set! new-env (cdr return))
                                         (car return))]))
                                  paths))
-                      new-env)))])]))
+                      new-env)))])]
+        [(Union ctors)
+         (cons (cons (force ctors)
+                     children)
+               env)]
+
+        [other (cons (cons other children)
+                     env)]))
 
     (define/public (custom-display port)
       (display (get-repr) port))
@@ -110,20 +118,37 @@
     (define/public (custom-write port)
       (write (get-repr) port))
 
-    ; Reference a child.
-    (define/public (ref role/path)
-      (let* ([path
-              (if (list? role/path)
-                  role/path
-                (list role/path))]
-             [lu
-              (delay (assq (car path) children))])
-        (cond [(null? path)  this]
-              [(force lu)
-               ; `(cdr (force lu))` is a child
-               (send (cdr (force lu))
-                 ref (cdr path))]
-              [else  #f])))
+    ; Reference a descendant. If not found then #f.
+    (define/public (ref path)
+      (check-pred list? path
+        "Path must be a list")
+
+      (if (null? path)
+          this
+        (match (refr (car path))
+          [#f #f]
+          ; `(cdr pair`) is a molecule
+          [child (send child
+                   ref (cdr path))])))
+
+    ; Like `ref`, but reference a direct child
+    (define/public (refr role)
+      (check-pred symbol? role)
+
+      (let ([lu (assq role children)])
+        (cond [lu (cdr lu)]
+              [else #f])))
+
+    ; Reference the data of a child.
+    (define/public (ref-data path)
+      (match (ref path)
+        [#f 'UNKNOWN]
+        [child (send child get-data)]))
+
+    (define/public (refr-data path)
+      (match (refr path)
+        [#f 'UNKNOWN]
+        [child (send child get-data)]))
 
     ; Tell those in the sync list to do something.
     ; `task` is a function takes a molecule.
@@ -139,7 +164,7 @@
     (define-syntax-rule (recur task)
       (for-each
         (lam (role)
-          (task role (ref role)))
+          (task role (refr role)))
         (get-roles)))
 
     (define/public (add-child role mole)
@@ -211,7 +236,7 @@
             just-expand (cdr path)))))
 
     (define/public (expand path)
-      (let ([lu (ref (car path))])
+      (let ([lu (refr (car path))])
         (match lu
           [#f
            (just-expand path)
@@ -260,13 +285,37 @@
                    val
                    fail-con))
 
+    (define/public (mutate val)
+      (when (neq? data val)
+        (set! data val)
+        (inform
+          (lam (m)
+            (send m set-data val)))))
+
+    (define/public (mutate-path path val)
+      (check-pred list? path
+        "Invalid path")
+
+      (let ([m (ref path)])
+        (check-true (ref path)
+          "Mutating an existing path")
+        (send m mutate val)))
+
+    (define/public (mutate-role role val)
+      (check-pred symbol? role)
+
+      (let ([m (refr role)])
+        (check-not-false m
+          "Mutating an existing path")
+        (send m mutate val)))
+
     ; Flush the sync list down to the new descendants.
     (define/public (cascade path)
       ; Only work when we have something in the sync list.
       (when (and (not (null? path))
                  (> (length sync-ls) 1))
         (let* ([role (car path)]
-               [c    (ref role)])
+               [c    (refr role)])
           (check-class c mole%
                        "We have this path")
           (check-eqv? (length (send c get-sync-ls))
@@ -274,7 +323,7 @@
                       "This child is new")
           (send c
             set-sync-ls
-              (map (lam (sy-i) (send sy-i ref role))
+              (map (lam (sy-i) (send sy-i refr role))
                    sync-ls))
           ; Then let them carry over.
           (send c cascade (cdr path)))))
@@ -338,7 +387,7 @@
             (recur
               (lam (role c)
                 (send c
-                  sync (send m-other ref role)
+                  sync (send m-other refr role)
                        (lam () (escape 'CONFLICT)))))))
       (when (eq? result 'CONFLICT)
         (fail-con)))

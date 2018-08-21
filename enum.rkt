@@ -8,107 +8,109 @@
          (all-from-out "types.rkt")
          (all-from-out "mole.rkt"))
 
-(struct Target (path type))
-
-; start enumerating with the root as the target
-(def (kick-start mole [root-type 'NOT-NEEDED])
-  (enum mole
-        (list (Target null root-type))))
-
 ; Returns: a generator of complete molecules
 (def (enum mole targets)
+  ; We keep track of the molecules we've worked on
+  ; by tagging them with the "expandd" role.
+  ; `p` is a path.
+  (def (expandd? p)
+    (send mole
+      ref (append1 p 'expandd)))
+
+  ; Returns: a stream of paths.
+  (def (level-iter m [relative null])
+    (stream-cons
+      relative
+      (stream-interleave (map (lam (role)
+                                (level-iter (send m ref role)
+                                            (append1 relative role)))
+                              (send m get-roles)))))
+
+  ; Find a molecule to work with.
+  ; Returns: a molecule, or #f if m is complete.
+  (def find-target
+    (let loop ([lvl-stream (level-iter mole)])
+      (def (recur)
+        (loop (stream-rest lvl-stream)))
+
+      (if (stream-empty? lvl-stream)
+          'NO-MORE-TARGETS
+        ; Notice that the every molecule has a constructor.
+        (let ([focus (stream-first lvl-stream)])
+          (match (send mole
+                   ref-data (append1 focus 'ctor))
+            [(Union _) focus]
+            [(Ctor _ _ _ _)
+             (cond [(expandd focus) (recur)]
+                   [else focus])]
+            [(or 'UNKNOWN 'ANY) (recur)])))))
+
   (generator ()
-    (if (null? targets)
-        (begin (yield mole)
-               'DONE)
-      (let* ([t-first (car targets)]
-             [t-rest  (cdr targets)]
-             [adv     (advance mole t-first)])
-        ; Multitask all the different branches.
-        (def multitasker
-          (gen-robin
-            (map
-              (lam (adv-iter)
-                (let ([new-mole    (car adv-iter)]
-                      [new-targets (cdr adv-iter)])
-                  ; Remember: `enum` returns a generator
-                  (enum new-mole
-                        (append t-rest new-targets))))
-              adv)))
-        ; Now, multitasker is a generator, the job now
-        ; is just return any value that it returns.
-        (let loop ()
-          (yield (multitasker))
-          (loop))))))
+    (match find-target
+      ['NO-MORE-TARGETS
+       (yield mole) 'DONE]
 
-; Output: a (possibly empty) list of
-; consistent molecule-targets pairs.
-(def (advance mole target)
-  (def tpath
-    (Target-path target))
-  (def ttype
-    (Target-type target))
+      [target
+       ; Multitask all the different branches.
+       (gen-impersonate
+         (gen-robin
+           (map
+             (lam (new-mole)
+               ; Tag it.
+               (send new-mole
+                 update-role 'expandd #t)
+               ; Remember: `enum` returns a generator
+               (enum new-mole))
+             (expand mole target))))])))
 
-  (def (explore-type)
-    (match ttype
-      [(Union ctors)
-       (remq* '(CONFLICT)
-         (map (lam (ctor)
-                (match ctor
-                  [(Ctor _ recs forms links)
-                   (let* ([mclone (send mole copy)])
-                     (send mclone
-                       update-path tpath ctor)
-                     (process-ctor tpath
-                                   mclone
-                                   recs
-                                   forms
-                                   links))]))
-              (force ctors)))]
-      ; If the type is unenumerable then we just ignore it.
-      ['ANY
-       (send mole
-         update-path tpath 'ANY)]))
+(def (pad relative role)
+  (append1 relative role))
 
-  (match (send mole ref tpath)
-    [#f (explore-type)]
+; Returns: a (possibly empty) list of consistent molecules.
+; `target`: a path
+(def (expand mole target)
+  (match (send mole
+           ref-data (append1 target 'ctor))
+    ; Many constructors to choose from.
+    [(Union ctors)
+     (let ([result null])
+       (for-each
+         (lam (ctor)
+           (match ctor
+             [(Ctor _ recs forms links)
+              ; Cloning is the biggest part
+              (let* ([mclone (send mole copy)])
+                (send mclone
+                  mutate-path (append1 target 'ctor) ctor)
+                (for-each
+                  (lam (code)
+                    (match code
+                      ['CONFLICT (void)]
+                      ['OK (cons! mclone result)]))
+                  (process-ctor (send mclone ref target)
+                                recs forms links))
+                mclone)]))
+         (force ctors))
+         result)]
+    ; Already has a constructor, but haven't expanded it.
+    [(Ctor _ recs forms links)
+     (match (process-ctor (send mole ref target)
+                          recs forms links)
+       ['CONFLICT null]
+       ['OK       (list mole)])]))
 
-    [(? (curryr is-a? mole%) m)
-     (match (send m get-data)
-       ['UNKNOWN (explore-type)]
-       ['ANY     (explore-type)]
-
-       ; We already have chosen the constructor.
-       [(Ctor _ recs forms links)
-        (match (process-ctor tpath
-                             mole
-                             recs
-                             forms
-                             links)
-          ['CONFLICT null]
-          [result (list result)])])]))
-
-; Returns: a pair containing the modified molecule
-; and a list of new targets.
-(def (process-ctor rpath
-                   mole
-                   recs
-                   forms
-                   links)
-  (check-timer)  ; This is a major time waster
-
-  ; We will be working under a relative path
-  (def (pad p) (append rpath p))
-  (def new-targets null)
+; Returns: nothing, but mutate `mole`.
+(def (process-ctor mole
+                   recs forms links)
+  (check-timer)  ; This is a major time consumer
 
   (let/cc escape
     (for-each
       (lam (recs-iter)
         (match recs-iter
           [(Rec role type)
-           (cons! (Target (pad (list role))
-                          type)
-                  new-targets)]))
+           (send mole
+             update-path '(role) type)]))
       recs)
 
     (for-each
@@ -116,7 +118,7 @@
         (match forms-iter
           [(Form path constructor)
            (send mole
-             update-path (pad path)
+             update-path path
                          constructor
                          (lam () (escape 'CONFLICT)))]))
       forms)
@@ -126,8 +128,7 @@
         (match links-iter
           [(SLink p1 p2)
            (send mole
-             sync-path (pad p1)
-                       (pad p2)
+             sync-path p1
+                       p2
                        (lam () (escape 'CONFLICT)))]))
-      links)
-    (cons mole new-targets)))
+      links)))

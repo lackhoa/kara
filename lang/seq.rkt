@@ -12,9 +12,14 @@
 
 ; Test if `x` is in `seq`, but returns the tail when hit
 (def (stream-member x seq)
-  (cond [(stream-empty? seq) #f]
-        [(equal? x (car seq)) seq]
-        [else (stream-member x (cdr seq))]))
+  (cond [(stream-empty? seq)
+         #f]
+
+        [(equal? x (car seq))
+         seq]
+
+        [else
+         (stream-member x (cdr seq))]))
 
 (def (exists pred seq)
   (cond [(stream-empty? seq) #f]
@@ -36,11 +41,22 @@
                    (not (equal? item x)))
                  s))
 
-(def (interleave s1 s2)
+(def (stream-interleave2 s1 s2)
   (if (stream-empty? s1)
       s2
-      (stream-cons (car s1)
-                   (interleave s2 (cdr s1)))))
+      (stream-cons (stream-first s1)
+                   (stream-interleave2 s2 (stream-rest s1)))))
+
+; `ls`: a list of streams.
+(def (stream-interleave ls)
+  (match ls
+    ['() empty-stream]
+    [(list s) s]
+    [(list s1 s2)
+     (stream-interleave2 s1 s2)]
+    [three-or-more
+     (stream-interleave (car three-or-more)
+                        (stream-interleave (cdr three-or-more)))]))
 
 (def (remove-pos ls pos)
   (cond [(= pos 0) (drop ls 1)]
