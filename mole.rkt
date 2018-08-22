@@ -47,6 +47,18 @@
     (define/public (get-sync-ls)
       sync-ls)
 
+    (define/public (get-ctor)
+      (refr-data 'ctor))
+
+    (define/public (get-type)
+      (refr-data 'type))
+
+    (define/public (ref-ctor path)
+      (ref-data (append1 path 'ctor)))
+
+    (define/public (ref-type path)
+      (ref-data (append1 path 'type)))
+
     ; Setters
     (define/public (set-data val)
       (set! data val))

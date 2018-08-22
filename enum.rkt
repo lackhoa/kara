@@ -1,7 +1,7 @@
 #lang racket
 (require "lang/kara.rkt"
          "engine.rkt"
-         "gen-robin.rkt"
+         "robin.rkt"
          "mole.rkt"
          "types.rkt")
 (provide (all-defined-out)
@@ -11,7 +11,7 @@
 ; Returns: a stream of complete molecules
 (def (enum mole targets)
   ; We keep track of the molecules we've worked on
-  ; by tagging them with the "expand" role.
+  ; by tagging them with the "expanded" role.
   ; `p` is a path.
   (def (expanded? p)
     (send mole
@@ -22,10 +22,10 @@
     (stream-cons
       relative
       (stream-interleave
-       (map (lam (role)
-              (level-iter (send m ref role)
-                          (append1 relative role)))
-            (send m get-roles)))))
+        (map (lam (role)
+               (level-iter (send m ref role)
+                           (append1 relative role)))
+             (send m get-roles)))))
 
   ; Find a molecule to work with.
   ; Returns: a molecule, or #f if m is complete.
@@ -38,14 +38,31 @@
       (if (stream-empty? lvl-stream)
           'NO-MORE-TARGETS
         ; Notice that the every molecule has a constructor.
-        (let ([focus (stream-first lvl-stream)])
-          (match (send mole
-                   ref-data (append1 focus 'ctor))
-            [(Union _) focus]
-            [(Ctor _ _ _ _)
-             (cond [(expand focus) (recur)]
-                   [else focus])]
-            [(or 'UNKNOWN 'ANY) (recur)])))))
+        (let ([pfocus
+               (stream-first lvl-stream)]
+              [mfocus
+               (send mole ref pfocus)])
+          (match (send mfocus get-data)
+            ['?DATA
+             (match* ((send mfocus get-ctor)
+                      (send mfocus get-type))
+               ; No idea what this is.
+               [('?DATA '?DATA) (recur)]
+
+               ; We know the type, not the constructor.
+               [('?DATA _) pfocus]
+
+               ; We know the constructor already.
+               [(_ _)
+                (match (send mfocus refr 'expanded)
+                  ; Not expanded yet
+                  ['NOT-FOUND pfocus]
+
+                  ; Already expanded
+                  [else (ctor)])])]
+
+            ; This is just data, nothing to do here.
+            [_ (recur)])))))
 
   (match next-target
     ['NO-MORE-TARGETS
@@ -56,32 +73,33 @@
      (stream-robin
        (map
          (lam (new-mole)
-           ; Tag it.
+           ; Tag it so we don't expand it in the future.
            (send new-mole
              update-role 'expanded #t)
-           ; Remember: `enum` returns a generator
+           ; Remember: `enum` returns a stream
            (enum new-mole))
          (expand mole target)))]))
 
 (def (pad relative role)
   (append1 relative role))
 
-; Returns: a (possibly empty) list of consistent molecules.
+; Returns: a (possibly empty) list of consistent molecules,
+; whose constructors are finalized (and unique).
 ; `target`: a path
 (def (expand mole target)
-  (match (send mole
-           ref-data (append1 target 'ctor))
+  (match* ((send mole ref-ctor target)
+           (send mole ref-type target))
     ; Many constructors to choose from.
-    [(Union ctors)
+    [('?DATA (Union stream-ctors))
      (let ([result null])
-       (for-each
+       (stream-for-each
          (lam (ctor)
            (match ctor
              [(Ctor _ recs forms links)
               ; Cloning is the biggest part
               (let* ([mclone (send mole copy)])
                 (send mclone
-                  mutate-path (append1 target 'ctor) ctor)
+                  update-path (append1 target 'ctor) ctor)
                 (for-each
                   (lam (code)
                     (match code
@@ -90,10 +108,11 @@
                   (process-ctor (send mclone ref target)
                                 recs forms links))
                 mclone)]))
-         (force ctors))
+         stream-ctors)
          result)]
+
     ; Already has a constructor, but haven't expanded it.
-    [(Ctor _ recs forms links)
+    [((Ctor _ recs forms links) _)
      (match (process-ctor (send mole ref target)
                           recs forms links)
        ['CONFLICT null]
@@ -105,12 +124,17 @@
   (check-timer)  ; This is a major time consumer
 
   (let/cc escape
+    (def get-me-out
+      (lam () (escape 'CONFLICT)))
+
     (for-each
       (lam (recs-iter)
         (match recs-iter
           [(Rec role type)
            (send mole
-             update-path '(role) type)]))
+             update-path (list role 'type)
+                         type
+                         get-me-out)]))
       recs)
 
     (for-each
@@ -118,9 +142,9 @@
         (match forms-iter
           [(Form path constructor)
            (send mole
-             update-path path
+             update-path (append1 path 'ctor)
                          constructor
-                         (lam () (escape 'CONFLICT)))]))
+                         get-me-out)]))
       forms)
 
     (for-each
@@ -130,6 +154,8 @@
            (send mole
              sync-path p1
                        p2
-                       (lam () (escape 'CONFLICT)))]))
-      links))
-  'OK)
+                       get-me-out)]))
+      links)
+
+    ; If we get here, then everything is fine.
+    'OK))
