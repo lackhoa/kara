@@ -8,7 +8,7 @@
          (all-from-out "types.rkt")
          (all-from-out "mole.rkt"))
 
-; Returns: a generator of complete molecules
+; Returns: a stream of complete molecules
 (def (enum mole targets)
   ; We keep track of the molecules we've worked on
   ; by tagging them with the "expand" role.
@@ -47,23 +47,21 @@
                    [else focus])]
             [(or 'UNKNOWN 'ANY) (recur)])))))
 
-  (generator ()
-    (match next-target
-      ['NO-MORE-TARGETS
-       (yield mole) 'DONE]
+  (match next-target
+    ['NO-MORE-TARGETS
+     (stream-cons mole 'DONE)]
 
-      [target
-       ; Multitask all the different branches.
-       (gen-impersonate
-         (gen-robin
-           (map
-             (lam (new-mole)
-               ; Tag it.
-               (send new-mole
-                 update-role 'expanded #t)
-               ; Remember: `enum` returns a generator
-               (enum new-mole))
-             (expand mole target))))])))
+    [target
+     ; Multitask all the different branches.
+     (stream-robin
+       (map
+         (lam (new-mole)
+           ; Tag it.
+           (send new-mole
+             update-role 'expanded #t)
+           ; Remember: `enum` returns a generator
+           (enum new-mole))
+         (expand mole target)))]))
 
 (def (pad relative role)
   (append1 relative role))
