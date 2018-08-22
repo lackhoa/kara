@@ -4,54 +4,62 @@
          "robin.rkt")
 
 ;; Testingu!
-(def (fib n)
+(def (tfib n)
   (check-timer)
   (if (< n 2)
       n
-    (+ (fib (- n 1))
-       (fib (- n 2)))))
+    (+ (tfib (- n 1))
+       (tfib (- n 2)))))
 
-; Fib from 4 to 12
-(def fib-gen1
+; Tfib from 4 to 12
+(def (tfib-gen1)
   (generator ()
     (let loop ([n 4])
-      (yield (fib n))
-      (if (<= n 9)
+      (yield (tfib n))
+      (if (<= n 11)
           (loop (+ n 1))
         'DONE))))
 
-; Fib from 12 to 3
-(def fib-gen2
+; Tfib from 12 to 3
+(def (tfib-gen2)
   (generator ()
     (let loop ([n 12])
-      (yield (fib n))
+      (yield (tfib n))
       (if (>= n 4)
           (loop (- n 1))
         'DONE))))
 
-(def g (gen-robin (list fib-gen1 fib-gen2)))
-(gen-get g 22 (lam (x) (printf "~s " x)))
+(def g1 (gen-robin (list (tfib-gen1)
+                         (tfib-gen2))))
+(def g2 (gen-robin (list (tfib-gen1)
+                         (tfib-gen2))))
+(def h (gen-robin (list g1 g2)))
+(gen-get h 100 (lam (x) (printf "~s " x)))
 
 
 ; For the stream
-; Fib from 4 to 12
-(def (fib-stream1 [n 4])
-  (if (<= n 9)
-      (stream-cons (fib n)
-                   (fib-stream1 (+ n 1)))
-    (stream-cons (fib n)
+; Tfib from 4 to 12
+(def (tfib-stream1 [n 4])
+  (if (<= n 11)
+      (stream-cons (tfib n)
+                   (tfib-stream1 (+ n 1)))
+    (stream-cons (tfib n)
                  empty-stream)))
 
-; Fib from 12 to 3
-(def (fib-stream2 [n 12])
+; Tfib from 12 to 3
+(def (tfib-stream2 [n 12])
   (if (>= n 4)
-      (stream-cons (fib n)
-                   (fib-stream2 (- n 1)))
-    (stream-cons (fib n)
+      (stream-cons (tfib n)
+                   (tfib-stream2 (- n 1)))
+    (stream-cons (tfib n)
                  empty-stream)))
 
-(def s
-  (stream-robin (list (fib-stream1)
-                      (fib-stream2))))
+(def (s1)
+  (stream-robin (list (tfib-stream2)
+                      (tfib-stream1))))
+
+(def (s2)
+  (stream-robin (list (s1) (s1))))
+
 (newline)
-(display (stream->list s))
+(stream->list (s2))

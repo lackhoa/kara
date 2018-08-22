@@ -36,43 +36,68 @@
 
 
 
-; `saved` is an engine, `stream` is a non-empty stream.
-; `saved` will finish with `(stream-first stream)` as result.
-(struct Pair (saved stream))
 
-; The first item is always computed, since it's
-; non-deterministic what the first item is.
 (def (stream-robin streams)
   ; Kick-start the core
-  (stream-robin-core
+  (stro-core
     (map (lam (stream)
            (Pair (proc->engine
                    (lam () (stream-first stream)))
                  stream))
-         (remq empty-stream streams))))
+         (remq empty-stream streams))
+    'NOT-YET-COMPUTED))
 
-(def (stream-robin-core pairs)
-  (cond
-    [(null? pairs) empty-stream]
+; `saved` is an engine, `stream` is a non-empty stream.
+; `saved` will finish with `(stream-first stream)` as result.
+(struct Pair (saved stream))
 
-    [else
-     (let* ([focus  (car pairs)]
-            [saved  (Pair-saved focus)]
-            [stream (Pair-stream focus)]
-            [others (cdr pairs)])
+(def _stream-empty? stream-empty?)
+(def _stream-first  stream-first)
+(def _stream-rest   stream-rest)
+
+(struct stro-core ([pairs #:mutable]
+                   [next  #:mutable])
+  #:methods gen:stream
+  [(define (stream-empty? stro)
+     (null? (stro-core-pairs stro)))
+
+   (define (stream-first stro)
+     (let* ([pairs   (stro-core-pairs stro)]
+            [focus   (car pairs)]
+            [others  (cdr pairs)]
+            [saved   (Pair-saved focus)]
+            [pstream (Pair-stream focus)])
        (saved 1
          (lam (value ticks)
-           (stream-cons
-             value
+           ; Set the next values
+           (if (_stream-empty? (_stream-rest pstream))
+               (set-stro-core-next! stro
+                 (stro-core others
+                            'NOT-YET-COMPUTED))
              ; Completers get another go
-             (if (stream-empty? (stream-rest stream))
-                 (stream-robin-core others)
-               (stream-robin-core
-                 (cons (Pair (proc->engine (lam () (stream-ref stream 1)))
-                             (stream-rest stream))
-                       others)))))
-         ; Failure: save progress and shove it to the end
+             (set-stro-core-next! stro
+               (stro-core
+                 (cons (Pair (proc->engine
+                               (lam () (stream-ref pstream 1)))
+                             (_stream-rest pstream))
+                       others)
+                 'NOT-YET-COMPUTED)))
+
+
+           ; And don't forget to return the result
+           value)
+
+         ; Failure: save progress, shove it to the end, then try again.
          (lam (resume-eng)
-           (stream-robin-core
+           (set-stro-core-pairs! stro
              (append1 others
-                      (Pair resume-eng stream))))))]))
+                      (Pair resume-eng pstream)))
+           (stream-first stro)))))
+
+   (define (stream-rest stro)
+     (match (stro-core-next stro)
+       ['NOT-YET-COMPUTED
+        (stream-first stro)
+        (stro-core-next stro)]
+
+       [any any]))])
