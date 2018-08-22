@@ -13,32 +13,23 @@
 ; The failure continuation that you're
 ; confident not gonna be called.
 (def (no-fail)
-  (raise "I did not expect this to fail..."))
+  (error "I did not expect this to fail!"))
 
 (def mole%
-  (class* object% (writable<%>)
+  (class* object%
+          (writable<%>)
     ; Initializer
     (super-new)
 
     ; Initialization parameters
-    (init [data-i '?DATA])
-    (init [kids-i ?KIDS])
+    (init [data-i    '?DATA])
+    (init [kids-i    null])
     (init [sync-ls-i null])
 
     ; Fields
-    (def data
-      (cond [(null? kids-i) data-i]
-            [else
-             (check-eq? data-i 'NO-DATA
-               "Cannot have both data and kids")
-             'NO-DATA]))
+    (def data data-i)
 
-    (def kids
-      (cond [(eq? '?NO-DATA data-i) kids-i]
-            [else
-             (check-eq? kids-i 'NO-KIDS
-               "Cannot have both data and kids")
-             'NO-KIDS]))
+    (def kids kids-i)
 
     ; The sync list is synced among its items,
     ; and everything is synced with itself.
@@ -52,90 +43,74 @@
       data)
     (define/public (get-roles)
       (map car kids))
+
     (define/public (get-sync-ls)
       sync-ls)
 
     ; Setters
     (define/public (set-data val)
-      (match kids
-        ['NO-KIDS (set! data val)]
-        ['?KIDS
-         (set! data val)
-         (set! kids 'NO-KIDS)]
-        [else (raise "Cannot set data of composites")]))
+      (set! data val))
 
     (define/public (set-sync-ls value)
-      (check-pred pair?
-                  value
-                  "Sync list must be non-empty")
+      (check-pred pair? value
+        "Sync list must be non-empty")
       (set! sync-ls value))
 
-    (define/public (get-repr)
-      (car (tech-get-repr null)))
+    (define/public (repr)
+      (match* (data kids)
+        ; We are totally unsure whether this is a structure or an atom.
+        [('?DATA '()) '?]
 
-    ; env: technical parameter to name free variables,
-    ; it is a mapping of sync lists to variable names.
-    ; Returns: the representation and the new environment.
-    (define/public (tech-get-repr env)
-      (match data
-        ['UNKNOWN
-         (cons (cons '? kids)
-               env)]
+        ; This is an atom
+        [(_ '()) data]
 
-        ['ANY
-         (check-eq? kids null)
-         ; Check if this is already in any sync list.
-         (match (memf (lam (pair)
-                        (assq this (car pair)))
-                      env)
-           ; No: get a new name and change the environment.
-           [#f
-            (let* ([next-name
-                    (string-append "?"
-                      (number->string (length env)))]
-                   [new-env
-                    (cons (cons sync-ls next-name)
-                          env)])
+        ; This is a molecule.
+        [('?DATA _)
+         (match* ((refr-data 'ctor)
+                  (refr-data 'type))
+          ; Unknown constructor, unknown type
+          [('?DATA
+            '?DATA)
+           (cons '? kids)]
 
-              (cons next-name new-env))]
-           ; There is already a name, use it.
-           [(list first _) (cons (cdr first)
-                                 env)])]
+          ; Unknown constructor, known type
+          [('?DATA
+            (Union ctors))
+           (cons (map force ctors)
+                 kids)]
 
-        [(Ctor repr _ _ _)
-         (match repr
-           [(Repr leader paths)
-            (if (null? paths)
-                (cons leader env)
-              ; new-env keeps the state of the environment.
-              ; as we cycle through each components.
-              (let ([new-env env])
-                (cons (cons leader
-                            (map (lam (path)
-                                   (match (ref path)
-                                     [#f (cons '? new-env)]
-                                     [child
-                                      (let ([return (send child
-                                                      get-repr new-env)])
-                                        (set! new-env (cdr return))
-                                        (car return))]))
-                                 paths))
-                      new-env)))])]
-        [(Union ctors)
-         (cons (cons (force ctors)
-                     kids)
-               env)]
+          [((Ctor repr _ _ _)
+            _)
+           (match repr
+             [(Repr leader paths)
+              (if (null? paths)
+                  leader
+                (cons leader
+                      (map (lam (path)
+                             (match (ref path)
+                               ['NOT-FOUND '?]
+                               [kid (send kid repr)]))
+                           paths)))])])]
 
-        [other (cons (cons other kids)
-                     env)]))
+        ; Non-trivial data and non-null kids list.
+        [(_ _)
+         (error "Branches cannot have data." data)]))
 
     (define/public (custom-display port)
-      (display (get-repr) port))
+      (display (repr) port))
 
     (define/public (custom-write port)
-      (write (get-repr) port))
+      (write (repr) port))
 
-    ; Reference a descendant. If not found then #f.
+    ; Like `ref`, but reference a direct kid
+    (define/public (refr role)
+      (check-pred symbol? role)
+
+      (let ([lu (assq role kids)])
+        (cond [lu (cdr lu)]
+              [else 'NOT-FOUND])))
+
+    ; Reference a descendant.
     (define/public (ref path)
       (check-pred list? path
         "Path must be a list")
@@ -143,29 +118,21 @@
       (if (null? path)
           this
         (match (refr (car path))
-          [#f #f]
+          ['NOT-FOUND 'NOT-FOUND]
           ; `(cdr pair`) is a molecule
-          [child (send child
+          [kid (send kid
                    ref (cdr path))])))
 
-    ; Like `ref`, but reference a direct child
-    (define/public (refr role)
-      (check-pred symbol? role)
-
-      (let ([lu (assq role kids)])
-        (cond [lu (cdr lu)]
-              [else #f])))
-
-    ; Reference the data of a child.
+    ; Reference the data of a kid.
     (define/public (ref-data path)
       (match (ref path)
-        [#f 'UNKNOWN]
-        [child (send child get-data)]))
+        ['NOT-FOUND '?DATA]
+        [kid (send kid get-data)]))
 
     (define/public (refr-data path)
       (match (refr path)
-        [#f 'UNKNOWN]
-        [child (send child get-data)]))
+        ['NOT-FOUND '?DATA]
+        [kid (send kid get-data)]))
 
     ; Tell those in the sync list to do something.
     ; `task` is a function takes a molecule.
@@ -184,10 +151,10 @@
           (task role (refr role)))
         (get-roles)))
 
-    (define/public (add-child role mole)
+    (define/public (add-kid role mole)
       (check-pred symbol? role)
       (check-class mole mole%
-        "Invalid child")
+        "Invalid kid")
       (cons! (cons role mole)
              kids))
 
@@ -203,13 +170,13 @@
         (for-each
           (lam (pair)
             (let* ([role (car pair)]
-                   [child (cdr pair)]
-                   [cp-res (send child clone-map)])
-              (let ([lu (assq child cp-res)])
+                   [kid (cdr pair)]
+                   [cp-res (send kid clone-map)])
+              (let ([lu (assq kid cp-res)])
                 (check-not-false lu
                   "`clone-map` does include the root.")
                 (send new-me
-                  add-child role (cdr lu)))
+                  add-kid role (cdr lu)))
               ; Since molecules are trees,
               ; there won't be any conflict.
               (set! env (append env cp-res))))
@@ -247,15 +214,15 @@
     ; until the path is exhausted.
     (define/public (just-expand path)
       (unless (null? path)
-        (let ([new-child (new mole%)])
-          (add-child (car path) new-child)
-          (send new-child
+        (let ([new-kid (new mole%)])
+          (add-kid (car path) new-kid)
+          (send new-kid
             just-expand (cdr path)))))
 
     (define/public (expand path)
       (let ([lu (refr (car path))])
         (match lu
-          [#f
+          ['NOT-FOUND
            (just-expand path)
            (inform (lam (m) (send m just-expand path)))
            ; The order is important: we must add all
@@ -263,15 +230,15 @@
            (cascade path)
            (inform (lam (m) (send m cascade path)))]
 
-          [child
-           (send child expand (cdr path))])))
+          [kid
+           (send kid expand (cdr path))])))
 
     ; Updating and syncing the data.
     ; `fail-con`: the function to in case of inconsistency.
     (define/public (update val
                            [fail-con no-fail])
       (when (neq? data val)
-        (if (eq? data 'UNKNOWN)
+        (if (eq? data '?DATA)
             (begin
               (set! data val)
               (inform
@@ -286,7 +253,7 @@
                                 [fail-con no-fail])
       (check-pred list? path
         "Invalid path")
-      (unless (ref path)
+      (when (eq? 'NOT-FOUND (ref path))
         (expand path))
       (let ([m (ref path)])
         (check-class m mole%
@@ -302,30 +269,6 @@
                    val
                    fail-con))
 
-    (define/public (mutate val)
-      (when (neq? data val)
-        (set! data val)
-        (inform
-          (lam (m)
-            (send m set-data val)))))
-
-    (define/public (mutate-path path val)
-      (check-pred list? path
-        "Invalid path")
-
-      (let ([m (ref path)])
-        (check-true (ref path)
-          "Mutating an existing path")
-        (send m mutate val)))
-
-    (define/public (mutate-role role val)
-      (check-pred symbol? role)
-
-      (let ([m (refr role)])
-        (check-not-false m
-          "Mutating an existing path")
-        (send m mutate val)))
-
     ; Flush the sync list down to the new descendants.
     (define/public (cascade path)
       ; Only work when we have something in the sync list.
@@ -337,7 +280,7 @@
                        "We have this path")
           (check-eqv? (length (send c get-sync-ls))
                       1
-                      "This child is new")
+                      "This kid is new")
           (send c
             set-sync-ls
               (map (lam (sy-i) (send sy-i refr role))
@@ -350,6 +293,7 @@
                          [fail-con no-fail])
       (check-class m-other mole%
         "Expected a molecule")
+
       (def result
         (let/ec escape
           (when (memq m-other sync-ls)
@@ -359,34 +303,39 @@
           ; Start out with syncing data
           (def other-data
             (send m-other get-data))
-          (cond
-            ; No on the top level
-            [(eq? data other-data)
-             (void)]
+          (match* (data other-data)
+            ; No conflict on the top level
+            [(x x) (void)]
+
             ; `m-other` has new intel for us
-            [(eq? data 'UNKNOWN)
+            [('?DATA _)
              (update other-data)]
+
             ; We have new intel for `m-other`
-            [(eq? other-data 'UNKNOWN)
+            [(_ '?DATA)
              (send m-other update data)]
+
             ; Nope, the data are inconsistent.
-            [else (escape 'CONFLICT)])
+            [(_ _) (escape 'CONFLICT)])
 
             ; Add the missing kids
-            (def our-roles
-              (list->seteq (get-roles)))
-            (def their-roles
-              (list->seteq (send m-other get-roles)))
-            (set-for-each
-              (set-subtract their-roles our-roles)
-              (lam (role)
-                (update-role role 'UNKNOWN)))
-            ; Same thing
-            (set-for-each
-              (set-subtract our-roles their-roles)
-              (lam (role)
-                (send m-other
-                  update-role role 'UNKNOWN)))
+            (let ([our-roles
+                   (list->seteq (get-roles))]
+                  [their-roles
+                   (list->seteq (send m-other get-roles))])
+              ; Add the missing kids for us
+              (set-for-each
+                (set-subtract their-roles our-roles)
+                (lam (role)
+                  (update-role role '?DATA)))
+
+              ; Same thing for the other guy
+              (set-for-each
+                (set-subtract our-roles their-roles)
+                (lam (role)
+                  (send m-other
+                    update-role role '?DATA))))
+
 
             ; Establish the connection among the top-level.
             ; Note that we don't cascade here,
@@ -395,7 +344,9 @@
                    (append sync-ls
                            (send m-other get-sync-ls))])
               (set-sync-ls merge)
-              (inform (lam (m) (send m set-sync-ls merge))))
+              (inform
+                (lam (m)
+                  (send m set-sync-ls merge))))
 
             ; Our work is over: Recursively let all the kids sync.
             (check-eqv? (length (get-roles))
@@ -409,14 +360,15 @@
       (when (eq? result 'CONFLICT)
         (fail-con)))
 
+
     ; Sync two descendants of this molecules.
     ; If they don't exist, expand them.
     (define/public (sync-path p1
                               p2
                               [fail-con no-fail])
-      (unless (ref p1)
+      (when (eq? 'NOT-FOUND (ref p1))
         (expand p1))
-      (unless (ref p2)
+      (when (eq? 'NOT-FOUND (ref p2))
         (expand p2))
 
       (send (ref p1)

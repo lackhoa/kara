@@ -63,9 +63,13 @@
 (struct Repr (leader paths)
   #:methods gen:custom-write
   [(define (write-proc arg-repr port mode)
-     (display (cons (Repr-leader arg-repr)
-                    (Repr-paths arg-repr))
-              port))])
+     (match* ((Repr-leader arg-repr)
+              (Repr-paths arg-repr))
+       [(leader '())
+        (display leader port)]
+       [(leader paths)
+        (display (cons leader paths)
+                 port)]))])
 
 (define-syntax macro-repr
   (syntax-rules ()
@@ -94,19 +98,21 @@
 ; -------------------------------------------------------
 ; Well-formed Formula
 (def wf
-  (macro-union Atom Implication))
-
-; Really, well-formed-formulas can be anything.
-(def Atom 'ANY)
+  (macro-union Implication))
 
 ; Symbols for testing. We aren't limited to working with symbols.
-(def A (Sym A))
-(def B (Sym B))
-(def C (Sym C))
+(def A (Sym A)) (def B (Sym B)) (def C (Sym C))
+(def X (Sym X)) (def Y (Sym Y)) (def Z (Sym Z))
+(def W (Sym W)) (def J (Sym J)) (def K (Sym K))
+(def V (Sym V))
+(def T (Sym T)) (def S (Sym S)) (def P (Sym P))
+(def Q (Sym Q)) (def R (Sym R)) (def D (Sym D))
+(def G (Sym G)) (def F (Sym F)) (def L (Sym L))
 
 (def-ctor Implication
   [macro-repr (-> ante csq)]
-  [macro-recs (ante wf) (csq wf)]
+  [macro-recs (ante wf)
+              (csq wf)]
   null null)
 
 ; Logical Entailment: only conclusion (ccs) is necessary.
@@ -120,7 +126,7 @@
   null
 
   [macro-forms
-   (ccs  Implication)]
+   (ccs Implication)]
 
   [macro-links
    (ccs_ante ccs_csq)])
