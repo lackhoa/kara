@@ -8,8 +8,20 @@
          (all-from-out "types.rkt")
          (all-from-out "mole.rkt"))
 
+; RNG for the enumeration
+(def (take-random ls from-ten)
+  (let ([result null])
+    (for-each
+      (lam (item)
+         (when (< (random 10)
+                  from-ten)
+           (cons! item result)))
+      ls)
+    result))
+
 ; Returns: a stream of complete molecules
-(def (enum mole)
+; `try-hard-lvl`: a number from 1 to 10
+(def (enum mole [try-hard-lvl 10])
   ; We keep track of the molecules we've worked on
   ; by tagging them with the "expanded" role.
   ; `p` is a path.
@@ -69,16 +81,18 @@
        ; Multitask all the different branches.
        (gen-impersonate
          (gen-robin
-           (map
-             (lam (new-mole)
-               ; Tag it so we don't expand it in the future.
-               (send new-mole
-                 update-path (append1 target
-                                      'expanded)
-                             #t)
-               ; Remember: `enum` returns a stream
-               (enum new-mole))
-             (expand mole target))))])))
+           (take-random
+             (map
+               (lam (new-mole)
+                 ; Tag it so we don't expand it in the future.
+                 (send new-mole
+                   update-path (append1 target
+                                        'expanded)
+                               #t)
+                 ; Remember: `enum` returns a stream
+                 (enum new-mole try-hard-lvl))
+               (expand mole target))
+             try-hard-lvl)))])))
 
 
 (def (pad relative role)
