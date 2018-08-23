@@ -63,13 +63,7 @@
 (struct Repr (leader paths)
   #:methods gen:custom-write
   [(define (write-proc arg-repr port mode)
-     (match* ((Repr-leader arg-repr)
-              (Repr-paths arg-repr))
-       [(leader '())
-        (display leader port)]
-       [(leader paths)
-        (display (cons leader paths)
-                 port)]))])
+     (display (Repr-leader arg-repr) port))])
 
 (define-syntax macro-repr
   (syntax-rules ()
@@ -77,28 +71,19 @@
      (Repr 'leader (list 'roles ...))]))
 
 ; Union: a delayed list of constructors.
-(struct Union (ctors))
-
-(define-syntax-rule (macro-union ctors ...)
-  (Union (delay (list ctors ...))))
+(struct Union (ctors-stream))
 
 ; Symbols: leaf construtors (or terminals).
 (define-syntax-rule (Sym s)
   (Ctor [macro-repr (s)] null null null))
 
-; Defining axioms.
-(define-syntax-rule (Axiom name e ...)
-  (begin
-    (def-ctor name e ...)
-    (cons! name entailment)))
-
-
 ; -------------------------------------------------------
 ; Deduction System
 ; -------------------------------------------------------
-; Well-formed Formula
+; Well-formed Formula: A, B, and C are just for testing.
 (def wf
-  (macro-union Implication))
+  (Union (stream Implication
+                 A B C)))
 
 ; Symbols for testing. We aren't limited to working with symbols.
 (def A (Sym A)) (def B (Sym B)) (def C (Sym C))
@@ -112,15 +97,15 @@
 (def-ctor Implication
   [macro-repr (-> ante csq)]
   [macro-recs (ante wf)
-              (csq wf)]
+              (csq  wf)]
   null null)
 
 ; Logical Entailment: only conclusion (ccs) is necessary.
 (def entailment
-  (Union (list)))
+  (Union (stream AI AK AS AB AS MP)))
 
 ; => A->A
-(Axiom AI
+(def-ctor AI
   [macro-repr (AI=> ccs)]
 
   null
@@ -132,7 +117,7 @@
    (ccs_ante ccs_csq)])
 
 ; => (A->B)->A
-(Axiom AK
+(def-ctor AK
   [macro-repr (AK=> ccs)]
 
   null
@@ -145,7 +130,7 @@
    (ccs_ante ccs_csq_csq)])
 
 ; => (A->(B->C)) -> ((A->B)->(A->C))
-(Axiom AS
+(def-ctor AS
   [macro-repr (AS=> ccs)]
 
   null
@@ -171,7 +156,7 @@
     ccs_csq_csq_csq)])
 
 ; => (B->C) -> ((A->B) -> (A->C))
-(Axiom AB
+(def-ctor AB
   [macro-repr (AB=> ccs)]
 
   null
@@ -185,14 +170,17 @@
 
   [macro-links
    ; A
-   (ccs_csq_ante_ante ccs_csq_csq_ante)
+   (ccs_csq_ante_ante
+    ccs_csq_csq_ante)
    ; B
-   (ccs_ante_ante ccs_csq_ante_csq)
+   (ccs_ante_ante
+    ccs_csq_ante_csq)
    ; C
-   (ccs_ante_csq ccs_csq_csq_csq)])
+   (ccs_ante_csq
+    ccs_csq_csq_csq)])
 
 ; => (A->(B->C)) -> (B->(A->C))
-(Axiom AC
+(def-ctor AC
   [macro-repr (AC=> ccs)]
 
   null
@@ -206,14 +194,17 @@
 
   [macro-links
    ; A
-   (ccs_ante_ante ccs_csq_csq_ante)
+   (ccs_ante_ante
+    ccs_csq_csq_ante)
    ; B
-   (ccs_ante_csq_ante ccs_csq_ante)
+   (ccs_ante_csq_ante
+    ccs_csq_ante)
    ; C
-   (ccs_ante_csq_csq ccs_csq_csq_csq)])
+   (ccs_ante_csq_csq
+    ccs_csq_csq_csq)])
 
 ; A, A->B => B
-(Axiom MP
+(def-ctor MP
   [macro-repr (MP=> ?=>a->b ?=>a ccs)]
 
   [macro-recs
@@ -233,18 +224,19 @@
 ; -------------------------------------------------------
 ; Equality
 ; -------------------------------------------------------
-; I think I don't know anything about type.
 (def Eq
   (Ctor
     [macro-repr (= lhs rhs)]
-    ; Yeah, the two sides can be anything.
-    [macro-recs
-      (lhs 'ANY)
-      (rhs 'ANY)]
-    null null))
+
+    null null
+
+    ; The two sides must be of the same type and constructor.
+    [macro-links
+     (lhs_type rhs_type)
+     (lhs_ctor rhs_ctor)]))
 
 ; x = x {any type}
-(Axiom Reflexivity
+(def-ctor Reflexivity
   [macro-repr (Ref=> ccs)]
 
   null
@@ -255,7 +247,7 @@
   [macro-links (ccs_lhs ccs_rhs)])
 
 ; x = y -> y = x {any type}
-(Axiom Commutativity
+(def-ctor Commutativity
   [macro-repr (Comm=> ccs)]
 
   null
@@ -266,11 +258,11 @@
     (ccs_csq  Eq)]
 
   [macro-links
-    (ccs_ante_lhs ccs_ante_rhs)  ; x
-    (ccs_ante_rhs ccs_csq_lhs)]) ; y
+    (ccs_ante_lhs  ccs_ante_rhs)  ; x
+    (ccs_ante_rhs  ccs_csq_lhs)]) ; y
 
 ; (x = y) -> ((y = z) -> (x = z))
-(Axiom Transitivity
+(def-ctor Transitivity
   [macro-repr (Tran=> ccs)]
 
   null
@@ -288,9 +280,10 @@
     (ccs_csq_ante_rhs ccs_csq_csq_rhs)]) ; z
 
 
+; What it means for two implication to be equal.
 ; (x = y) ->
 ; ((z = t) -> ((x -> z) = (y -> t)))
-(Axiom (Eq-Wf)
+(def-ctor (Eq-Wf)
   [macro-repr (Eq-Wf=> ccs)]
 
   null
@@ -305,13 +298,13 @@
     (ccs_csq_csq_rhs Implication)]
 
   [macro-links
-    (ccs_ante_lhs     ccs_csq_csq_lhs_ante)  ; x
-    (ccs_ante_rhs     ccs_csq_csq_rhs_ante)  ; y
-    (ccs_csq_ante_lhs ccs_csq_csq_lhs_csq)   ; z
-    (ccs_csq_ante_rhs ccs_csq_csq_rhs_csq)]) ; t
+    (ccs_ante_lhs      ccs_csq_csq_lhs_ante)  ; x
+    (ccs_ante_rhs      ccs_csq_csq_rhs_ante)  ; y
+    (ccs_csq_ante_lhs  ccs_csq_csq_lhs_csq)   ; z
+    (ccs_csq_ante_rhs  ccs_csq_csq_rhs_csq)]) ; t
 
 ; (x = y) -> (x -> y) {any type}
-(Axiom I9
+(def-ctor I9
   [macro-repr (I9=> ccs)]
 
   null
@@ -329,101 +322,101 @@
 ; Category Theory
 ; -------------------------------------------------------
 
-(def Object 'ANY)
+;; (def Object 'ANY)
 
-; The morphism type: source and target are common.
-(def mor
-  (macro-union Atomic-Map Comp Iden))
+;; ; The morphism type: source and target are common.
+;; (def mor
+;;   (macro-union Atomic-Map Comp Iden))
 
-(def-ctor Atomic-Map
-  [macro-repr (-> name src targ)]
-  null
-  [macro-recs
-   (name 'ANY)
-   (src  Object)
-   (targ Object)]
-  null)
+;; (def-ctor Atomic-Map
+;;   [macro-repr (-> name src targ)]
+;;   null
+;;   [macro-recs
+;;    (name 'ANY)
+;;    (src  Object)
+;;    (targ Object)]
+;;   null)
 
-(def-ctor Comp
-  [macro-repr (∘ g f)]
-  [macro-recs
-    (g mor)
-    (f mor)]
-  null
-  [macro-links
-    (src  f_src)
-    (targ g_targ)])
+;; (def-ctor Comp
+;;   [macro-repr (∘ g f)]
+;;   [macro-recs
+;;     (g mor)
+;;     (f mor)]
+;;   null
+;;   [macro-links
+;;     (src  f_src)
+;;     (targ g_targ)])
 
-(def-ctor Iden
-  [macro-repr (|1| src)]
-  null
-  null
-  [macro-links (src targ)])
-
-
+;; (def-ctor Iden
+;;   [macro-repr (|1| src)]
+;;   null
+;;   null
+;;   [macro-links (src targ)])
 
 
-; f: A -> B => 1B ∘ f = f
-(Axiom Iden-Axiom1
-  [macro-repr (IM1=> ccs)]
 
-  [macro-recs (rhs mor)]
 
-  [macro-forms
-    (ccs       Eq)
-    (ccs_lhs   Comp)
-    (ccs_lhs_g Iden)]
+;; ; f: A -> B => 1B ∘ f = f
+;; (def-ctor Iden-Axiom1
+;;   [macro-repr (IM1=> ccs)]
 
-  [macro-links
-    (ccs_lhs_f     rhs)
-    (ccs_lhs_g_src rhs_targ)])
+;;   [macro-recs (rhs mor)]
 
-; => g ∘ 1A = g (g: A -> B)
-(Axiom Iden-Axiom2
-  [macro-repr (IM2=> ccs)]
+;;   [macro-forms
+;;     (ccs       Eq)
+;;     (ccs_lhs   Comp)
+;;     (ccs_lhs_g Iden)]
 
-  [macro-recs (rhs mor)]
+;;   [macro-links
+;;     (ccs_lhs_f     rhs)
+;;     (ccs_lhs_g_src rhs_targ)])
 
-  [macro-forms
-    (ccs       Eq)
-    (ccs_lhs   Comp)
-    (ccs_lhs_f Iden)]
+;; ; => g ∘ 1A = g (g: A -> B)
+;; (def-ctor Iden-Axiom2
+;;   [macro-repr (IM2=> ccs)]
 
-  [macro-links
-    (ccs_lhs_g     rhs)
-    (ccs_lhs_f_src rhs_src)])
+;;   [macro-recs (rhs mor)]
 
-; => (h ∘ g) ∘ f = h ∘ (g ∘ f)
-(Axiom Comp-Assoc
-  [macro-repr (Assoc=> ccs)]
-  [macro-recs
-    (ccs_lhs_f mor)
-    (ccs_rhs_g mor)]
-  [macro-forms
-    (ccs        Eq)
-    (ccs_lhs_g Comp)
-    (ccs_rhs_f Comp)]
-  [macro-links
-    (ccs_lhs_f   ccs_rhs_f_f) ; f
-    (ccs_lhs_g_f ccs_rhs_f_g) ; g
-    (ccs_lhs_g_g ccs_rhs_g)]) ; h
+;;   [macro-forms
+;;     (ccs       Eq)
+;;     (ccs_lhs   Comp)
+;;     (ccs_lhs_f Iden)]
 
-; (f = g) -> ((h = i) -> (f ∘ h = g ∘ i))
-(Axiom Comp-Eq
-  [macro-repr (Comp-Eq=> ccs)]
+;;   [macro-links
+;;     (ccs_lhs_g     rhs)
+;;     (ccs_lhs_f_src rhs_src)])
 
-  null
+;; ; => (h ∘ g) ∘ f = h ∘ (g ∘ f)
+;; (def-ctor Comp-Assoc
+;;   [macro-repr (Assoc=> ccs)]
+;;   [macro-recs
+;;     (ccs_lhs_f mor)
+;;     (ccs_rhs_g mor)]
+;;   [macro-forms
+;;     (ccs        Eq)
+;;     (ccs_lhs_g Comp)
+;;     (ccs_rhs_f Comp)]
+;;   [macro-links
+;;     (ccs_lhs_f   ccs_rhs_f_f) ; f
+;;     (ccs_lhs_g_f ccs_rhs_f_g) ; g
+;;     (ccs_lhs_g_g ccs_rhs_g)]) ; h
 
-  [macro-forms
-    (ccs_ante        Eq)
-    (ccs_csq         Implication)
-    (ccs_csq_ante    Eq)
-    (ccs_csq_csq     Eq)
-    (ccs_csq_csq_lhs Comp)
-    (ccs_csq_csq_rhs Comp)]
+;; ; (f = g) -> ((h = i) -> (f ∘ h = g ∘ i))
+;; (def-ctor Comp-Eq
+;;   [macro-repr (Comp-Eq=> ccs)]
 
-  [macro-links
-    (ccs_ante_lhs     ccs_csq_csq_lhs_g)   ; f
-    (ccs_ante_rhs     ccs_csq_csq_rhs_g)   ; g
-    (ccs_csq_ante_lhs ccs_csq_csq_lhs_f)   ; h
-    (ccs_csq_ante_rhs ccs_csq_csq_rhs_f)]) ; i
+;;   null
+
+;;   [macro-forms
+;;     (ccs_ante        Eq)
+;;     (ccs_csq         Implication)
+;;     (ccs_csq_ante    Eq)
+;;     (ccs_csq_csq     Eq)
+;;     (ccs_csq_csq_lhs Comp)
+;;     (ccs_csq_csq_rhs Comp)]
+
+;;   [macro-links
+;;     (ccs_ante_lhs     ccs_csq_csq_lhs_g)   ; f
+;;     (ccs_ante_rhs     ccs_csq_csq_rhs_g)   ; g
+;;     (ccs_csq_ante_lhs ccs_csq_csq_lhs_f)   ; h
+;;     (ccs_csq_ante_rhs ccs_csq_csq_rhs_f)]) ; i

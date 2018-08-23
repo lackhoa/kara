@@ -3,29 +3,38 @@
 (require "lang/kara.rkt"
          "enum.rkt")
 
-; This should now spits out generic values.
-(def (enum1)
+(def (enum-test)
+  ; Now, we assume these symbols to be
+  ; well-formed formulas (they aren't).
   (def m (new mole%))
-  (send m update-role 'ctor wf)
-  (gen-get (enum m) 10))
+  (send m
+    update-role 'type wf)
 
-(enum1)
+  (gen-get (enum m) 2))
+
+;; (enum-test)
 
 (def (proof1)
   (def m (new mole%))
-  (update-roles m
-    (ccs Implication))
   (send m
-    sync ccs_ante ccs_csq)
+    update-role 'type entailment)
 
-  (gen-get (enum m) 3))
+  (update-ctors m
+    (ccs       Implication)
+    (ccs_ante  A)
+    (ccs_csq   A))
+
+  (gen-get (enum m) 1))
 
 ;; (proof1)
 
 ; (A -> (A -> B)) -> (A -> B)
 (def (AW-proof)
   (def m (new mole%))
-  (update-roles m
+  (send m
+    update-role 'type entailment)
+
+  (update-ctors m
     (ccs               Implication)
     (ccs_ante          Implication)
     (ccs_ante_ante     A)
@@ -38,4 +47,4 @@
 
   (gen-get (enum m) 1))
 
-;; (AW-proof)
+(AW-proof)

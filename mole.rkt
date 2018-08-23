@@ -86,8 +86,6 @@
       (cons! (cons role mole)
              kids))
 
-
-
     (define/public (repr)
       (match* (data kids)
         ; Totally unsure whether this is a structure or an atom.
@@ -108,22 +106,27 @@
           ; Unknown constructor, known type
           [('?DATA
             (Union ctors))
-           (cons (map force ctors)
-                 kids)]
+           (cons (stream->list ctors)
+                 (filter-not
+                   (lam (kid)
+                     (case (car kid)
+                       [(type ctor) #t]
+                       [else        #f]))
+                   kids))]
 
           ; Known constructor
           [((Ctor repr _ _ _)
             _)
            (match repr
-             [(Repr leader paths)
-              (if (null? paths)
+             [(Repr leader roles)
+              (if (null? roles)
                   leader
                 (cons leader
-                      (map (lam (path)
-                             (match (ref path)
+                      (map (lam (role)
+                             (match (refr role)
                                ['NOT-FOUND '?]
                                [kid (send kid repr)]))
-                           paths)))])])]
+                           roles)))])])]
 
         ; Non-trivial data and kids.
         [(_ _)
@@ -403,9 +406,9 @@
   (syntax-rules ()
     [(_ mole) (void)]
 
-    [(_ mole (path ctor) rest ...)
+    [(_ mole (path cval) rest ...)
      (begin (send mole
               update-path (append1 (path-proc 'path)
                                    'ctor)
-                          ctor)
-            (update-macro mole rest ...))]))
+                          cval)
+            (update-ctors mole rest ...))]))

@@ -9,13 +9,15 @@
          (all-from-out "mole.rkt"))
 
 ; Returns: a stream of complete molecules
-(def (enum mole targets)
+(def (enum mole)
   ; We keep track of the molecules we've worked on
   ; by tagging them with the "expanded" role.
   ; `p` is a path.
   (def (expanded? p)
-    (send mole
-      ref (append1 p 'expanded)))
+    (match (send mole
+             ref (append1 p 'expanded))
+      ['NOT-FOUND #f]
+      [_          #t]))
 
   ; Returns: a stream of paths.
   (def (level-iter m [relative null])
@@ -23,12 +25,13 @@
       relative
       (stream-interleave
         (map (lam (role)
-               (level-iter (send m ref role)
+               (level-iter (send m refr role)
                            (append1 relative role)))
-             (send m get-roles)))))
+             (remq* '(expanded ctor type)
+                    (send m get-roles))))))
 
   ; Find a molecule to work with.
-  ; Returns: a molecule, or #f if m is complete.
+  ; Returns: a path, 'NO-MORE-TARGETS.
   (def next-target
     (let loop ([lvl-stream
                 (level-iter mole)])
@@ -38,47 +41,45 @@
       (if (stream-empty? lvl-stream)
           'NO-MORE-TARGETS
         ; Notice that the every molecule has a constructor.
-        (let ([pfocus
-               (stream-first lvl-stream)]
-              [mfocus
-               (send mole ref pfocus)])
-          (match (send mfocus get-data)
-            ['?DATA
-             (match* ((send mfocus get-ctor)
-                      (send mfocus get-type))
-               ; No idea what this is.
-               [('?DATA '?DATA) (recur)]
+        ; We know that we're only working on structures.
+        (let* ([pfocus
+                (stream-first lvl-stream)]
+               [mfocus
+                (send mole ref pfocus)])
+          (match* ((send mfocus get-ctor)
+                   (send mfocus get-type))
+            ; No idea what this is.
+            [('?DATA '?DATA) (recur)]
 
-               ; We know the type, not the constructor.
-               [('?DATA _) pfocus]
+            ; We know the type, not the constructor.
+            [('?DATA _) pfocus]
 
-               ; We know the constructor already.
-               [(_ _)
-                (match (send mfocus refr 'expanded)
-                  ; Not expanded yet
-                  ['NOT-FOUND pfocus]
+            ; We know the constructor already.
+            [(_ _)
+             (match (expanded? pfocus)
+               [#f pfocus]
+               [#t (recur)])])))))
 
-                  ; Already expanded
-                  [else (ctor)])])]
+  (generator ()
+    (match next-target
+      ['NO-MORE-TARGETS
+       (yield mole) 'DONE]
 
-            ; This is just data, nothing to do here.
-            [_ (recur)])))))
+      [target
+       ; Multitask all the different branches.
+       (gen-impersonate
+         (gen-robin
+           (map
+             (lam (new-mole)
+               ; Tag it so we don't expand it in the future.
+               (send new-mole
+                 update-path (append1 target
+                                      'expanded)
+                             #t)
+               ; Remember: `enum` returns a stream
+               (enum new-mole))
+             (expand mole target))))])))
 
-  (match next-target
-    ['NO-MORE-TARGETS
-     (stream-cons mole 'DONE)]
-
-    [target
-     ; Multitask all the different branches.
-     (stream-robin
-       (map
-         (lam (new-mole)
-           ; Tag it so we don't expand it in the future.
-           (send new-mole
-             update-role 'expanded #t)
-           ; Remember: `enum` returns a stream
-           (enum new-mole))
-         (expand mole target)))]))
 
 (def (pad relative role)
   (append1 relative role))
@@ -97,17 +98,16 @@
            (match ctor
              [(Ctor _ recs forms links)
               ; Cloning is the biggest part
-              (let* ([mclone (send mole copy)])
+              (let* ([mclone
+                      (send mole copy)])
                 (send mclone
-                  update-path (append1 target 'ctor) ctor)
-                (for-each
-                  (lam (code)
-                    (match code
-                      ['CONFLICT (void)]
-                      ['OK (cons! mclone result)]))
-                  (process-ctor (send mclone ref target)
-                                recs forms links))
-                mclone)]))
+                  update-path (append1 target 'ctor)
+                              ctor)
+                  ; Send it off to process-ctor
+                  (match (process-ctor (send mclone ref target)
+                                       recs forms links)
+                    ['CONFLICT (void)]
+                    ['OK (cons! mclone result)]))]))
          stream-ctors)
          result)]
 

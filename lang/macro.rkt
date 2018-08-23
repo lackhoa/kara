@@ -29,4 +29,10 @@
 
 ; Add an element to the beginning of the list.
 (define-syntax-rule (cons! item ls)
-  (set! ls (cons item ls)))
+  (set! ls (cons item
+                 ls)))
+
+; Same, but with streams
+(define-syntax-rule (stream-cons! item stream)
+  (set! stream (stream-cons item
+                            stream)))
