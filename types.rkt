@@ -83,7 +83,7 @@
 ; Well-formed Formula: A, B, and C are just for testing.
 (def wf
   (Union (stream Implication
-                 A B C)))
+                 A B C D)))
 
 ; Symbols for testing. We aren't limited to working with symbols.
 (def A (Sym A)) (def B (Sym B)) (def C (Sym C))
@@ -102,7 +102,7 @@
 
 ; Logical Entailment: only conclusion (ccs) is necessary.
 (def entailment
-  (Union (stream AI AK AS AB AS MP)))
+  (Union (stream AI AK AS AB AC MP)))
 
 ; => A->A
 (def-ctor AI

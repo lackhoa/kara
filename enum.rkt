@@ -10,14 +10,16 @@
 
 ; RNG for the enumeration
 (def (take-random ls from-ten)
-  (let ([result null])
-    (for-each
-      (lam (item)
-         (when (< (random 10)
-                  from-ten)
-           (cons! item result)))
-      ls)
-    result))
+  (if (= from-ten 10)
+      ls
+    (let ([result null])
+      (for-each
+        (lam (item)
+           (when (< (random 10)
+                    from-ten)
+             (cons! item result)))
+        ls)
+      result)))
 
 ; Returns: a stream of complete molecules
 ; `try-hard-lvl`: a number from 1 to 10
