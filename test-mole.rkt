@@ -15,15 +15,12 @@
            W)
 
 (send m1
-  update-role 'a X)
+  update-role 'a '?DATA)
 
 (check-equal? (send m1 get-roles)
               '(a d))
 
 (def a (send m1 refr 'a))
-
-(check-equal? (send a get-data)
-              X)
 
 (check-equal? (send a get-sync-ls)
               (list a))
@@ -86,9 +83,9 @@ m2
 
 
 "Fail update-path"
-(send m2 update-path '(h) R)
+(send m2 update-path '(h q) R)
 (check-equal? (send m2
-                update-role 'h
+                update-path '(h q)
                             Q
                             (lam () "Now we fail"))
               "Now we fail")
@@ -116,9 +113,6 @@ m2
   (def cp (send test copy))
   (check-equal? (send cp get-sync-ls)
                 (list cp))
-  (send cp update L)
-  (check-eq? (send cp get-data)
-             L)
   (check-eq? (send test get-data)
              '?DATA)
   (send cp update-role 'j '?DATA)

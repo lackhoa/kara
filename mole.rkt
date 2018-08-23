@@ -6,9 +6,6 @@
 ; ---------------------------------
 ; Molecules
 ; ---------------------------------
-; Naming convention:
-; * roles (and paths) are lowercase,
-; * data are capitalized.
 
 ; The failure continuation that you're
 ; confident not gonna be called.
@@ -61,16 +58,39 @@
 
     ; Setters
     (define/public (set-data val)
-      (set! data val))
+      (match* (data val kids)
+        ; No new information
+        [(_ '?DATA _)
+         (void)]
+
+        ; Can update
+        [(_ _ '())
+         (set! data val)]
+
+        ; Illegal state
+        [(_ _ _)
+         (error "A composite cannot have data")]))
 
     (define/public (set-sync-ls value)
       (check-pred pair? value
         "Sync list must be non-empty")
       (set! sync-ls value))
 
+    (define/public (add-kid role mole)
+      (check-pred symbol? role
+        "Role is a symbol")
+      (check-class mole mole%
+        "Kid is a molecule")
+      (check-eq? data '?DATA
+        "This is not an atom")
+      (cons! (cons role mole)
+             kids))
+
+
+
     (define/public (repr)
       (match* (data kids)
-        ; We are totally unsure whether this is a structure or an atom.
+        ; Totally unsure whether this is a structure or an atom.
         [('?DATA '()) '?]
 
         ; This is an atom
@@ -78,8 +98,8 @@
 
         ; This is a molecule.
         [('?DATA _)
-         (match* ((refr-data 'ctor)
-                  (refr-data 'type))
+         (match* ((get-ctor)
+                  (get-type))
           ; Unknown constructor, unknown type
           [('?DATA
             '?DATA)
@@ -91,6 +111,7 @@
            (cons (map force ctors)
                  kids)]
 
+          ; Known constructor
           [((Ctor repr _ _ _)
             _)
            (match repr
@@ -104,7 +125,7 @@
                                [kid (send kid repr)]))
                            paths)))])])]
 
-        ; Non-trivial data and non-null kids list.
+        ; Non-trivial data and kids.
         [(_ _)
          (error "Branches cannot have data." data)]))
 
@@ -116,22 +137,17 @@
 
     ; Like `ref`, but reference a direct kid
     (define/public (refr role)
-      (check-pred symbol? role)
-
       (let ([lu (assq role kids)])
         (cond [lu (cdr lu)]
               [else 'NOT-FOUND])))
 
     ; Reference a descendant.
     (define/public (ref path)
-      (check-pred list? path
-        "Path must be a list")
-
       (if (null? path)
           this
         (match (refr (car path))
           ['NOT-FOUND 'NOT-FOUND]
-          ; `(cdr pair`) is a molecule
+
           [kid (send kid
                    ref (cdr path))])))
 
@@ -139,11 +155,13 @@
     (define/public (ref-data path)
       (match (ref path)
         ['NOT-FOUND '?DATA]
+
         [kid (send kid get-data)]))
 
     (define/public (refr-data path)
       (match (refr path)
         ['NOT-FOUND '?DATA]
+
         [kid (send kid get-data)]))
 
     ; Tell those in the sync list to do something.
@@ -162,13 +180,6 @@
         (lam (role)
           (task role (refr role)))
         (get-roles)))
-
-    (define/public (add-kid role mole)
-      (check-pred symbol? role)
-      (check-class mole mole%
-        "Invalid kid")
-      (cons! (cons role mole)
-             kids))
 
     ; Returns a mapping of the originals to their copies,
     ; without the sync list.
@@ -207,8 +218,6 @@
             (send clone
               ; Translate the entire sync list
               ; to the copied version.
-              ; This part won't work if the system isn't closed,
-              ; i.e., this molecule is linked to something else.
               set-sync-ls
                 (map
                   (lam (m)
@@ -219,7 +228,7 @@
                       (cdr lu)))
                   (send orig get-sync-ls))))
           cns)
-        ; This will return the copy.
+        ; This will return the root's copy.
         (cdr (assq this cns))))
 
     ; Keep adding new kids
@@ -250,28 +259,29 @@
     (define/public (update val
                            [fail-con no-fail])
       (when (neq? data val)
-        (if (eq? data '?DATA)
-            (begin
-              (set! data val)
-              (inform
-                (lam (m)
-                  (send m set-data val))))
+        (match data
+          ['?DATA
+           (set-data val)
+           (inform
+             (lam (m)
+               (send m set-data val)))]
+
           ; Conflict: available data is not equal.
-          (fail-con))))
+          [_ (fail-con)])))
 
     ; Just a convenience function
     (define/public (update-path path
                                 val
                                 [fail-con no-fail])
-      (check-pred list? path
-        "Invalid path")
-      (when (eq? 'NOT-FOUND (ref path))
-        (expand path))
-      (let ([m (ref path)])
-        (check-class m mole%
-          "Expand gave us a reference to the path.")
-        (send m
-          update val (lam () (fail-con)))))
+      (match (ref path)
+        ['NOT-FOUND
+         (expand path)
+         (send (ref path)
+           update val (lam () (fail-con)))]
+
+        [kid
+         (send kid
+           update val (lam () (fail-con)))]))
 
     ; Short-hand for the short-hand that is update-path.
     (define/public (update-role role
@@ -281,7 +291,8 @@
                    val
                    fail-con))
 
-    ; Flush the sync list down to the new descendants.
+    ; Flush the sync list down to the
+    ; new descendants on a path.
     (define/public (cascade path)
       ; Only work when we have something in the sync list.
       (when (and (not (null? path))
