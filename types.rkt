@@ -102,7 +102,7 @@
 
 ; Logical Entailment: only conclusion (ccs) is necessary.
 (def entailment
-  (Union (stream AI AK AS AB AC MP)))
+  (Union (stream AI AK AS AC MP)))
 
 ; => A->A
 (def-ctor AI

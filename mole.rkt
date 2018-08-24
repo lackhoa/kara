@@ -51,10 +51,10 @@
       (refr-data 'type))
 
     (define/public (ref-ctor path)
-      (ref-data (append1 path 'ctor)))
+      (ref-data (pad path 'ctor)))
 
     (define/public (ref-type path)
-      (ref-data (append1 path 'type)))
+      (ref-data (pad path 'type)))
 
     ; Setters
     (define/public (set-data val)
@@ -408,7 +408,7 @@
 
     [(_ mole (path cval) rest ...)
      (begin (send mole
-              update-path (append1 (path-proc 'path)
-                                   'ctor)
+              update-path (pad (path-proc 'path)
+                               'ctor)
                           cval)
             (update-ctors mole rest ...))]))

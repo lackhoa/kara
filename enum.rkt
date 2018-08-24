@@ -21,15 +21,31 @@
         ls)
       result)))
 
-; Returns: a stream of complete molecules
-; `try-hard-lvl`: a number from 1 to 10
-(def (enum mole [try-hard-lvl 10])
+; Iterative Deepening Search
+(def (enum1 mole)
+  (let loop ([cutoff 10])
+    (match (enum-co mole cutoff)
+      ; Got cut-off: double the cutoff limit
+      ['CUT-OFF
+       (loop (* 2 cutoff))]
+
+      ; Impossible to find a value
+      ['NO-VALUE
+       'NO-VALUE]
+
+      ; Got a value
+      [result
+       result])))
+
+; Returns: a single complete molecule,
+; or CUT-OFF, or NO-VALUE.
+(def (enum-co mole cutoff)
   ; We keep track of the molecules we've worked on
   ; by tagging them with the "expanded" role.
   ; `p` is a path.
   (def (expanded? p)
     (match (send mole
-             ref (append1 p 'expanded))
+             ref (pad p 'expanded))
       ['NOT-FOUND #f]
       [_          #t]))
 
@@ -40,65 +56,75 @@
       (stream-interleave
         (map (lam (role)
                (level-iter (send m refr role)
-                           (append1 relative role)))
+                           (pad relative role)))
+             ; `remq*` weeds out the data.
              (remq* '(expanded ctor type)
                     (send m get-roles))))))
 
-  ; Find a molecule to work with.
-  ; Returns: a path, 'NO-MORE-TARGETS.
-  (def next-target
-    (let loop ([lvl-stream
-                (level-iter mole)])
-      (def (recur)
-        (loop (stream-rest lvl-stream)))
+  (cond
+    [(<= cutoff 0) 'CUT-OFF]
 
-      (if (stream-empty? lvl-stream)
-          'NO-MORE-TARGETS
-        ; Notice that the every molecule has a constructor.
-        ; We know that we're only working on structures.
-        (let* ([pfocus
-                (stream-first lvl-stream)]
-               [mfocus
-                (send mole ref pfocus)])
-          (match* ((send mfocus get-ctor)
-                   (send mfocus get-type))
-            ; No idea what this is.
-            [('?DATA '?DATA) (recur)]
+    [else
+     ; WORK BEGINS: Find a molecule to work with.
+     ; Returns: a path | 'NO-MORE-TARGETS.
+     (def next-target
+       (let loop ([lvl-stream
+                   (level-iter mole)])
+         (def (recur)
+           (loop (stream-rest lvl-stream)))
 
-            ; We know the type, not the constructor.
-            [('?DATA _) pfocus]
+         (if (stream-empty? lvl-stream)
+             'NO-MORE-TARGETS
+           (let* ([pfocus
+                   (stream-first lvl-stream)]
+                  [mfocus
+                   (send mole ref pfocus)])
+             (match* ((send mfocus get-ctor)
+                      (send mfocus get-type))
+               ; No idea what this is.
+               [('?DATA '?DATA) (recur)]
 
-            ; We know the constructor already.
-            [(_ _)
-             (match (expanded? pfocus)
-               [#f pfocus]
-               [#t (recur)])])))))
+               ; We know the type, not the constructor.
+               [('?DATA _) pfocus]
 
-  (generator ()
-    (match next-target
-      ['NO-MORE-TARGETS
-       (yield mole) 'DONE]
+               ; We know the constructor already.
+               [(_ _)
+                (match (expanded? pfocus)
+                  [#f pfocus]
+                  [#t (recur)])])))))
 
-      [target
-       ; Multitask all the different branches.
-       (gen-impersonate
-         (gen-robin
-           (take-random
-             (map
-               (lam (new-mole)
-                 ; Tag it so we don't expand it in the future.
-                 (send new-mole
-                   update-path (append1 target
-                                        'expanded)
-                               #t)
-                 ; Remember: `enum` returns a stream
-                 (enum new-mole try-hard-lvl))
-               (expand mole target))
-             try-hard-lvl)))])))
+     (match next-target
+       ; Good news.
+       ['NO-MORE-TARGETS
+        mole]
 
+       [target
+        (def cutoff-flag #f)
 
-(def (pad relative role)
-  (append1 relative role))
+        (let/cc escape
+          (for-each
+            (lam (new-mole)
+              ; Tag it so we don't expand it in the future.
+              (send new-mole
+                update-path (pad target
+                                 'expanded)
+                            #t)
+              (match (enum-co new-mole
+                              (- cutoff 1))
+                ['NO-VALUE
+                 (void)]
+
+                ['CUT-OFF
+                 (set! cutoff-flag
+                       #t)]
+
+                [result
+                 (escape result)]))
+            (expand mole target))
+
+          (if cutoff-flag
+              'CUT-OFF
+            'NO-VALUE))])]))
 
 ; Returns: a (possibly empty) list of consistent molecules,
 ; whose constructors are finalized (and unique).
@@ -117,7 +143,7 @@
               (let* ([mclone
                       (send mole copy)])
                 (send mclone
-                  update-path (append1 target 'ctor)
+                  update-path (pad target 'ctor)
                               ctor)
                   ; Send it off to process-ctor
                   (match (process-ctor (send mclone ref target)
@@ -158,7 +184,7 @@
         (match forms-iter
           [(Form path constructor)
            (send mole
-             update-path (append1 path 'ctor)
+             update-path (pad path 'ctor)
                          constructor
                          get-me-out)]))
       forms)

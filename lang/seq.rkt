@@ -61,9 +61,12 @@
                            (drop ls (+ pos 1)))]
         [else (error "REMOVE-POS" "Invalid position" pos)]))
 
-; Just add an item to the end of a list
-(def (append1 ls single-item)
+; Add an item to the end of a list
+(def (pad ls single-item)
   (append ls (list single-item)))
+
+; Synonym
+(def append1 pad)
 
 ;; (def (permutations s)
 ;;   ; This function sticks the x to the permutations that doesn't contain x

@@ -65,5 +65,8 @@
   ; `g` stops the generator from being re-defined every loop
   (let ([g gen])
     (let loop ()
-      (yield (g))
-      (loop))))
+      (match (g)
+        ['DONE 'DONE]
+        [any
+         (begin (yield any)
+                (loop))]))))
