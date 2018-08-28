@@ -49,7 +49,7 @@
 
   (enum1 m))
 
-(time (AW-proof))
+(AW-proof)
 
 ; A -> ((A -> B) -> B)
 (def (reverse-proof)

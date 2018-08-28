@@ -96,27 +96,18 @@
 
         ; This is a molecule.
         [('?DATA _)
-         (match* ((get-ctor)
-                  (get-type))
-          ; Unknown constructor, unknown type
-          [('?DATA
-            '?DATA)
-           (cons '? kids)]
-
-          ; Unknown constructor, known type
-          [('?DATA
-            (Union ctors))
-           (cons (stream->list ctors)
-                 (filter-not
-                   (lam (kid)
-                     (case (car kid)
-                       [(type ctor) #t]
-                       [else        #f]))
-                   kids))]
+         (match (get-ctor)
+          ; Unknown constructor
+          ['?DATA
+           (filter-not
+             (lam (kid)
+               (case (car kid)
+                 [(type ctor) #t]
+                 [else        #f]))
+             kids)]
 
           ; Known constructor
-          [((Ctor repr _ _ _)
-            _)
+          [(Ctor repr _ _ _)
            (match repr
              [(Repr leader roles)
               (if (null? roles)

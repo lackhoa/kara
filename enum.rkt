@@ -8,38 +8,40 @@
          (all-from-out "types.rkt")
          (all-from-out "mole.rkt"))
 
-; RNG for the enumeration
-(def (take-random ls from-ten)
-  (if (= from-ten 10)
-      ls
-    (let ([result null])
-      (for-each
-        (lam (item)
-           (when (< (random 10)
-                    from-ten)
-             (cons! item result)))
-        ls)
-      result)))
+; Ions are molecules that haven't been fully enumerated.
+(struct Ions ([ions #:mutable]))
 
 ; Iterative Deepening Search
 (def (enum1 mole)
-  (let loop ([cutoff 10])
+  (let loop ([cutoff 4])
     (match (enum-co mole cutoff)
-      ; Got cut-off: double the cutoff limit
-      ['CUT-OFF
-       (loop (* 2 cutoff))]
-
       ; Impossible to find a value
-      ['NO-VALUE
+      [(Ions '())
        'NO-VALUE]
+
+      ; Still got potential ions
+      [(Ions ions)
+       (printf "Ions: ~s\n" (length ions))
+       ; Document it
+       (call-with-output-file "data"
+         #:exists 'truncate
+         (lam (out-port)
+           (for-each (lam (ion)
+                       (pdisplay ion out-port 35)
+                       (newline out-port))
+                     ions)))
+       ; Double the cutoff limit
+       (loop (+ cutoff 1))]
 
       ; Got a value
       [result
        result])))
 
-; Returns: a single complete molecule,
-; or CUT-OFF, or NO-VALUE.
+; Returns: a single complete molecule, or ions.
+; or NO-VALUE.
 (def (enum-co mole cutoff)
+  (def ions (Ions null))
+
   ; We keep track of the molecules we've worked on
   ; by tagging them with the "expanded" role.
   ; `p` is a path.
@@ -62,7 +64,8 @@
                     (send m get-roles))))))
 
   (cond
-    [(<= cutoff 0) 'CUT-OFF]
+    [(<= cutoff 0)
+     (Ions (list mole))]
 
     [else
      ; WORK BEGINS: Find a molecule to work with.
@@ -81,17 +84,20 @@
                    (send mole ref pfocus)])
              (match* ((send mfocus get-ctor)
                       (send mfocus get-type))
-               ; No idea what this is.
-               [('?DATA '?DATA) (recur)]
-
-               ; We know the type, not the constructor.
-               [('?DATA _) pfocus]
+               ; We know it's an entailment,
+               ; not sure about the constructor.
+               [('?DATA (== entailment eq?))
+                pfocus]
 
                ; We know the constructor already.
-               [(_ _)
+               [(_ (== entailment eq?))
                 (match (expanded? pfocus)
                   [#f pfocus]
-                  [#t (recur)])])))))
+                  [#t (recur)])]
+
+               ; Not an entailment, not our job
+               [(_ _)
+                (recur)])))))
 
      (match next-target
        ; Good news.
@@ -99,8 +105,6 @@
         mole]
 
        [target
-        (def cutoff-flag #f)
-
         (let/cc escape
           (for-each
             (lam (new-mole)
@@ -111,20 +115,17 @@
                             #t)
               (match (enum-co new-mole
                               (- cutoff 1))
-                ['NO-VALUE
-                 (void)]
-
-                ['CUT-OFF
-                 (set! cutoff-flag
-                       #t)]
+                [(Ions new-ions)
+                 (set-Ions-ions! ions
+                   (append (Ions-ions ions)
+                           new-ions))]
 
                 [result
                  (escape result)]))
             (expand mole target))
 
-          (if cutoff-flag
-              'CUT-OFF
-            'NO-VALUE))])]))
+          ; End of the loop, found nothing.
+          ions)])]))
 
 ; Returns: a (possibly empty) list of consistent molecules,
 ; whose constructors are finalized (and unique).
