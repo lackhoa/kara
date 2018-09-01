@@ -23,9 +23,9 @@
                 parent-ticks
                 new-ticks
                 (lam (value ticks-left)
-                  (escape (lam () (complete value ticks-left))))
+                  (escape (thunk (complete value ticks-left))))
                 (lam (resume-engine)
-                  (escape (lam () (expire resume-engine)))))))))))
+                  (escape (thunk (expire resume-engine)))))))))))
 
 ; This procedure intelligently handles the clock (and the stack)
 ; to works out the differences between parent and child

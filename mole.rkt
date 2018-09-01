@@ -341,11 +341,11 @@
         ['NOT-FOUND
          (expand path)
          (send (ref path)
-           update val (lam () (fail-con)))]
+           update val fail-con)]
 
         [kid
          (send kid
-           update val (lam () (fail-con)))]))
+           update val fail-con)]))
 
     ; Short-hand for the short-hand that is update-path.
     (define/public (update-role role
@@ -443,7 +443,7 @@
               (lam (role c)
                 (send c
                   sync (send m-other refr role)
-                       (lam () (escape 'CONFLICT)))))))
+                       (thunk (escape 'CONFLICT)))))))
       (when (eq? result 'CONFLICT)
         (fail-con)))
 

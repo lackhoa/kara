@@ -168,7 +168,7 @@
 
   (let/cc escape
     (def get-me-out
-      (lam () (escape 'CONFLICT)))
+      (thunk (escape 'CONFLICT)))
 
     (for-each
       (lam (recs-iter)

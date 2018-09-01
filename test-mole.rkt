@@ -56,7 +56,7 @@
 (check-equal?
  (send (send a refr 'b)
    sync (send a refr 'c)
-        (lam () "Will fail!"))
+        (thunk "Will fail!"))
  "Will fail!")
 
 
@@ -87,7 +87,7 @@ m2
 (check-equal? (send m2
                 update-path '(h q)
                             Q
-                            (lam () "Now we fail"))
+                            (thunk "Now we fail"))
               "Now we fail")
 
 (test-case

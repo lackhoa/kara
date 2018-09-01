@@ -42,7 +42,7 @@
   (stro-core
     (map (lam (stream)
            (Pair (proc->engine
-                   (lam () (stream-first stream)))
+                   (thunk (stream-first stream)))
                  stream))
          (remq empty-stream streams))
     'NOT-YET-COMPUTED))
@@ -78,7 +78,7 @@
              (set-stro-core-next! stro
                (stro-core
                  (cons (Pair (proc->engine
-                               (lam () (stream-ref pstream 1)))
+                               (thunk (stream-ref pstream 1)))
                              (_stream-rest pstream))
                        others)
                  'NOT-YET-COMPUTED)))

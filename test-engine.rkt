@@ -3,9 +3,9 @@
          "engine.rkt")
 
 (def eng
-  (proc->engine (tlam () 3)))
+  (proc->engine (thunk 3)))
 
-"tlam () 3"
+"thunk 3"
 (eng 8
   ; Complete: Return ticks remaining and value.
   list
@@ -21,7 +21,7 @@
 
 (def fib-eng
   (proc->engine
-    (lam ()
+    (thunk
       (fib 10))))
 
 (def (mileage thunk)
@@ -36,7 +36,7 @@
   (loop (proc->engine thunk) 0))
 
 "Mileage of fib"
-; (mileage (lam () (fib 10)))
+; (mileage (thunk (fib 10)))
 
 (def (print-even)
   (for-each (tlam (x) (printf "~s\n" x))
@@ -61,7 +61,7 @@
                (lappend (cdr engs) (list eng))))))))
 
 (def rr-engine
-  (proc->engine (lam ()
+  (proc->engine (thunk
                  (round-robin (list even-engine odd-engine)))))
 
 (def where-we-left-off null)
