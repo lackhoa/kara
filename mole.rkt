@@ -83,28 +83,87 @@
         "Kid is a molecule")
       (check-eq? data '?DATA
         "This is not an atom")
+
       (cons! (cons role mole)
              kids))
 
     (define/public (repr)
+      (repr-core (get-repr-env null)))
+
+    ; Sort out which variables are
+    ; represented by which symbol.
+    (define/public (get-repr-env old-env)
       (match* (data kids)
-        ; Totally unsure whether this is a structure or an atom.
-        [('?DATA '()) '?]
+        ; This is an unknown variable.
+        [('?DATA (list))
+         (let loop ([envi old-env])
+           (match envi
+             [(list)
+              (let ([new-symbol
+                     (integer->char (+ 65
+                                       (length old-env)))])
+                (cons (cons sync-ls
+                            new-symbol)
+                      old-env))]
+
+             [(cons first rest)
+              (match (assq this first)
+                [#f  (loop rest)]
+                ; No change to the environment
+                [any old-env])]))]
 
         ; This is an atom
-        [(_ '()) data]
+        [(_ (list))
+         old-env]
+
+        ; This is a molecule
+        [('?DATA _)
+         (let ([new-env old-env])
+           (for-each
+             (lam (kid)
+               (set! new-env
+                 (send kid get-env new-env)))
+             kids)
+           ; Return the accumulated environment
+           new-env)]
+
+        ; Illegal state
+        [(_ _)
+         (error "Branches cannot have data" data)]))
+
+    ; `env`: sync list -> name entry
+    (define/public (repr-core env)
+      (match* (data kids)
+        ; This is an unknown variable.
+        [('?DATA (list))
+         (let loop ([envi env])
+           (match envi
+             [(list)
+              (error "Repr code is wrong")]
+
+             [(cons first rest)
+              (match (assq this first)
+                [#f  (loop rest)]
+                [any any])]))]
+
+        ; This is an atom
+        [(_ (list))
+         data]
 
         ; This is a molecule.
         [('?DATA _)
          (match (get-ctor)
           ; Unknown constructor
           ['?DATA
-           (filter-not
-             (lam (kid)
-               (case (car kid)
-                 [(type ctor) #t]
-                 [else        #f]))
-             kids)]
+           (map
+            (lam (m)
+              (send m repr-core env))
+            (filter
+              (lam (kid)
+                (case (car kid)
+                  [(type ctor) #f]
+                  [else        #t]))
+              kids))]
 
           ; Known constructor
           [(Ctor repr _ _ _)
@@ -116,7 +175,8 @@
                       (map (lam (role)
                              (match (refr role)
                                ['NOT-FOUND '?]
-                               [kid (send kid repr)]))
+                               [kid
+                                (send kid repr-core env)]))
                            roles)))])])]
 
         ; Non-trivial data and kids.
