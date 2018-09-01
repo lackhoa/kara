@@ -27,7 +27,7 @@
          #:exists 'truncate
          (lam (out-port)
            (for-each (lam (ion)
-                       (pdisplay ion out-port 35)
+                       (pdisplay ion 35 out-port)
                        (newline out-port))
                      ions)))
        ; Double the cutoff limit

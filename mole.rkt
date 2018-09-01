@@ -106,23 +106,24 @@
                             new-symbol)
                       old-env))]
 
-             [(cons first rest)
-              (match (assq this first)
+             [(cons (cons mls _)
+                    rest)
+              (match (memq this mls)
                 [#f  (loop rest)]
                 ; No change to the environment
-                [any old-env])]))]
+                [_  old-env])]))]
 
         ; This is an atom
-        [(_ (list))
-         old-env]
+        [(_ (list))  old-env]
 
         ; This is a molecule
         [('?DATA _)
          (let ([new-env old-env])
            (for-each
-             (lam (kid)
+             (lam (kidp)
                (set! new-env
-                 (send kid get-env new-env)))
+                 (send (cdr kidp)
+                   get-repr-env new-env)))
              kids)
            ; Return the accumulated environment
            new-env)]
@@ -141,10 +142,16 @@
              [(list)
               (error "Repr code is wrong")]
 
-             [(cons first rest)
-              (match (assq this first)
-                [#f  (loop rest)]
-                [any any])]))]
+             [(cons (cons mlist symbol)
+                    rest)
+              (match (memq this mlist)
+                ; No match
+                [#f
+                 (loop rest)]
+
+                ; Match
+                [_
+                 symbol])]))]
 
         ; This is an atom
         [(_ (list))
@@ -156,18 +163,21 @@
           ; Unknown constructor
           ['?DATA
            (map
-            (lam (m)
-              (send m repr-core env))
-            (filter
-              (lam (kid)
-                (case (car kid)
-                  [(type ctor) #f]
-                  [else        #t]))
-              kids))]
+             (lam (pm)
+               ; Display also the roles.
+               (cons (car pm)
+                     (send (cdr pm)
+                       repr-core env)))
+             (filter
+               (lam (kid)
+                 (case (car kid)
+                   [(type ctor) #f]
+                   [else        #t]))
+               kids))]
 
           ; Known constructor
-          [(Ctor repr _ _ _)
-           (match repr
+          [(Ctor ctor-repr _ _ _)
+           (match ctor-repr
              [(Repr leader roles)
               (if (null? roles)
                   leader

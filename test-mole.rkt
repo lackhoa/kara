@@ -143,3 +143,33 @@ m2
   (check-eqv? (length (send (send m1 ref '(d a))
                         get-sync-ls))
               4))
+
+(test-case
+  "Intro to variables"
+  (def m (new mole%))
+  (displayln "This should be a variable")
+  m)
+
+(test-case
+  "Intro to variables 2"
+  (def m (new mole%))
+  (displayln "a and b should be the same")
+  (send m sync-path '(a) '(b))
+  m)
+
+(test-case
+  "Intro to variables 3"
+  (def m (new mole%))
+  (send m sync-path '(a) '(b))
+  (send m sync-path '(a) '(c d))
+  (send m update-role 'e '?DATA)
+  (displayln "a, b and d should  be the same")
+  (pdisplay m 25 (current-output-port)))
+
+(test-case
+  "Hard variable example"
+  (def m (new mole%))
+  (send m sync-path '(a) '(b c))
+  (send m sync-path '(e) '(b d))
+  (displayln "a, c and d, e should  be the same")
+  (pdisplay m 35 (current-output-port)))
