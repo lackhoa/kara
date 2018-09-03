@@ -69,8 +69,8 @@
    sync (send a refr 'f))
 
 (displayln "These two should be the same")
-(send a refr 'b)
-(send a refr 'f)
+(displayln (send a refr 'b))
+(displayln (send a refr 'f))
 
 "Try modifying f from somewhere else"
 (def m2 (new mole%))
@@ -78,9 +78,9 @@
 (send m2 update-path '(h i) T)
 
 (displayln "These three should be the same")
-(send a refr 'b)
-m2
-(send a refr 'f)
+(displayln (send a refr 'b))
+(displayln m2)
+(displayln (send a refr 'f))
 
 (send m2 update-path '(h q) R)
 (check-equal? (send m2
@@ -147,14 +147,14 @@ m2
   "Intro to variables"
   (def m (new mole%))
   (displayln "This should be a variable")
-  m)
+  (displayln m))
 
 (test-case
   "Intro to variables 2"
   (def m (new mole%))
-  (displayln "a and b should be the same")
+  (displayln "a, b and c, d should be the same")
   (send m sync-path '(a) '(b))
-  m)
+  (displayln m))
 
 (test-case
   "Intro to variables 3"

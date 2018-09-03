@@ -1,13 +1,12 @@
 #lang racket
 (require "lang/kara.rkt"
-         "types.rkt")
+         "types.rkt"
+         racket/hash)
 (provide (all-defined-out))
 
 ; ---------------------------------
 ; Molecules
 ; ---------------------------------
-
-(struct Forall (id))
 
 ; The failure continuation that you're
 ; confident not gonna be called.
@@ -22,7 +21,7 @@
     ; Fields
     (def data '?DATA)  ; '?DATA | constructor | Forall
 
-    (def kids null)
+    (def kids (make-hasheq))
 
     ; The sync list is synced among its items,
     ; and everything is synced with itself.
@@ -34,7 +33,7 @@
     (define/public (get-data)
       data)
     (define/public (get-roles)
-      (map car kids))
+      (hash-keys kids))
 
     (define/public (get-sync-ls)
       sync-ls)
@@ -53,13 +52,13 @@
 
     ; Setters
     (define/public (set-data val)
-      (match* (data val kids)
+      (match* (data val (get-roles))
         ; No new information
         [(_ '?DATA _)
          (void)]
 
         ; Can update
-        [(_ _ '())
+        [(_ _ (list))
          (set! data val)]
 
         ; Illegal state
@@ -79,74 +78,63 @@
       (check-eq? data '?DATA
         "This is not an atom")
 
-      (cons! (cons role mole)
-             kids))
+      (hash-set! kids role mole))
 
     (define/public (repr)
-      (repr-core (get-repr-env null)))
+      (repr-core
+        (car (get-repr-env))))
 
     ; Sort out which variables are
     ; represented by which symbol.
-    (define/public (get-repr-env old-env)
-      (match* (data kids)
+    (define/public (get-repr-env [env   (make-hasheq)]
+                                 [count 65])
+      (match* (data (get-roles))
         ; This is an unknown variable.
         [('?DATA (list))
-         (let loop ([envi old-env])
-           (match envi
-             [(list)
-              (let ([new-symbol
-                     (integer->char (+ 65
-                                       (length old-env)))])
-                (cons (cons sync-ls
-                            new-symbol)
-                      old-env))]
+         (match (hash-ref env
+                          this
+                          'UNBOUND)
+           ['UNBOUND
+            (let ([new-symbol
+                   (integer->char count)])
+              (for-each
+                (lam (m)
+                  (hash-set! env
+                             m
+                             new-symbol))
+                sync-ls))
+            (set! count (+ 1 count))]
 
-             [(cons (cons mls _)
-                    rest)
-              (match (memq this mls)
-                [#f  (loop rest)]
-                ; No change to the environment
-                [_  old-env])]))]
+           ; No change to the environment
+           [_ (void)])]
 
         ; This is an atom
-        [(_ (list))  old-env]
+        [(_ (list)) (void)]
 
         ; This is a molecule
         [('?DATA _)
-         (let ([new-env old-env])
-           (for-each
-             (lam (kidp)
-               (set! new-env
-                 (send (cdr kidp)
-                   get-repr-env new-env)))
-             kids)
-           ; Return the accumulated environment
-           new-env)]
+         (hash-for-each kids
+           (lam (role kid)
+             (set! count
+               (cdr
+                 (send kid
+                   get-repr-env env count)))))]
 
         ; Illegal state
         [(_ _)
-         (error "Branches cannot have data" data)]))
+         (error "Branches cannot have data" data)])
+
+      ; Finally, returns the modified environment
+      (cons env count))
 
     ; `env`: sync list -> name entry
     (define/public (repr-core env)
-      (match* (data kids)
+      (match* (data (get-roles))
         ; This is an unknown variable.
         [('?DATA (list))
-         (let loop ([envi env])
-           (match envi
-             [(list)
-              (error "Repr code is wrong")]
-
-             [(cons (cons mlist symbol)
-                    rest)
-              (match (memq this mlist)
-                ; No match
-                [#f
-                 (loop rest)]
-
-                ; Match
-                [_
-                 symbol])]))]
+         (hash-ref env
+                   this
+                   (thunk (error "Repr code is wrong")))]
 
         ; This is an atom
         [(_ (list))
@@ -158,17 +146,14 @@
           ; Unknown constructor
           ['?DATA
            (map
-             (lam (pm)
+             (lam (role)
                ; Display also the roles.
-               (cons (car pm)
-                     (send (cdr pm)
+               (cons role
+                     (send (refr role)
                        repr-core env)))
-             (filter
-               (lam (kid)
-                 (case (car kid)
-                   [(type ctor) #f]
-                   [else        #t]))
-               kids))]
+             (filter-not (lam (role)
+                           (memq role '(type ctor)))
+                     (get-roles)))]
 
           ; Known constructor
           [(Ctor ctor-repr _ _ _)
@@ -196,9 +181,9 @@
 
     ; Like `ref`, but reference a direct kid
     (define/public (refr role)
-      (let ([lu (assq role kids)])
-        (cond [lu (cdr lu)]
-              [else 'NOT-FOUND])))
+      (hash-ref kids
+                role
+                'NOT-FOUND))
 
     ; Reference a descendant.
     (define/public (ref path)
@@ -208,7 +193,7 @@
           ['NOT-FOUND 'NOT-FOUND]
 
           [kid (send kid
-                   ref (cdr path))])))
+                 ref (cdr path))])))
 
     ; Reference the data of a kid.
     (define/public (ref-data path)
@@ -235,61 +220,53 @@
     ; Order the kids to do something.
     ; `task` takes a role and a molecule
     (define-syntax-rule (recur task)
-      (for-each
-        (lam (role)
-          (task role (refr role)))
-        (get-roles)))
+      (hash-for-each kids
+        (lam (role kid)
+          (task role kid))))
 
     ; Returns a mapping of the originals to their copies,
     ; without the sync list.
     ; By 'the originals', I mean every single node in the tree.
     (define/public (clone-map)
-      ; `env` holds the result.
-      (let ([env null]
-            [new-me (new mole%)])
+      ; `the-map` holds the result.
+      (let ([the-map (make-hasheq)]
+            [new-me  (new mole%)])
+        ; Clone the data
         (send new-me update data)
 
-        ; Add the kids
-        (for-each
-          (lam (pair)
-            (let* ([role (car pair)]
-                   [kid (cdr pair)]
-                   [cp-res (send kid clone-map)])
-              (let ([lu (assq kid cp-res)])
-                (check-not-false lu
-                  "`clone-map` does include the root.")
-                (send new-me
-                  add-kid role (cdr lu)))
-              ; Since molecules are trees,
-              ; there won't be any conflict.
-              (set! env (append env cp-res))))
-          kids)
+        ; Work with the kids
+        (hash-for-each kids
+          (lam (role kid)
+            (let* ([cp-res (send kid clone-map)]
+                   [lu     (hash-ref cp-res kid)])
+              ; Add the kids for `new-me`
+              (send new-me
+                add-kid role lu)
+              ; Change `the-map`
+              (hash-union! the-map cp-res))))
         ; Don't forget to map itself.
-        (cons (cons this new-me)
-              env)))
+        (hash-set! the-map this new-me)
+        the-map))
 
     ; The complete cloning interface (works for the root)
+    ; This is a major time consumer, be efficient.
     (define/public (copy)
       (let ([cns (clone-map)])
-        (for-each
-          (lam (pair)
-            (def orig (car pair))
-            (def clone (cdr pair))
+        (hash-for-each cns
+          (lam (orig clone)
             (send clone
               ; Translate the entire sync list
               ; to the copied version.
               set-sync-ls
                 (map
                   (lam (m)
-                    (let ([lu (assq m cns)])
-                      (check-not-false lu
-                        "Sync list contains only \
-                         descendants of this molecule.")
-                      (cdr lu)))
-                  (send orig get-sync-ls))))
-          cns)
+                    (hash-ref cns
+                              m
+                              (thunk
+                                (error "Sync list contains non-descendants." this))))
+                  (send orig get-sync-ls)))))
         ; This will return the root's copy.
-        (cdr (assq this cns))))
+        (hash-ref cns this)))
 
     ; Keep adding new kids
     ; until the path is exhausted.
@@ -445,6 +422,15 @@
 
           ; Nope, the data are inconsistent.
           [(_ _) (fail-con)])))
+
+
+    ; Like sync, but the only difference is that
+    ; it doesn't have an impact on `m-other`
+    (define/public (unify m-other
+                          [fail-con no-fail])
+      (let ([m-other-clone
+             (send m-other copy)])
+        (sync m-other fail-con)))
 
 
     ; Sync two descendants of this molecules.
