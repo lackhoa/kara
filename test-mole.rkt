@@ -5,6 +5,7 @@
          rackunit)
 
 "Elementary stuff"
+
 (def m1 (new mole%))
 
 (send m1 update-role 'd W)
@@ -81,8 +82,6 @@
 m2
 (send a refr 'f)
 
-
-"Fail update-path"
 (send m2 update-path '(h q) R)
 (check-equal? (send m2
                 update-path '(h q)

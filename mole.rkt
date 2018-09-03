@@ -7,31 +7,26 @@
 ; Molecules
 ; ---------------------------------
 
+(struct Forall (id))
+
 ; The failure continuation that you're
 ; confident not gonna be called.
 (def (no-fail)
   (error "I did not expect this to fail!"))
 
 (def mole%
-  (class* object%
-          (writable<%>)
+  (class* object% (writable<%>)
     ; Initializer
     (super-new)
 
-    ; Initialization parameters
-    (init [data-i    '?DATA])
-    (init [kids-i    null])
-    (init [sync-ls-i null])
-
     ; Fields
-    (def data data-i)
+    (def data '?DATA)  ; '?DATA | constructor | Forall
 
-    (def kids kids-i)
+    (def kids null)
 
     ; The sync list is synced among its items,
     ; and everything is synced with itself.
-    (def sync-ls
-      (cons this sync-ls-i))
+    (def sync-ls (list this))
 
     ; Getters
     (define/public (get-kids)
@@ -251,8 +246,9 @@
     (define/public (clone-map)
       ; `env` holds the result.
       (let ([env null]
-            [new-me
-             (new mole% [data-i data])])
+            [new-me (new mole%)])
+        (send new-me update data)
+
         ; Add the kids
         (for-each
           (lam (pair)
@@ -381,71 +377,74 @@
       (check-class m-other mole%
         "Expected a molecule")
 
-      (def result
-        (let/ec escape
-          (when (memq m-other sync-ls)
-            (escape 'ALREADY-SYNCED))
+      (unless (memq m-other sync-ls)
+        ; Fact: The two sync sets are mutually exclusive
+        ; Start out with syncing data
+        (def other-data
+          (send m-other get-data))
+        (match* (data other-data)
+          ; Both can be structures
+          [('?DATA '?DATA)
+           ; Add the missing kids
+           (def result
+             (let/ec escape
+               (let ([our-roles
+                      (list->seteq (get-roles))]
+                     [their-roles
+                      (list->seteq
+                        (send m-other get-roles))])
+                 ; Add the missing kids for us
+                 (set-for-each
+                   (set-subtract their-roles
+                                 our-roles)
+                   (lam (role)
+                     (update-role role '?DATA)))
 
-          ; Fact: The two sync sets are mutually exclusive
-          ; Start out with syncing data
-          (def other-data
-            (send m-other get-data))
-          (match* (data other-data)
-            ; No conflict on the top level
-            [(x x) (void)]
+                 ; Same thing for the other guy
+                 (set-for-each
+                   (set-subtract our-roles their-roles)
+                   (lam (role)
+                     (send m-other
+                       update-role role '?DATA))))
 
-            ; `m-other` has new intel for us
-            [('?DATA _)
-             (update other-data)]
+               ; Establish the connection among the top-level.
+               ; Note that we don't cascade here,
+               ; to preserve symmetry the recursive calls.
+               (let ([merge
+                      (append sync-ls
+                              (send m-other get-sync-ls))])
+                 (set-sync-ls merge)
+                 (inform
+                   (lam (m)
+                     (send m set-sync-ls merge))))
 
-            ; We have new intel for `m-other`
-            [(_ '?DATA)
-             (send m-other update data)]
+               ; Our work is over: Recursively let all the kids sync.
+               (check-eqv? (length (get-roles))
+                           (length (send m-other get-roles))
+                           "The structures are synced.")
 
-            ; Nope, the data are inconsistent.
-            [(_ _) (escape 'CONFLICT)])
+               (recur
+                 (lam (role c)
+                   (send c
+                     sync (send m-other refr role)
+                          (thunk (escape 'CONFLICT)))))))
 
-            ; Add the missing kids
-            (let ([our-roles
-                   (list->seteq (get-roles))]
-                  [their-roles
-                   (list->seteq (send m-other get-roles))])
-              ; Add the missing kids for us
-              (set-for-each
-                (set-subtract their-roles our-roles)
-                (lam (role)
-                  (update-role role '?DATA)))
+           (when (eq? result 'CONFLICT)
+             (fail-con))]
 
-              ; Same thing for the other guy
-              (set-for-each
-                (set-subtract our-roles their-roles)
-                (lam (role)
-                  (send m-other
-                    update-role role '?DATA))))
+          ; Both are consistent atoms
+          [(x x) (void)]
 
+          ; `m-other` has new data for us
+          [('?DATA _)
+           (update other-data)]
 
-            ; Establish the connection among the top-level.
-            ; Note that we don't cascade here,
-            ; to preserve symmetry the recursive calls.
-            (let ([merge
-                   (append sync-ls
-                           (send m-other get-sync-ls))])
-              (set-sync-ls merge)
-              (inform
-                (lam (m)
-                  (send m set-sync-ls merge))))
+          ; We have new data for `m-other`
+          [(_ '?DATA)
+           (send m-other update data)]
 
-            ; Our work is over: Recursively let all the kids sync.
-            (check-eqv? (length (get-roles))
-                        (length (send m-other get-roles))
-                        "The structures are synced.")
-            (recur
-              (lam (role c)
-                (send c
-                  sync (send m-other refr role)
-                       (thunk (escape 'CONFLICT)))))))
-      (when (eq? result 'CONFLICT)
-        (fail-con)))
+          ; Nope, the data are inconsistent.
+          [(_ _) (fail-con)])))
 
 
     ; Sync two descendants of this molecules.
