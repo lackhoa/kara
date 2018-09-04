@@ -8,40 +8,8 @@
          (all-from-out "types.rkt")
          (all-from-out "mole.rkt"))
 
-; Ions are molecules that haven't been fully enumerated.
-(struct Ions ([ions #:mutable]))
-
-; Iterative Deepening Search
-(def (enum1 mole)
-  (let loop ([cutoff 4])
-    (match (enum-co mole cutoff)
-      ; Impossible to find a value
-      [(Ions '())
-       'NO-VALUE]
-
-      ; Still got potential ions
-      [(Ions ions)
-       (printf "Ions: ~s\n" (length ions))
-       ; Document it
-       (call-with-output-file "data"
-         #:exists 'truncate
-         (lam (out-port)
-           (for-each (lam (ion)
-                       (pdisplay ion 35 out-port)
-                       (newline out-port))
-                     ions)))
-       ; Double the cutoff limit
-       (loop (+ cutoff 1))]
-
-      ; Got a value
-      [result
-       result])))
-
-; Returns: a single complete molecule, or ions.
-; or NO-VALUE.
-(def (enum-co mole cutoff)
-  (def ions (Ions null))
-
+; Returns: a single complete molecule, or NO-VALUE.
+(def (general-search mole queue-fn)
   ; We keep track of the molecules we've worked on
   ; by tagging them with the "expanded" role.
   ; `p` is a path.
@@ -63,69 +31,68 @@
              (remq* '(expanded ctor type)
                     (send m get-roles))))))
 
-  (cond
-    [(<= cutoff 0)
-     (Ions (list mole))]
+  ; WORK BEGINS: Find a molecule to work with.
+  ; Returns: a path | 'NO-MORE-TARGETS.
+  (let loop ([nodes (list mole)])
+    (displayln nodes)
+    (match nodes
+      [(list)  'NO-VALUE]
 
-    [else
-     ; WORK BEGINS: Find a molecule to work with.
-     ; Returns: a path | 'NO-MORE-TARGETS.
-     (def next-target
-       (let loop ([lvl-stream
-                   (level-iter mole)])
-         (def (recur)
-           (loop (stream-rest lvl-stream)))
+      [(cons mfocus mrest)
+       (def next-target
+         (let loop ([lvl-stream
+                     (level-iter mfocus)])
+           (def (recur)
+             (loop (stream-rest lvl-stream)))
 
-         (if (stream-empty? lvl-stream)
-             'NO-MORE-TARGETS
-           (let* ([pfocus
-                   (stream-first lvl-stream)]
-                  [mfocus
-                   (send mole ref pfocus)])
-             (match* ((send mfocus get-ctor)
-                      (send mfocus get-type))
-               ; We know it's an entailment,
-               ; not sure about the constructor.
-               [('?DATA (== entailment eq?))
-                pfocus]
+           (if (stream-empty? lvl-stream)
+               'NO-MORE-TARGETS
+             (let* ([pfocus
+                     (stream-first lvl-stream)]
+                    [mfocus
+                     (send mfocus ref pfocus)])
+               (match* ((send mfocus get-ctor)
+                        (send mfocus get-type))
+                 ; We know it's an entailment,
+                 ; not sure about the constructor.
+                 [('?DATA (== entailment eq?))
+                  pfocus]
 
-               ; We know the constructor already.
-               [(_ (== entailment eq?))
-                (match (expanded? pfocus)
-                  [#f pfocus]
-                  [#t (recur)])]
+                 ; We know the constructor already.
+                 [(_ (== entailment eq?))
+                  (match (expanded? pfocus)
+                    [#f pfocus]
+                    [#t (recur)])]
 
-               ; Not an entailment, not our job
-               [(_ _)
-                (recur)])))))
+                 ; Not an entailment, not our job
+                 [(_ _)
+                  (recur)])))))
 
-     (match next-target
-       ; Good news.
-       ['NO-MORE-TARGETS
-        mole]
+       (match next-target
+         ; Good news.
+         ['NO-MORE-TARGETS  mfocus]
 
-       [target
-        (let/cc escape
-          (for-each
-            (lam (new-mole)
-              ; Tag it so we don't expand it in the future.
-              (send new-mole
-                update-path (pad target
-                                 'expanded)
-                            #t)
-              (match (enum-co new-mole
-                              (- cutoff 1))
-                [(Ions new-ions)
-                 (set-Ions-ions! ions
-                   (append (Ions-ions ions)
-                           new-ions))]
+         [target
+          (let ([new-moles
+                 (expand mfocus target)])
+            (for-each
+              (lam (new-mole)
+                ; Tag it so we don't expand it in the future.
+                (send new-mole
+                  update-path (pad target
+                                   'expanded)
+                              #t))
+              new-moles)
 
-                [result
-                 (escape result)]))
-            (expand mole target))
+            (loop (queue-fn mrest
+                            new-moles)))])])))
 
-          ; End of the loop, found nothing.
-          ions)])]))
+(def (bfs mole)
+  (general-search mole append))
+
+(def (dfs mole)
+  (general-search mole (flip append)))
+
 
 ; Returns: a (possibly empty) list of consistent molecules,
 ; whose constructors are finalized (and unique).

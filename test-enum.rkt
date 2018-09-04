@@ -4,16 +4,15 @@
          "enum.rkt"
          "engine.rkt")
 
-(def (enum-test)
-  ; Now, we assume these symbols to be
-  ; well-formed formulas (they aren't).
+(def (enum)
   (def m (new mole%))
   (send m
     update-role 'type wf)
 
-  (enum1 m))
+  (bfs m))
 
-;; (enum-test)
+(check-class (enum)
+             mole%)
 
 (def (proof1)
   (def m (new mole%))
@@ -25,7 +24,7 @@
     (ccs_ante  A)
     (ccs_csq   A))
 
-  (enum1 m))
+  (bfs m))
 
 ;; (proof1)
 
@@ -47,9 +46,9 @@
     (ccs_csq_ante       A)
     (ccs_csq_csq        B))
 
-  (enum1 m))
+  (bfs m))
 
-(AW-proof)
+;; (AW-proof)
 
 ; A -> ((A -> B) -> B)
 (def (reverse-proof)
@@ -66,6 +65,6 @@
     (ccs_csq_ante_csq   B)
     (ccs_csq_csq        B))
 
-  (enum1 m))
+  (bfs m))
 
 ;; (reverse-proof)
