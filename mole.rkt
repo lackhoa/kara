@@ -27,6 +27,10 @@
     ; and everything is synced with itself.
     (def sync-ls (list this))
 
+    ; The list of items we cannot sync with
+    ; it is NOT synced among the items of `sync-ls`.
+    (def no-sync (list))
+
     ; Getters
     (define/public (get-kids)
       kids)
@@ -65,10 +69,16 @@
         [(_ _ _)
          (error "A composite cannot have data")]))
 
-    (define/public (set-sync-ls value)
-      (check-pred pair? value
+    ; Note that this method can fail.
+    (define/public (set-sync-ls value fail-con)
+      (check-pred list? value
         "Sync list must be non-empty")
-      (set! sync-ls value))
+
+      (if (set-empty?
+            (set-intersect no-sync
+                           value))
+          (set! sync-ls value)
+        (fail-con)))
 
     (define/public (add-kid role mole)
       (check-pred symbol? role
@@ -79,6 +89,14 @@
         "This is not an atom")
 
       (hash-set! kids role mole))
+
+    ; This method is intended to be used
+    ; for setting up new molecules as proof goals,
+    (define/public (set-no-sync ls)
+      (if (set-empty? (set-intersect ls sync-ls))
+          (set! no-sync ls)
+        (error "SET-NO-SYNC -- Illegal state" sync-ls ls)))
+
 
     (define/public (repr)
       (repr-core
@@ -264,7 +282,8 @@
                               m
                               (thunk
                                 (error "Sync list contains non-descendants." this))))
-                  (send orig get-sync-ls)))))
+                  (send orig get-sync-ls))
+                no-fail)))
         ; This will return the root's copy.
         (hash-ref cns this)))
 
@@ -333,7 +352,8 @@
     (define/public (cascade path)
       ; Only work when we have something in the sync list.
       (when (and (not (null? path))
-                 (> (length sync-ls) 1))
+                 (> (length sync-ls)
+                    1))
         (let* ([role (car path)]
                [c    (refr role)])
           (check-class c mole%
@@ -344,7 +364,8 @@
           (send c
             set-sync-ls
               (map (lam (sy-i) (send sy-i refr role))
-                   sync-ls))
+                   sync-ls)
+              no-fail)
           ; Then let them carry over.
           (send c cascade (cdr path)))))
 
@@ -390,10 +411,16 @@
                (let ([merge
                       (append sync-ls
                               (send m-other get-sync-ls))])
-                 (set-sync-ls merge)
+                 (set-sync-ls merge
+                              (thunk (escape 'CANT-SYNC)))
+
+                 ; Since `sync-ls` now also includes molecules on
+                 ; 'the other side', we can inform them in one message.
                  (inform
                    (lam (m)
-                     (send m set-sync-ls merge))))
+                     (send m
+                       set-sync-ls merge
+                                   (thunk (escape 'CANT-SYNC)))))
 
                ; Our work is over: Recursively let all the kids sync.
                (check-eqv? (length (get-roles))
@@ -404,9 +431,10 @@
                  (lam (role c)
                    (send c
                      sync (send m-other refr role)
-                          (thunk (escape 'CONFLICT)))))))
+                          (thunk (escape 'CONFLICT))))))))
 
-           (when (eq? result 'CONFLICT)
+           (when (memq result
+                       '(CONFLICT CANT-SYNC))
              (fail-con))]
 
           ; Both are consistent atoms
@@ -432,7 +460,6 @@
              (send m-other copy)])
         (sync m-other fail-con)))
 
-
     ; Sync two descendants of this molecules.
     ; If they don't exist, expand them.
     (define/public (sync-path p1
@@ -444,7 +471,25 @@
         (expand p2))
 
       (send (ref p1)
-        sync (ref p2) fail-con))))
+        sync (ref p2) fail-con))
+
+
+    ; Do not let these molecules sync with each other.
+    ; (note: overwrites existing no-sync policies)
+    (define/public (distinguish-paths paths)
+      (let ([moles null])
+        (for ([p paths])
+          (match (ref p)
+            ['NOT-FOUND
+             (expand p)
+             (cons! (ref p) moles)]
+
+            [m  (cons! m moles)]))
+
+        (for ([m moles])
+          (send m
+            set-no-sync (remq m
+                              moles)))))))
 
 
 ; Update the constructor of multiple paths of a molecule.
