@@ -152,13 +152,6 @@
 (test-case
   "Intro to variables 2"
   (def m (new mole%))
-  (displayln "a, b and c, d should be the same")
-  (send m sync-path '[a] '[b])
-  (displayln m))
-
-(test-case
-  "Intro to variables 3"
-  (def m (new mole%))
   (send m sync-path '[a] '[b])
   (send m sync-path '[a] '[c d])
   (send m update-role 'e '?DATA)
