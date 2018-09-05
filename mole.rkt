@@ -38,6 +38,9 @@
       data)
     (define/public (get-roles)
       (hash-keys dic))
+    (define/public (get-kids)
+      (hash-values dic))
+
 
     (define/public (get-sync-ls)
       sync-ls)
@@ -70,15 +73,21 @@
          (error "A composite cannot have data")]))
 
     ; Note that this method can fail.
-    (define/public (set-sync-ls value fail-con)
-      (check-pred list? value
+    (define/public (set-sync-ls ls fail-con)
+      (check-pred list? ls
         "Sync list must be non-empty")
 
-      (if (set-empty?
-            (set-intersect no-sync
-                           value))
-          (set! sync-ls value)
-        (fail-con)))
+      (cond [(exists? (lam (m) (check-descendant? m))
+                     ls)
+             (fail-con)]
+            ; Cycle checks
+
+            [(set-empty?
+               (set-intersect no-sync
+                              ls))
+             (set! sync-ls ls)]
+
+            [else (fail-con)]))
 
     (define/public (add-kid role mole)
       (check-pred symbol? role
@@ -96,6 +105,20 @@
       (if (set-empty? (set-intersect ls sync-ls))
           (set! no-sync ls)
         (error "SET-NO-SYNC -- Illegal state" sync-ls ls)))
+
+
+    (define/public (check-descendant? mole)
+      (trace-let loop ([ks  (get-kids)])
+        (match ks
+          [(list)  #f]
+
+          [(cons kfocus krest)
+           (match (send kfocus get-kids)
+             [(list)  (or (eq? mole kfocus)
+                          (loop krest))]
+             [_  (or (send kfocus
+                       check-descendant? mole)
+                     (loop krest))])])))
 
 
     (define/public (repr)
@@ -136,12 +159,11 @@
 
         [(or 'KNOWN-STRUCT
              'UNKNOWN-STRUCT)
-         (hash-for-each dic
-           (lam (role kid)
-             (match (send kid
-                      get-repr-env env count)
-              [(cons _ c)
-               (set! count c)])))])
+         (recur (lam (role kid)
+                  (match (send kid
+                           get-repr-env env count)
+                   [(cons _ c)
+                    (set! count c)])))])
 
       ; Finally, returns the modified environment
       (cons env count))
@@ -304,7 +326,7 @@
     ; `fail-con`: the function to in case of inconsistency.
     (define/public (update val
                            [fail-con no-fail])
-      (when (neq? data val)
+      (unless (eq? data val)
         (match data
           ['?DATA
            (set-data val)
@@ -359,6 +381,7 @@
           ; Then let them carry over.
           (send c cascade (cdr path)))))
 
+
     ; Sync up two molecules that haven't been synced before
     (define/public (sync m-other
                          [fail-con no-fail])
@@ -370,17 +393,16 @@
         ; Start out with syncing data
         (def other-data
           (send m-other get-data))
+
         (match* (data other-data)
           ; Both can be structures
           [('?DATA '?DATA)
            ; Add the missing kids
            (def result
              (let/ec escape
-               (let ([our-roles
-                      (list->seteq (get-roles))]
-                     [their-roles
-                      (list->seteq
-                        (send m-other get-roles))])
+               (let ([our-roles    (list->seteq (get-roles))]
+                     [their-roles  (list->seteq
+                                     (send m-other get-roles))])
                  ; Add the missing kids for us
                  (set-for-each
                    (set-subtract their-roles
@@ -390,14 +412,17 @@
 
                  ; Same thing for the other guy
                  (set-for-each
-                   (set-subtract our-roles their-roles)
+                   (set-subtract our-roles
+                                 their-roles)
                    (lam (role)
                      (send m-other
                        update-role role '?DATA))))
 
-               ; Establish the connection among the top-level.
-               ; Note that we don't cascade here,
-               ; to preserve symmetry the recursive calls.
+               ; Establish the syncing among the top-level.
+               ; Note that we do not cascade to preserve the
+               ; symmetry of the following recursive calls.
+               ; This can fail: either because of a user constraint,
+               ; or a cycle (syncing with one of its descendant).
                (let ([merge
                       (append sync-ls
                               (send m-other get-sync-ls))])
@@ -406,28 +431,22 @@
 
                  ; Since `sync-ls` now also includes molecules on
                  ; 'the other side', we can inform them in one message.
-                 (inform
-                   (lam (m)
-                     (send m
-                       set-sync-ls merge
-                                   (thunk (escape 'CANT-SYNC)))))
+                 (inform (lam (m)
+                           (send m
+                             set-sync-ls merge
+                                         (thunk (escape 'CANT-SYNC))))))
 
                ; Our work is over: Recursively let all the kids sync.
-               (check-eqv? (length (get-roles))
-                           (length (send m-other get-roles))
-                           "The structures are synced.")
-
-               (recur
-                 (lam (role c)
-                   (send c
-                     sync (send m-other refr role)
-                          (thunk (escape 'CONFLICT))))))))
+               (recur (lam (role c)
+                        (send c
+                          sync (send m-other refr role)
+                               (thunk (escape 'CONFLICT)))))))
 
            (when (memq result
                        '(CONFLICT CANT-SYNC))
              (fail-con))]
 
-          ; Both are consistent atoms
+          ; They're consistent atoms
           [(x x) (void)]
 
           ; `m-other` has new data for us
@@ -459,7 +478,6 @@
         (expand p1))
       (when (eq? 'NOT-FOUND (ref p2))
         (expand p2))
-
       (send (ref p1)
         sync (ref p2) fail-con))
 

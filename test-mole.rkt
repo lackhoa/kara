@@ -5,7 +5,7 @@
          rackunit)
 
 ; "Elementary stuff"
-
+(display "What the fuck?")
 (def m1 (new mole%))
 
 (send m1 update-role 'd W)
@@ -66,7 +66,7 @@
 (send a update-path '[f g] V)
 
 (send (send a refr 'b)
-   sync (send a refr 'f))
+   sync (send a refr 'f) )
 
 (displayln "These two should be the same")
 (displayln (send a refr 'b))
@@ -181,3 +181,19 @@ m2
   (send m sync-path '[a] '[c])
   (check-equal? "Now it fails"
                 (send m sync-path '[c] '[b] (thunk "Now it fails"))))
+
+(test-case
+  "Display"
+  (def m (new mole%))
+  (send m update-role 'type wf)
+  (displayln "This should also be a variable")
+  m)
+
+(test-case
+  "Cyclic syncing detection"
+  (def m (new mole%))
+  (send m sync-path '[a] '[b c])
+  (check-equal? "Please fail!"
+                (send m
+                  sync-path '[a] '[b] (thunk "Please fail!")))
+  )

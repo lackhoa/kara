@@ -8,33 +8,29 @@
          (all-from-out "types.rkt")
          (all-from-out "mole.rkt"))
 
-; Returns: a single complete molecule, or NO-VALUE.
+; Returns: a single complete molecule, or 'NO-VALUE.
 (def (general-search mole queue-fn)
   ; We keep track of the molecules we've worked on
   ; by tagging them with the "expanded" role.
-  ; `p` is a path.
-  (def (expanded? p)
-    (match (send mole
-             ref (pad p 'expanded))
-      ['NOT-FOUND #f]
-      [_          #t]))
+  (def (expanded? path)
+    (neq? (send mole
+            ref (pad path 'expanded))
+          'NOT-FOUND))
 
   ; Returns: a stream of paths.
   (def (level-iter m [relative null])
-    (stream-cons
-      relative
-      (stream-interleave
-        (map (lam (role)
-               (level-iter (send m refr role)
-                           (pad relative role)))
-             ; `remq*` weeds out the data.
-             (remq* '(expanded ctor type)
-                    (send m get-roles))))))
+    (stream-cons relative
+                 (stream-interleave
+                   (map (lam (role)
+                          (level-iter (send m refr role)
+                                      (pad relative role)))
+                        ; `remq*` weeds out the data.
+                        (remq* '(expanded ctor type)
+                               (send m get-roles))))))
 
   ; WORK BEGINS: Find a molecule to work with.
   ; Returns: a path | 'NO-MORE-TARGETS.
   (let loop ([nodes (list mole)])
-    (displayln nodes)
     (match nodes
       [(list)  'NO-VALUE]
 
@@ -75,14 +71,12 @@
          [target
           (let ([new-moles
                  (expand mfocus target)])
-            (for-each
-              (lam (new-mole)
-                ; Tag it so we don't expand it in the future.
-                (send new-mole
-                  update-path (pad target
-                                   'expanded)
-                              #t))
-              new-moles)
+            (for-each (lam (new-mole)
+                        ; Tag it
+                        (send new-mole
+                          update-path (pad target 'expanded)
+                                      #t))
+                      new-moles)
 
             (loop (queue-fn mrest
                             new-moles)))])])))
@@ -134,9 +128,6 @@
   (check-timer)  ; This is a major time consumer
 
   (let/cc escape
-    (def get-me-out
-      (thunk (escape 'CONFLICT)))
-
     (for-each
       (lam (recs-iter)
         (match recs-iter
@@ -144,7 +135,7 @@
            (send mole
              update-path (list role 'type)
                          type
-                         get-me-out)]))
+                         (thunk (escape 'CONFLICT)))]))
       recs)
 
     (for-each
@@ -154,18 +145,18 @@
            (send mole
              update-path (pad path 'ctor)
                          constructor
-                         get-me-out)]))
+                         (thunk (escape 'CONFLICT)))]))
       forms)
 
     (for-each
       (lam (links-iter)
         (match links-iter
           [(SLink p1 p2)
+           (displayln "Stuck")
            (send mole
              sync-path p1
                        p2
-                       get-me-out)]))
+                       (thunk (escape 'CONFLICT)))]))
       links)
 
-    ; If we get here, then everything is fine.
     'OK))

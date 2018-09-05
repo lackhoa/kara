@@ -4,29 +4,27 @@
          "enum.rkt"
          "engine.rkt")
 
-(def (enum)
+(def (trivial)
   (def m (new mole%))
-  (send m
-    update-role 'type wf)
+  (send m update-role 'type wf)
 
   (bfs m))
 
-(check-class (enum)
-             mole%)
+;; (trivial)
 
 (def (proof1)
   (def m (new mole%))
   (send m
     update-role 'type entailment)
-
   (update-ctors m
-    (ccs       Implication)
-    (ccs_ante  A)
-    (ccs_csq   A))
+    (ccs Implication))
+  (send m
+    sync-path '[ccs ante]
+              '[ccs csq])
 
   (bfs m))
 
-;; (proof1)
+(proof1)
 
 ; If you don't have AB and AC, this proof is impossible
 ; (A -> (A -> B)) -> (A -> B)

@@ -116,7 +116,7 @@
   [macro-links
    (ccs_ante ccs_csq)])
 
-; => (A->B)->A
+; => A -> (B->A)
 (def-ctor AK
   [macro-repr (AK=> ccs)]
 
@@ -127,7 +127,7 @@
    (ccs_csq  Implication)]
 
   [macro-links
-   (ccs_ante ccs_csq_csq)])
+   (ccs_ante  ccs_csq_csq)])
 
 ; => (A->(B->C)) -> ((A->B)->(A->C))
 (def-ctor AS
