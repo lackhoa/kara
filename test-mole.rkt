@@ -4,7 +4,7 @@
          "types.rkt"
          rackunit)
 
-"Elementary stuff"
+; "Elementary stuff"
 
 (def m1 (new mole%))
 
@@ -47,7 +47,7 @@
 (check-eq? (send a-clone-ad get-data)
            X)
 
-"another harder example"
+; "another harder example"
 (send a
   update-path '[b d] W)
 (send a
@@ -61,7 +61,7 @@
  "Will fail!")
 
 
-"More sync"
+; "More sync"
 ; Let's go again with the sync
 (send a update-path '[f g] V)
 
@@ -72,15 +72,15 @@
 (displayln (send a refr 'b))
 (displayln (send a refr 'f))
 
-"Try modifying f from somewhere else"
+; "Try modifying f from somewhere else"
 (def m2 (new mole%))
 (send m2 sync (send a refr 'b))
 (send m2 update-path '[h i] T)
 
 (displayln "These three should be the same")
-(displayln (send a refr 'b))
-(displayln m2)
-(displayln (send a refr 'f))
+(send a refr 'b)
+m2
+(send a refr 'f)
 
 (send m2 update-path '[h q] R)
 (check-equal? (send m2
@@ -147,7 +147,7 @@
   "Intro to variables"
   (def m (new mole%))
   (displayln "This should be a variable")
-  (displayln m))
+  m)
 
 (test-case
   "Intro to variables 2"
@@ -156,7 +156,7 @@
   (send m sync-path '[a] '[c d])
   (send m update-role 'e '?DATA)
   (displayln "a, b and d should  be the same")
-  (pdisplay m 25 (current-output-port)))
+  (pdisplay m 25))
 
 (test-case
   "Hard variable example"
@@ -164,7 +164,7 @@
   (send m sync-path '[a] '[b c])
   (send m sync-path '[e] '[b d])
   (displayln "a, c and d, e should  be the same")
-  (pdisplay m 35 (current-output-port)))
+  (pdisplay m 35))
 
 
 (test-case

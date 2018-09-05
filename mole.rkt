@@ -21,7 +21,7 @@
     ; Fields
     (def data '?DATA)  ; '?DATA | constructor | Forall
 
-    (def kids (make-hasheq))
+    (def dic (make-hasheq))
 
     ; The sync list is synced among its items,
     ; and everything is synced with itself.
@@ -32,12 +32,12 @@
     (def no-sync (list))
 
     ; Getters
-    (define/public (get-kids)
-      kids)
+    (define/public (get-dic)
+      dic)
     (define/public (get-data)
       data)
     (define/public (get-roles)
-      (hash-keys kids))
+      (hash-keys dic))
 
     (define/public (get-sync-ls)
       sync-ls)
@@ -88,7 +88,7 @@
       (check-eq? data '?DATA
         "This is not an atom")
 
-      (hash-set! kids role mole))
+      (hash-set! dic role mole))
 
     ; This method is intended to be used
     ; for setting up new molecules as proof goals,
@@ -99,107 +99,97 @@
 
 
     (define/public (repr)
-      (repr-core
-        (car (get-repr-env))))
+      (repr-core (car
+                   (get-repr-env))))
+
+    (def (classify)
+      (match data
+        ['?DATA  (match (get-ctor)
+                   ['?DATA (match (remq* '(type ctor)
+                                         (get-roles))
+                             [(list)  'BLANK]
+                             [_       'UNKNOWN-STRUCT])]
+                   [_  'KNOWN-STRUCT])]
+        [_  'ATOM]))
 
     ; Sort out which variables are
-    ; represented by which symbol.
+    ; represented by which symbol. (mutates `env`)
     (define/public (get-repr-env [env   (make-hasheq)]
                                  [count 65])
-      (match* (data (get-roles))
-        ; This is an unknown variable.
-        [('?DATA (list))
+      (match (classify)
+        ['BLANK
          (match (hash-ref env
                           this
                           'UNBOUND)
-           ['UNBOUND
-            (let ([new-symbol
-                   (integer->char count)])
-              (for-each
-                (lam (m)
-                  (hash-set! env
-                             m
-                             new-symbol))
-                sync-ls))
-            (set! count (+ 1 count))]
+           ['UNBOUND (let ([new-symbol
+                            (integer->char count)])
+                       (for-each (lam (m)
+                                   (hash-set! env
+                                              m
+                                              new-symbol))
+                                 sync-ls))
+                     (set! count (+ 1 count))]
+           ; Already bound
+           [_  (void)])]
 
-           ; No change to the environment
-           [_ (void)])]
+        ['ATOM  (void)]
 
-        ; This is an atom
-        [(_ (list)) (void)]
-
-        ; This is a molecule
-        [('?DATA _)
-         (hash-for-each kids
+        [(or 'KNOWN-STRUCT
+             'UNKNOWN-STRUCT)
+         (hash-for-each dic
            (lam (role kid)
-             (set! count
-               (cdr
-                 (send kid
-                   get-repr-env env count)))))]
-
-        ; Illegal state
-        [(_ _)
-         (error "Branches cannot have data" data)])
+             (match (send kid
+                      get-repr-env env count)
+              [(cons _ c)
+               (set! count c)])))])
 
       ; Finally, returns the modified environment
       (cons env count))
 
     ; `env`: sync list -> name entry
     (define/public (repr-core env)
-      (match* (data (get-roles))
-        ; This is an unknown variable.
-        [('?DATA (list))
+      (match (classify)
+        ['BLANK
          (hash-ref env
                    this
                    (thunk (error "Repr code is wrong")))]
 
-        ; This is an atom
-        [(_ (list))
-         data]
+        ['ATOM  data]
 
-        ; This is a molecule.
-        [('?DATA _)
-         (match (get-ctor)
-          ; Unknown constructor
-          ['?DATA
-           (map
-             (lam (role)
-               ; Display also the roles.
-               (cons role
-                     (send (refr role)
-                       repr-core env)))
-             (filter-not (lam (role)
-                           (memq role '(type ctor)))
+        ['UNKNOWN-STRUCT
+         (map (lam (role)
+                ; Display the roles and the kids.
+                (cons role
+                      (send (refr role)
+                        repr-core env)))
+              (remq* '(type ctor)
                      (get-roles)))]
 
-          ; Known constructor
-          [(Ctor ctor-repr _ _ _)
-           (match ctor-repr
-             [(Repr leader roles)
-              (if (null? roles)
-                  leader
-                (cons leader
-                      (map (lam (role)
-                             (match (refr role)
-                               ['NOT-FOUND '?]
-                               [kid
-                                (send kid repr-core env)]))
-                           roles)))])])]
-
-        ; Non-trivial data and kids.
-        [(_ _)
-         (error "Branches cannot have data." data)]))
+        ['KNOWN-STRUCT
+         (match (get-ctor)
+           [(Ctor ctor-repr _ _ _)
+            (match ctor-repr
+              [(Repr leader roles)
+               (if (null? roles)
+                   leader
+                 (cons leader
+                       (map (lam (role)
+                              (match (refr role)
+                                ['NOT-FOUND  '?]
+                                [kid
+                                 (send kid repr-core env)]))
+                            roles)))])])]))
 
     (define/public (custom-display port)
       (display (repr) port))
 
+    ; Also specifies the Repl printing
     (define/public (custom-write port)
-      (write (repr) port))
+      (display (repr) port))
 
     ; Like `ref`, but reference a direct kid
     (define/public (refr role)
-      (hash-ref kids
+      (hash-ref dic
                 role
                 'NOT-FOUND))
 
@@ -238,7 +228,7 @@
     ; Order the kids to do something.
     ; `task` takes a role and a molecule
     (define-syntax-rule (recur task)
-      (hash-for-each kids
+      (hash-for-each dic
         (lam (role kid)
           (task role kid))))
 
@@ -253,7 +243,7 @@
         (send new-me update data)
 
         ; Work with the kids
-        (hash-for-each kids
+        (hash-for-each dic
           (lam (role kid)
             (let* ([cp-res (send kid clone-map)]
                    [lu     (hash-ref cp-res kid)])
