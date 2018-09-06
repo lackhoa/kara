@@ -77,16 +77,9 @@
       (check-pred list? ls
         "Sync list must be non-empty")
 
-      (cond [(exists? (lam (m) (check-descendant? m))
-                     ls)
-             (fail-con)]
-            ; Cycle checks
-
-            [(set-empty?
-               (set-intersect no-sync
-                              ls))
+      (cond [(set-empty? (set-intersect no-sync
+                                        ls))
              (set! sync-ls ls)]
-
             [else (fail-con)]))
 
     (define/public (add-kid role mole)
@@ -108,7 +101,7 @@
 
 
     (define/public (check-descendant? mole)
-      (trace-let loop ([ks  (get-kids)])
+      (let loop ([ks  (get-kids)])
         (match ks
           [(list)  #f]
 
@@ -397,20 +390,29 @@
         (match* (data other-data)
           ; Both can be structures
           [('?DATA '?DATA)
-           ; Add the missing kids
+
+           ; The control is going to be all over the place.
            (def result
              (let/ec escape
+               ; Cycle check
+               (when (or (exists? (lam (m) (check-descendant? m))
+                                  (send m-other get-sync-ls))
+                         (exists? (lam (m) (send m-other check-descendant? m))
+                                  sync-ls))
+                 (escape 'CYCLE))
+
+               ; Alright, no cycle: add the missing kids...
                (let ([our-roles    (list->seteq (get-roles))]
                      [their-roles  (list->seteq
                                      (send m-other get-roles))])
-                 ; Add the missing kids for us
+                 ; ... for us,
                  (set-for-each
                    (set-subtract their-roles
                                  our-roles)
                    (lam (role)
                      (update-role role '?DATA)))
 
-                 ; Same thing for the other guy
+                 ; ... and for the other guy.
                  (set-for-each
                    (set-subtract our-roles
                                  their-roles)
@@ -418,11 +420,10 @@
                      (send m-other
                        update-role role '?DATA))))
 
-               ; Establish the syncing among the top-level.
-               ; Note that we do not cascade to preserve the
+               ; Establish the syncing among the two roots.
+               ; Note that we do not cascade, to preserve the
                ; symmetry of the following recursive calls.
-               ; This can fail: either because of a user constraint,
-               ; or a cycle (syncing with one of its descendant).
+               ; This may fail because of user constraint.
                (let ([merge
                       (append sync-ls
                               (send m-other get-sync-ls))])
@@ -443,7 +444,7 @@
                                (thunk (escape 'CONFLICT)))))))
 
            (when (memq result
-                       '(CONFLICT CANT-SYNC))
+                       '(CONFLICT CANT-SYNC CYCLE))
              (fail-con))]
 
           ; They're consistent atoms

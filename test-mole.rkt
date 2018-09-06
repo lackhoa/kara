@@ -5,7 +5,6 @@
          rackunit)
 
 ; "Elementary stuff"
-(display "What the fuck?")
 (def m1 (new mole%))
 
 (send m1 update-role 'd W)
@@ -190,10 +189,26 @@ m2
   m)
 
 (test-case
-  "Cyclic syncing detection"
+  "Descendant check"
   (def m (new mole%))
-  (send m sync-path '[a] '[b c])
-  (check-equal? "Please fail!"
-                (send m
-                  sync-path '[a] '[b] (thunk "Please fail!")))
-  )
+  (def n (new mole%))
+  (send m update-path '[a b] '?DATA)
+  (check-eq? #t
+             (send (send m refr 'a)
+               check-descendant? (send m ref '[a b])))
+  (check-eq? #t
+             (send m
+               check-descendant? (send m ref '[a b])))
+  (check-eq? #f
+             (send m check-descendant? n))
+  (check-eq? #f
+             (send m check-descendant? m)))
+
+(test-case
+  "Syncing with cycle"
+  (def m (new mole%))
+  (send m sync-path '[a b] '[c])
+  (check-eq? #f
+             (send m sync-path '[a] '[c] (thunk #f)))
+  (check-eq? #f
+             (send m sync-path '[a] '[a b] (thunk #f))))
