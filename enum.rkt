@@ -12,8 +12,8 @@
 (def (general-search mole queue-fn)
   ;; We keep track of the molecules we've worked on
   ;; by tagging them with the "expanded" role.
-  (def (expanded? path)
-    (neq? (send mole ref (pad path 'expanded))
+  (def (expanded? m path)
+    (neq? (send m ref (pad path 'expanded))
           'NOT-FOUND))
 
   ;; Returns: a stream of paths.
@@ -55,7 +55,7 @@
 
                    ;; We know the constructor already.
                    [(_ (== entailment eq?))
-                    (match (expanded? pfocus)
+                    (match (expanded? mfocus pfocus)
                       [#f pfocus]
                       [#t (recur)])]
 
