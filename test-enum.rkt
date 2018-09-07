@@ -1,3 +1,4 @@
+#! /usr/bin/racket
 #lang racket
 
 (require "lang/kara.rkt"
