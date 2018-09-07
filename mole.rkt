@@ -28,9 +28,13 @@
     (def sync-ls
       (list this))
 
-    ;; The list of items we cannot sync with
+    ;; The list of items this molecule cannot sync with
     ;; it is NOT synced among the items of `sync-ls`.
     (def no-sync (list))
+
+    ;; if set to #t, will return failure
+    ;; when we try to update data
+    (def no-touch? #f)
 
     ;; Getters
     (define/public (get-dic)
@@ -59,19 +63,16 @@
       (ref-data (pad path 'type)))
 
     ;; Setters
-    (define/public (set-data val)
-      (match* (data val (get-roles))
-        ;; No new information
-        [(_ '?DATA _)
-         (void)]
-
-        ;; Can update
-        [(_ _ (list))
-         (set! data val)]
-
-        ;; Illegal state
-        [(_ _ _)
-         (error "A composite cannot have data")]))
+    (define/public (set-data val fail-con)
+      (match no-touch?
+        [#t  (fail-con)]
+        [#f  (match* (data val (get-roles))
+               ;; No new information
+               [(_ '?DATA _)  (void)]
+               ;; Can update
+               [(_ _ (list))  (set! data val)]
+               ;; Illegal state
+               [(_ _ _)       (error "A composite can't have data" this)])]))
 
     ;; Note that this method can fail.
     (define/public (set-sync-ls ls fail-con)
@@ -82,6 +83,16 @@
                                         ls))
              (set! sync-ls ls)]
             [else (fail-con)]))
+
+    (define/public (mark-no-touch)
+      (set! no-touch? #t))
+
+    (define/public (get-height)
+      (match (get-kids)
+        [(list)  0]
+        [kids    (add1 (apply max
+                         (map (lam (k) (send k get-height))
+                              (get-kids))))]))
 
     (define/public (add-kid role mole)
       (check-pred symbol? role
@@ -99,19 +110,6 @@
       (if (set-empty? (set-intersect ls sync-ls))
           (set! no-sync ls)
           (error "SET-NO-SYNC -- Illegal state" sync-ls ls)))
-
-
-    (define/public (check-descendant? mole)
-      (let loop ([ks  (get-kids)])
-        (match ks
-          [(list)  #f]
-
-          [(cons kfocus krest)
-           (match (send kfocus get-kids)
-             [(list)  (or (eq? mole kfocus)
-                          (loop krest))]
-             [_  (or (send kfocus check-descendant? mole)
-                     (loop krest))])])))
 
 
     (define/public (repr)
@@ -252,6 +250,9 @@
             [new-me  (new mole%)])
         ;; Clone the data
         (send new-me update data)
+        ;; Clone the information necessary
+        (when no-touch?
+          (send new-me mark-no-touch))
 
         ;; Work with the kids
         (hash-for-each dic
@@ -314,15 +315,17 @@
     (define/public (update val
                            [fail-con no-fail])
       (unless (eq? data val)
-        (match data
-          ['?DATA
-           (set-data val)
-           (inform
-            (lam (m)
-              (send m set-data val)))]
+        (match (let/ec escape
+                 (match data
+                   ['?DATA (set-data val (thunk (escape 'NO-TOUCH)))
+                           (inform
+                            (lam (m) (send m set-data
+                                     val (thunk (escape 'NO-TOUCH)))))]
+                   ;; Conflict: available data is not equal.
+                   [_      (escape 'CONFLICT)]))
 
-          ;; Conflict: available data is not equal.
-          [_ (fail-con)])))
+          [(or 'NO-TOUCH 'CONFLICT)  (fail-con)]
+          [_                         (void)])))
 
     ;; Just a convenience function
     (define/public (update-path path
@@ -385,55 +388,55 @@
            ;; The control is going to be all over the place.
            (def result
              (let/ec escape
-                     ;; Cycle check
-                     (when (or (exists? (lam (m) (check-descendant? m))
-                                        (send m-other get-sync-ls))
-                               (exists? (lam (m) (send m-other check-descendant? m))
-                                        sync-ls))
-                       (escape 'CYCLE))
+               ;; Add the missing kids...
+               (let* ([our-roles      (list->seteq (get-roles))]
+                      [their-roles    (list->seteq
+                                       (send m-other get-roles))]
+                      ;; Monitor the height to check for cycle
+                      [max-height     (thunk (max (get-height)
+                                                  (send m-other get-height)))]
+                      [height-before  (max-height)])
+                 ;; ... for us,
+                 (set-for-each (set-subtract their-roles
+                                             our-roles)
+                               (lam (role)
+                                 (update-role role '?DATA)))
 
-                     ;; Alright, no cycle: add the missing kids...
-                     (let ([our-roles    (list->seteq (get-roles))]
-                           [their-roles  (list->seteq
-                                          (send m-other get-roles))])
-                       ;; ... for us,
-                       (set-for-each
-                        (set-subtract their-roles
-                                      our-roles)
-                        (lam (role)
-                          (update-role role '?DATA)))
+                 ;; ... and for the other guy.
+                 (set-for-each (set-subtract our-roles
+                                             their-roles)
+                               (lam (role)
+                                 (send m-other update-role
+                                   role '?DATA)))
 
-                       ;; ... and for the other guy.
-                       (set-for-each
-                        (set-subtract our-roles
-                                      their-roles)
-                        (lam (role)
-                          (send m-other update-role
-                            role
-                            '?DATA))))
+                 ;; Remember the cycle check?
+                 (when (> (max-height)
+                          height-before)
+                   (escape 'CYCLE)))
 
-                     ;; Establish the syncing among the two roots.
-                     ;; Note that we do not cascade, to preserve the
-                     ;; symmetry of the following recursive calls.
-                     ;; This may fail because of user constraint.
-                     (let ([merge
-                            (append sync-ls
-                                    (send m-other get-sync-ls))])
-                       (set-sync-ls merge
-                                    (thunk (escape 'CANT-SYNC)))
+               ;; Establish the syncing among the two roots.
+               ;; Note that we do not cascade, to preserve the
+               ;; symmetry of the following recursive calls.
+               ;; This may fail because of user constraint.
+               (let ([merge
+                      (append sync-ls
+                              (send m-other get-sync-ls))])
+                 (set-sync-ls merge
+                              (thunk (escape 'CANT-SYNC)))
 
-                       ;; Since `sync-ls` now also includes molecules on
-                       ;; 'the other side', we can inform them in one message.
-                       (inform (lam (m)
-                                 (send m set-sync-ls
-                                   merge
-                                   (thunk (escape 'CANT-SYNC))))))
+                 ;; Since `sync-ls` now also includes molecules on
+                 ;; 'the other side', we can inform them in one message.
+                 (inform (lam (m)
+                           (send m set-sync-ls
+                             merge
+                             (thunk (escape 'CANT-SYNC))))))
 
-                     ;; Our work is over: Recursively let all the kids sync.
-                     (recur (lam (role c)
-                              (send c sync
-                                (send m-other refr role)
-                                (thunk (escape 'CONFLICT)))))))
+               ;; Our work is over: Recursively let all the kids sync.
+               ;; And `max-height` will be reduced by 1.
+               (recur (lam (role c)
+                        (send c sync
+                          (send m-other refr role)
+                          (thunk (escape 'CONFLICT)))))))
 
            (when (memq result
                        '(CONFLICT CANT-SYNC CYCLE))
