@@ -4,35 +4,31 @@
          racket/hash)
 (provide (all-defined-out))
 
-; ---------------------------------
-; Molecules
-; ---------------------------------
-
-; The failure continuation that you're
-; confident not gonna be called.
 (def (no-fail)
+  ;; The failure continuation that you're
+  ;; confident not gonna be called.
   (error "I did not expect this to fail!"))
 
 (def mole%
   (class* object% (writable<%>)
-    ;; Initializer
-    (super-new)
+    (super-new)  ; Initializer
 
-    ;; Fields
+;;; Fields
     (def data '?DATA)     ; '?DATA | constructor | Forall
 
     (def dic (make-hasheq))
 
-    ;; The sync list is synced among its items,
-    ;; and everything is synced with itself.
     (def sync-ls
+      ;; The sync list is synced among its items,
+      ;; and everything is synced with itself.
       (list this))
 
-    ;; The list of items we cannot sync with
-    ;; it is NOT synced among the items of `sync-ls`.
-    (def no-sync (list))
+    (def no-sync
+      ;; The list of items we cannot sync with
+      ;; it is NOT synced among the items of `sync-ls`.
+      (list))
 
-    ;; Getters
+;;; Getters
     (define/public (get-dic)
       dic)
     (define/public (get-data)
@@ -58,23 +54,23 @@
     (define/public (ref-type path)
       (ref-data (pad path 'type)))
 
-    ;; Setters
+;;; Setters
     (define/public (set-data val)
       (match* (data val (get-roles))
-        ;; No new information
         [(_ '?DATA _)
+         ;; No new information
          (void)]
 
-        ;; Can update
         [(_ _ (list))
+         ;; Can update
          (set! data val)]
 
-        ;; Illegal state
         [(_ _ _)
+         ;; Illegal state
          (error "A composite cannot have data")]))
 
-    ;; Note that this method can fail.
     (define/public (set-sync-ls ls fail-con)
+      ;; Note that this method can fail.
       (check-pred list? ls
                   "Sync list must be non-empty")
 
@@ -93,9 +89,9 @@
 
       (hash-set! dic role mole))
 
-    ;; This method is intended to be used
-    ;; for setting up new molecules as proof goals,
     (define/public (set-no-sync ls)
+      ;; This method is intended to be used
+      ;; for setting up new molecules as proof goals,
       (if (set-empty? (set-intersect ls sync-ls))
           (set! no-sync ls)
           (error "SET-NO-SYNC -- Illegal state" sync-ls ls)))
@@ -109,9 +105,9 @@
           [(cons kfocus krest)
            (match (send kfocus get-kids)
              [(list)  (or (eq? mole kfocus)
-                          (loop krest))]
+                         (loop krest))]
              [_  (or (send kfocus check-descendant? mole)
-                     (loop krest))])])))
+                    (loop krest))])])))
 
 
     (define/public (repr)
@@ -127,10 +123,10 @@
                    [_  'KNOWN-STRUCT])]
         [_  'ATOM]))
 
-    ;; Sort out which variables are
-    ;; represented by which symbol. (mutates `env`)
     (define/public (get-repr-env [env   (make-hasheq)]
                                  [count 65])
+      ;; Sort out which variables are
+      ;; represented by which symbol. (mutates `env`)
       (match (classify)
         ['BLANK
          (match (hash-ref env
@@ -144,13 +140,14 @@
                                               new-symbol))
                                  sync-ls))
                      (set! count (+ 1 count))]
-           ;; Already bound
-           [_  (void)])]
+           [_
+            ;; Already bound
+            (void)])]
 
         ['ATOM  (void)]
 
         [(or 'KNOWN-STRUCT
-             'UNKNOWN-STRUCT)
+            'UNKNOWN-STRUCT)
          (recur (lam (role kid)
                   (match (send kid get-repr-env env count)
                     [(cons _ c)
@@ -159,8 +156,8 @@
       ;; Finally, returns the modified environment
       (cons env count))
 
-    ;; `env`: sync list -> name entry
     (define/public (repr-core env)
+      ;; `env`: sync list -> name entry
       (match (classify)
         ['BLANK
          (hash-ref env
@@ -195,18 +192,18 @@
     (define/public (custom-display port)
       (display (repr) port))
 
-    ;; Also specifies the Repl printing
     (define/public (custom-write port)
+      ;; Also specifies the how the Repl prints
       (display (repr) port))
 
-    ;; Like `ref`, but reference a direct kid
     (define/public (refr role)
+      ;; Like `ref`, but reference a direct kid
       (hash-ref dic
                 role
                 'NOT-FOUND))
 
-    ;; Reference a descendant.
     (define/public (ref path)
+      ;; Reference a descendant.
       (if (null? path)
           this
           (match (refr (car path))
@@ -214,8 +211,8 @@
 
             [kid (send kid ref (cdr path))])))
 
-    ;; Reference the data of a kid.
     (define/public (ref-data path)
+      ;; Reference the data of a kid.
       (match (ref path)
         ['NOT-FOUND '?DATA]
 
@@ -227,48 +224,51 @@
 
         [kid (send kid get-data)]))
 
-    ;; Tell those in the sync list to do something.
-    ;; `task` is a function takes a molecule.
     (def (inform task)
+      ;; Tell those in the sync list to do something.
+      ;; `task` is a function takes a molecule.
       (check-pred procedure? task)
       (for-each
        (lam (subject)
          (task subject))
        (remq this sync-ls)))
 
-    ;; Order the kids to do something.
-    ;; `task` takes a role and a molecule
     (define-syntax-rule (recur task)
+      ;; Order the kids to do something.
+      ;; `task` takes a role and a molecule
       (hash-for-each dic
                      (lam (role kid)
                        (task role kid))))
 
-    ;; Returns a mapping of the originals to their copies,
-    ;; without the sync list.
-    ;; By 'the originals', I mean every single node in the tree.
     (define/public (clone-map)
-      ;; `the-map` holds the result.
-      (let ([the-map (make-hasheq)]
+      ;; Returns a mapping of the originals to their copies,
+      ;; without the sync list.
+      ;; By 'the originals', I mean every single node in the tree.
+      (let ([the-map
+             ;; holds the result.
+             (make-hasheq)]
             [new-me  (new mole%)])
-        ;; Clone the data
-        (send new-me update data)
+        (send new-me update data)  ; Clone the data
 
-        ;; Work with the kids
-        (hash-for-each dic
-                       (lam (role kid)
-                         (let* ([cp-res (send kid clone-map)]
-                                [lu     (hash-ref cp-res kid)])
-                           ;; Add the kids for `new-me`
-                           (send new-me add-kid role lu)
-                           ;; Change `the-map`
-                           (hash-union! the-map cp-res))))
-        ;; Don't forget to map itself.
-        (hash-set! the-map this new-me)
+
+        (hash-for-each
+         ;; Work with the kids
+         dic
+         (lam (role kid)
+           (let* ([cp-res (send kid clone-map)]
+                  [lu     (hash-ref cp-res kid)])
+             ;; Add the kids for `new-me`
+             (send new-me add-kid role lu)
+             ;; Change `the-map`
+             (hash-union! the-map cp-res))))
+        (hash-set!
+         ;; Don't forget to map itself.
+         the-map this new-me)
         the-map))
 
-    ;; The complete cloning interface (works for the root)
-    ;; This is a major time consumer, be efficient.
     (define/public (copy)
+      ;; The complete cloning interface (works for the root)
+      ;; This is a major time consumer, be efficient.
       (let ([cns (clone-map)])
         (hash-for-each cns
                        (lam (orig clone)
@@ -287,9 +287,9 @@
         ;; This will return the root's copy.
         (hash-ref cns this)))
 
-    ;; Keep adding new kids
-    ;; until the path is exhausted.
     (define/public (just-expand path)
+      ;; Keep adding new kids
+      ;; until the path is exhausted.
       (unless (null? path)
         (let ([new-kid (new mole%)])
           (add-kid (car path) new-kid)
@@ -309,10 +309,10 @@
           [kid
            (send kid expand (cdr path))])))
 
-    ;; Updating and syncing the data.
-    ;; `fail-con`: the function to in case of inconsistency.
     (define/public (update val
                            [fail-con no-fail])
+      ;; Updating and syncing the data.
+      ;; `fail-con`: the function to in case of inconsistency.
       (unless (eq? data val)
         (match data
           ['?DATA
@@ -321,13 +321,14 @@
             (lam (m)
               (send m set-data val)))]
 
-          ;; Conflict: available data is not equal.
-          [_ (fail-con)])))
+          [_
+           ;; Conflict: available data is not equal.
+           (fail-con)])))
 
-    ;; Just a convenience function
     (define/public (update-path path
                                 val
                                 [fail-con no-fail])
+      ;; Just a convenience function
       (match (ref path)
         ['NOT-FOUND
          (expand path)
@@ -336,21 +337,21 @@
         [kid
          (send kid update val fail-con)]))
 
-    ;; Short-hand for the short-hand that is update-path.
     (define/public (update-role role
                                 val
                                 [fail-con no-fail])
+      ;; Short-hand for the short-hand that is update-path.
       (update-path (list role)
                    val
                    fail-con))
 
-    ;; Flush the sync list down to the
-    ;; new descendants on a path.
     (define/public (cascade path)
-      ;; Only work when we have something in the sync list.
+      ;; Flush the sync list down to the
+      ;; new descendants on a path.
       (when (and (not (null? path))
-                 (> (length sync-ls)
-                    1))
+               (> (length sync-ls)
+                  1))
+        ;; Only work when we have something in the sync list.
         (let* ([role (car path)]
                [c    (refr role)])
           (check-class c mole%
@@ -366,9 +367,9 @@
           (send c cascade (cdr path)))))
 
 
-    ;; Sync up two molecules that haven't been synced before
     (define/public (sync m-other
                          [fail-con no-fail])
+      ;; Sync up two molecules that haven't been synced before
       (check-class m-other mole%
                    "Expected a molecule")
 
@@ -379,94 +380,97 @@
           (send m-other get-data))
 
         (match* (data other-data)
-          ;; Both can be structures
           [('?DATA '?DATA)
+           ;; Both can be structures
 
-           ;; The control is going to be all over the place.
            (def result
+             ;; The control is going to be all over the place.
              (let/ec escape
-                     ;; Cycle check
-                     (when (or (exists? (lam (m) (check-descendant? m))
-                                        (send m-other get-sync-ls))
-                               (exists? (lam (m) (send m-other check-descendant? m))
-                                        sync-ls))
-                       (escape 'CYCLE))
+               (when (or (exists? (lam (m) (check-descendant? m))
+                                 (send m-other get-sync-ls))
+                        (exists? (lam (m) (send m-other check-descendant? m))
+                                 sync-ls))
+                 ;; Cycle check
+                 (escape 'CYCLE))
 
-                     ;; Alright, no cycle: add the missing kids...
-                     (let ([our-roles    (list->seteq (get-roles))]
-                           [their-roles  (list->seteq
-                                          (send m-other get-roles))])
-                       ;; ... for us,
-                       (set-for-each
-                        (set-subtract their-roles
-                                      our-roles)
-                        (lam (role)
-                          (update-role role '?DATA)))
+               (let ([our-roles    (list->seteq (get-roles))]
+                     [their-roles  (list->seteq
+                                    (send m-other get-roles))])
+                 ;; Alright, no cycle: add the missing kids...
+                 (set-for-each
+                  ;; ... for us,
+                  (set-subtract their-roles
+                                our-roles)
+                  (lam (role)
+                    (update-role role '?DATA)))
 
-                       ;; ... and for the other guy.
-                       (set-for-each
-                        (set-subtract our-roles
-                                      their-roles)
-                        (lam (role)
-                          (send m-other update-role
-                            role
-                            '?DATA))))
+                 (set-for-each
+                  ;; ... and for the other guy.
+                  (set-subtract our-roles
+                                their-roles)
+                  (lam (role)
+                    (send m-other update-role
+                      role
+                      '?DATA))))
 
-                     ;; Establish the syncing among the two roots.
-                     ;; Note that we do not cascade, to preserve the
-                     ;; symmetry of the following recursive calls.
-                     ;; This may fail because of user constraint.
-                     (let ([merge
-                            (append sync-ls
-                                    (send m-other get-sync-ls))])
-                       (set-sync-ls merge
-                                    (thunk (escape 'CANT-SYNC)))
+               (let ([merge
+                      (append sync-ls
+                              (send m-other get-sync-ls))])
+                 ;; Establish the syncing among the two roots.
+                 ;; Note that we do not cascade, to preserve the
+                 ;; symmetry of the following recursive calls.
+                 ;; This may fail because of user constraint.
+                 (set-sync-ls merge
+                              (thunk (escape 'CANT-SYNC)))
 
-                       ;; Since `sync-ls` now also includes molecules on
-                       ;; 'the other side', we can inform them in one message.
-                       (inform (lam (m)
-                                 (send m set-sync-ls
-                                   merge
-                                   (thunk (escape 'CANT-SYNC))))))
+                 (inform
+                  ;; Since `sync-ls` now also includes molecules on
+                  ;; 'the other side', we can inform them in one message.
+                  (lam (m)
+                    (send m set-sync-ls
+                      merge
+                      (thunk (escape 'CANT-SYNC))))))
 
-                     ;; Our work is over: Recursively let all the kids sync.
-                     (recur (lam (role c)
-                              (send c sync
-                                (send m-other refr role)
-                                (thunk (escape 'CONFLICT)))))))
+               (recur
+                ;; Our work is over: Recursively let all the kids sync.
+                (lam (role c)
+                  (send c sync
+                    (send m-other refr role)
+                    (thunk (escape 'CONFLICT)))))))
 
            (when (memq result
                        '(CONFLICT CANT-SYNC CYCLE))
              (fail-con))]
 
-          ;; They're consistent atoms
-          [(x x) (void)]
+          [(x x)
+           ;; They're consistent atoms
+           (void)]
 
-          ;; `m-other` has new data for us
           [('?DATA _)
+           ;; `m-other` has new data for us
            (update other-data)]
 
-          ;; We have new data for `m-other`
           [(_ '?DATA)
+           ;; We have new data for `m-other`
            (send m-other update data)]
 
-          ;; Nope, the data are inconsistent.
-          [(_ _) (fail-con)])))
+          [(_ _)
+           ;; Nope, the data are inconsistent.
+           (fail-con)])))
 
-
-    ;; Like sync, but the only difference is that
-    ;; it doesn't have an impact on `m-other`
     (define/public (unify m-other
                           [fail-con no-fail])
+      ;; Like sync, but the only difference is that
+      ;; it doesn't have an impact on `m-other`
       (let ([m-other-clone
              (send m-other copy)])
         (sync m-other fail-con)))
 
-    ;; Sync two descendants of this molecules.
-    ;; If they don't exist, expand them.
     (define/public (sync-path p1
                               p2
                               [fail-con no-fail])
+      ;; Sync two descendants of this molecules.
+      ;; If they don't exist, expand them.
       (when (eq? 'NOT-FOUND (ref p1))
         (expand p1))
       (when (eq? 'NOT-FOUND (ref p2))
@@ -476,9 +480,9 @@
         fail-con))
 
 
-    ;; Do not let these molecules sync with each other.
-    ;; (note: overwrites existing no-sync policies)
     (define/public (distinguish-paths paths)
+      ;; Do not let these molecules sync with each other.
+      ;; (note: overwrites existing no-sync policies)
       (let ([moles null])
         (for ([p paths])
           (match (ref p)
@@ -493,8 +497,8 @@
                                     moles)))))))
 
 
-;; Update the constructor of multiple paths of a molecule.
 (define-syntax update-ctors
+  ;; Update the constructor of multiple paths of a molecule.
   (syntax-rules ()
     [(_ mole) (void)]
 

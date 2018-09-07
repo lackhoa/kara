@@ -4,7 +4,7 @@
          "types.rkt"
          rackunit)
 
-;; "Elementary stuff"
+;;; "Elementary stuff"
 (def m1 (new mole%))
 
 (send m1 update-role 'd W)
@@ -16,8 +16,8 @@
 
 (send m1 update-role 'a '?DATA)
 
-(check-equal? (send m1 get-roles)
-              '[a d])
+(check-eqv? (length (send m1 get-roles))
+            2)
 
 (def a (send m1 refr 'a))
 
@@ -44,7 +44,7 @@
 (check-eq? (send a-clone-ad get-data)
            X)
 
-;; "another harder example"
+;;; "another harder example"
 (send a update-path '[b d] W)
 (send a update-path '[c e] V)
 (send a update-path '[c d] V)
@@ -55,7 +55,7 @@
  "Will fail!")
 
 
-;; "More sync"
+;;; "More sync"
 ;; Let's go again with the sync
 (send a update-path '[f g] V)
 
@@ -66,7 +66,7 @@
 (displayln (send a refr 'b))
 (displayln (send a refr 'f))
 
-;; "Try modifying f from somewhere else"
+;;; "Try modifying f from somewhere else"
 (def m2 (new mole%))
 (send m2 sync (send a refr 'b))
 (send m2 update-path '[h i] T)
@@ -138,35 +138,35 @@ m2
              4))
 
 (test-case
-  "Intro to variables"
-  (def m (new mole%))
-  (displayln "This should be a variable")
-  m)
+ "Intro to variables"
+ (def m (new mole%))
+ (displayln "This should be a variable")
+ m)
 
 (test-case
-  "Intro to variables 2"
-  (def m (new mole%))
-  (send m sync-path '[a] '[b])
-  (send m sync-path '[a] '[c d])
-  (send m update-role 'e '?DATA)
-  (displayln "a, b and d should  be the same")
-  (pdisplay m 25))
+ "Intro to variables 2"
+ (def m (new mole%))
+ (send m sync-path '[a] '[b])
+ (send m sync-path '[a] '[c d])
+ (send m update-role 'e '?DATA)
+ (displayln "a, b and d should  be the same")
+ (pdisplay m 25))
 
 (test-case
-  "Hard variable example"
-  (def m (new mole%))
-  (send m sync-path '[a] '[b c])
-  (send m sync-path '[e] '[b d])
-  (displayln "a, c and d, e should  be the same")
-  (pdisplay m 35))
+ "Hard variable example"
+ (def m (new mole%))
+ (send m sync-path '[a] '[b c])
+ (send m sync-path '[e] '[b d])
+ (displayln "a, c and d, e should  be the same")
+ (pdisplay m 35))
 
 
 (test-case
-  "no-sync usage"
-  (def m (new mole%))
-  (send m distinguish-paths '([a] [b]))
-  (check-equal? "Of course it fails!"
-                (send m sync-path '[a] '[b] (thunk "Of course it fails!"))))
+ "no-sync usage"
+ (def m (new mole%))
+ (send m distinguish-paths '([a] [b]))
+ (check-equal? "Of course it fails!"
+               (send m sync-path '[a] '[b] (thunk "Of course it fails!"))))
 
 (test-case
  "no-sync usage 2"
@@ -178,11 +178,11 @@ m2
                  '[c] '[b] (thunk "Now it fails"))))
 
 (test-case
-  "Display"
-  (def m (new mole%))
-  (send m update-role 'type wf)
-  (displayln "This should also be a variable")
-  m)
+ "Display"
+ (def m (new mole%))
+ (send m update-role 'type wf)
+ (displayln "This should also be a variable")
+ m)
 
 (test-case
  "Descendant check"
@@ -200,10 +200,10 @@ m2
             (send m check-descendant? m)))
 
 (test-case
-  "Syncing with cycle"
-  (def m (new mole%))
-  (send m sync-path '[a b] '[c])
-  (check-eq? #f
-             (send m sync-path '[a] '[c] (thunk #f)))
-  (check-eq? #f
-             (send m sync-path '[a] '[a b] (thunk #f))))
+ "Syncing with cycle"
+ (def m (new mole%))
+ (send m sync-path '[a b] '[c])
+ (check-eq? #f
+            (send m sync-path '[a] '[c] (thunk #f)))
+ (check-eq? #f
+            (send m sync-path '[a] '[a b] (thunk #f))))
