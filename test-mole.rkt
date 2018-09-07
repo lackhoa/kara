@@ -185,21 +185,6 @@ m2
  m)
 
 (test-case
- "Descendant check"
- (def m (new mole%))
- (def n (new mole%))
- (send m update-path '[a b] '?DATA)
- (check-eq? #t
-            (send (send m refr 'a) check-descendant?
-              (send m ref '[a b])))
- (check-eq? #t
-            (send m check-descendant? (send m ref '[a b])))
- (check-eq? #f
-            (send m check-descendant? n))
- (check-eq? #f
-            (send m check-descendant? m)))
-
-(test-case
  "Syncing with cycle"
  (def m (new mole%))
  (send m sync-path '[a b] '[c])
@@ -207,3 +192,26 @@ m2
             (send m sync-path '[a] '[c] (thunk #f)))
  (check-eq? #f
             (send m sync-path '[a] '[a b] (thunk #f))))
+
+(test-case
+ "Syncing with cycle 2"
+ (def m (new mole%))
+ (send m sync-path '[a b] '[c])
+ (check-eq? #f
+            (send m sync-path '[] '[a] (thunk #f))))
+
+(test-case
+ "No touch"
+ (def m (new mole%))
+ (send m mark-no-touch)
+ (check-eq? #f
+            (send m update A (thunk #f))))
+
+(test-case
+ "No touch 2"
+ (def m1 (new mole%))
+ (def m2 (new mole%))
+ (send m1 sync m2)
+ (send m1 mark-no-touch)
+ (check-eq? #f
+            (send m2 update A (thunk #f))))

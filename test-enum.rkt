@@ -14,13 +14,19 @@
 
 (def (proof1)
   (def m (new mole%))
-  (send m
-    update-role 'type entailment)
+  (send m update-role
+    'type entailment)
   (update-ctors m
-    (ccs Implication))
-  (send m
-    sync-path '[ccs ante]
-              '[ccs csq])
+                (ccs Implication))
+  (send m sync-path
+    '[ccs ante]
+    '[ccs csq])
+  (send m update-path
+    '[ccs ante ctor] '?DATA)
+  (send m update-path
+    '[ccs csq ctor] '?DATA)
+  (send (send m ref '[ccs ante ctor]) mark-no-touch)
+  (send (send m ref '[ccs csq ctor]) mark-no-touch)
 
   (bfs m))
 

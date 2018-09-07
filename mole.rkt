@@ -23,12 +23,24 @@
       ;; and everything is synced with itself.
       (list this))
 
+    <<<<<<< HEAD
     (def no-sync
       ;; The list of items we cannot sync with
       ;; it is NOT synced among the items of `sync-ls`.
       (list))
 
 ;;; Getters
+    =======
+    ;; The list of items this molecule cannot sync with
+    ;; it is NOT synced among the items of `sync-ls`.
+    (def no-sync (list))
+
+    ;; if set to #t, will return failure
+    ;; when we try to update data
+    (def no-touch? #f)
+
+    ;; Getters
+    >>>>>>> e7343617c3d456e56032450da25a187da94922ae
     (define/public (get-dic)
       dic)
     (define/public (get-data)
@@ -54,6 +66,7 @@
     (define/public (ref-type path)
       (ref-data (pad path 'type)))
 
+    <<<<<<< HEAD
 ;;; Setters
     (define/public (set-data val)
       (match* (data val (get-roles))
@@ -68,6 +81,19 @@
         [(_ _ _)
          ;; Illegal state
          (error "A composite cannot have data")]))
+    =======
+    ;; Setters
+    (define/public (set-data val fail-con)
+      (match no-touch?
+        [#t  (fail-con)]
+        [#f  (match* (data val (get-roles))
+               ;; No new information
+               [(_ '?DATA _)  (void)]
+               ;; Can update
+               [(_ _ (list))  (set! data val)]
+               ;; Illegal state
+               [(_ _ _)       (error "A composite can't have data" this)])]))
+    >>>>>>> e7343617c3d456e56032450da25a187da94922ae
 
     (define/public (set-sync-ls ls fail-con)
       ;; Note that this method can fail.
@@ -78,6 +104,16 @@
                                         ls))
              (set! sync-ls ls)]
             [else (fail-con)]))
+
+    (define/public (mark-no-touch)
+      (set! no-touch? #t))
+
+    (define/public (get-height)
+      (match (get-kids)
+        [(list)  0]
+        [kids    (add1 (apply max
+                         (map (lam (k) (send k get-height))
+                              (get-kids))))]))
 
     (define/public (add-kid role mole)
       (check-pred symbol? role
@@ -97,6 +133,7 @@
           (error "SET-NO-SYNC -- Illegal state" sync-ls ls)))
 
 
+    <<<<<<< HEAD
     (define/public (check-descendant? mole)
       (let loop ([ks  (get-kids)])
         (match ks
@@ -110,6 +147,8 @@
                     (loop krest))])])))
 
 
+    =======
+    >>>>>>> e7343617c3d456e56032450da25a187da94922ae
     (define/public (repr)
       (repr-core (car (get-repr-env))))
 
@@ -147,7 +186,7 @@
         ['ATOM  (void)]
 
         [(or 'KNOWN-STRUCT
-            'UNKNOWN-STRUCT)
+             'UNKNOWN-STRUCT)
          (recur (lam (role kid)
                   (match (send kid get-repr-env env count)
                     [(cons _ c)
@@ -249,7 +288,8 @@
              (make-hasheq)]
             [new-me  (new mole%)])
         (send new-me update data)  ; Clone the data
-
+        (when no-touch?
+          (send new-me mark-no-touch))  ; Clone the information necessary
 
         (hash-for-each
          ;; Work with the kids
@@ -261,9 +301,12 @@
              (send new-me add-kid role lu)
              ;; Change `the-map`
              (hash-union! the-map cp-res))))
+
         (hash-set!
          ;; Don't forget to map itself.
-         the-map this new-me)
+         the-map
+         this new-me)
+
         the-map))
 
     (define/public (copy)
@@ -314,6 +357,7 @@
       ;; Updating and syncing the data.
       ;; `fail-con`: the function to in case of inconsistency.
       (unless (eq? data val)
+        <<<<<<< HEAD
         (match data
           ['?DATA
            (set-data val)
@@ -324,6 +368,19 @@
           [_
            ;; Conflict: available data is not equal.
            (fail-con)])))
+    =======
+    (match (let/ec escape
+             (match data
+               ['?DATA (set-data val (thunk (escape 'NO-TOUCH)))
+                       (inform
+                        (lam (m) (send m set-data
+                                 val (thunk (escape 'NO-TOUCH)))))]
+               ;; Conflict: available data is not equal.
+               [_      (escape 'CONFLICT)]))
+
+      [(or 'NO-TOUCH 'CONFLICT)  (fail-con)]
+      [_                         (void)])))
+>>>>>>> e7343617c3d456e56032450da25a187da94922ae
 
     (define/public (update-path path
                                 val
@@ -386,6 +443,7 @@
            (def result
              ;; The control is going to be all over the place.
              (let/ec escape
+<<<<<<< HEAD
                (when (or (exists? (lam (m) (check-descendant? m))
                                  (send m-other get-sync-ls))
                         (exists? (lam (m) (send m-other check-descendant? m))
@@ -437,6 +495,57 @@
                   (send c sync
                     (send m-other refr role)
                     (thunk (escape 'CONFLICT)))))))
+=======
+               ;; Add the missing kids...
+               (let* ([our-roles      (list->seteq (get-roles))]
+                      [their-roles    (list->seteq
+                                       (send m-other get-roles))]
+                      ;; Monitor the height to check for cycle
+                      [max-height     (thunk (max (get-height)
+                                                  (send m-other get-height)))]
+                      [height-before  (max-height)])
+                 ;; ... for us,
+                 (set-for-each (set-subtract their-roles
+                                             our-roles)
+                               (lam (role)
+                                 (update-role role '?DATA)))
+
+                 ;; ... and for the other guy.
+                 (set-for-each (set-subtract our-roles
+                                             their-roles)
+                               (lam (role)
+                                 (send m-other update-role
+                                   role '?DATA)))
+
+                 ;; Remember the cycle check?
+                 (when (> (max-height)
+                          height-before)
+                   (escape 'CYCLE)))
+
+               ;; Establish the syncing among the two roots.
+               ;; Note that we do not cascade, to preserve the
+               ;; symmetry of the following recursive calls.
+               ;; This may fail because of user constraint.
+               (let ([merge
+                      (append sync-ls
+                              (send m-other get-sync-ls))])
+                 (set-sync-ls merge
+                              (thunk (escape 'CANT-SYNC)))
+
+                 ;; Since `sync-ls` now also includes molecules on
+                 ;; 'the other side', we can inform them in one message.
+                 (inform (lam (m)
+                           (send m set-sync-ls
+                             merge
+                             (thunk (escape 'CANT-SYNC))))))
+
+               ;; Our work is over: Recursively let all the kids sync.
+               ;; And `max-height` will be reduced by 1.
+               (recur (lam (role c)
+                        (send c sync
+                          (send m-other refr role)
+                          (thunk (escape 'CONFLICT)))))))
+>>>>>>> e7343617c3d456e56032450da25a187da94922ae
 
            (when (memq result
                        '(CONFLICT CANT-SYNC CYCLE))
