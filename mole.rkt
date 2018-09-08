@@ -88,8 +88,8 @@
       (match (get-kids)
         [(list)  0]
         [kids    (add1 (apply max
-                         (map (lam (k) (send k get-height))
-                              (get-kids))))]))
+                         (for/list ([k (get-kids)])
+                           (send k get-height))))]))
 
     (define/public (add-kid role mole)
       (check-pred symbol? role
@@ -108,9 +108,6 @@
           (set! no-sync ls)
           (error "SET-NO-SYNC -- Illegal state" sync-ls ls)))
 
-    (define/public (repr)
-      (repr-core (car (get-repr-env))))
-
     (def (classify)
       (match data
         ['?DATA  (match (get-ctor)
@@ -121,56 +118,60 @@
                    [_  'KNOWN-STRUCT])]
         [_  'ATOM]))
 
-    (define/public (get-repr-env [env   (make-hasheq)]
-                                 [count 65])
+    (define/public (custom-display port)
+      (display (repr) port))
+
+    (define/public (custom-write port)
+      (write (cons data
+                   (hash->list dic))
+             port))
+
+    (define/public (repr)
+      (let* ([env (make-hasheq)])
+        (set-repr-env! env
+                       (let ([count 64])
+                         ;; Count closure
+                         (thunk (set! count (add1 count))
+                                (integer->char count))))
+        (repr-core env)))
+
+    (define/public (set-repr-env! env get-next)
       ;; Sort out which variables are
-      ;; represented by which symbol. (mutates `env`)
+      ;; represented by which symbol.
       (match (classify)
         ['BLANK
          (match (hash-ref env
                           this
                           'UNBOUND)
-           ['UNBOUND (let ([new-symbol
-                            (integer->char count)])
-                       (for-each (lam (m)
-                                   (hash-set! env
-                                              m
-                                              new-symbol))
-                                 sync-ls))
-                     (set! count (+ 1 count))]
+           ['UNBOUND (let ([new-symbol  (get-next)])
+                       (for ([m sync-ls])
+                         (hash-set! env
+                                    m
+                                    new-symbol)))]
            [_
             ;; Already bound
             (void)])]
 
-        ['ATOM  (void)]
-
         [(or 'KNOWN-STRUCT
             'UNKNOWN-STRUCT)
-         (recur (lam (role kid)
-                  (match (send kid get-repr-env env count)
-                    [(cons _ c)
-                     (set! count c)])))])
+         (for ([kid (get-kids)])
+           (send kid set-repr-env!
+             env get-next))]
 
-      ;; Finally, returns the modified environment
-      (cons env count))
+        ['ATOM  (void)]))
 
     (define/public (repr-core env)
-      ;; `env`: sync list -> name entry
       (match (classify)
-        ['BLANK
-         (hash-ref env
-                   this
-                   (thunk (error "Repr code is wrong")))]
+        ['BLANK  (hash-ref env this)]
 
-        ['ATOM  data]
+        ['ATOM   data]
 
         ['UNKNOWN-STRUCT
-         (map (lam (role)
-                ;; Display the roles and the kids.
-                (cons role
-                      (send (refr role) repr-core env)))
-              (remq* '(type ctor)
-                     (get-roles)))]
+         (for/list ([role (remq* '(type ctor)
+                                 (get-roles))])
+           ;; Display the roles and the kids.
+           (cons role
+                 (send (refr role) repr-core env)))]
 
         ['KNOWN-STRUCT
          (match (get-ctor)
@@ -180,19 +181,11 @@
                (if (null? roles)
                    leader
                    (cons leader
-                         (map (lam (role)
-                                (match (refr role)
-                                  ['NOT-FOUND  '?]
-                                  [kid
-                                   (send kid repr-core env)]))
-                              roles)))])])]))
-
-    (define/public (custom-display port)
-      (display (repr) port))
-
-    (define/public (custom-write port)
-      ;; Also specifies the how the Repl prints
-      (display (repr) port))
+                         (for/list ([role roles])
+                           (match (refr role)
+                             ['NOT-FOUND  '?]
+                             [kid
+                              (send kid repr-core env)]))))])])]))
 
     (define/public (refr role)
       ;; Like `ref`, but reference a direct kid
@@ -226,17 +219,8 @@
       ;; Tell those in the sync list to do something.
       ;; `task` is a function takes a molecule.
       (check-pred procedure? task)
-      (for-each
-       (lam (subject)
-         (task subject))
-       (remq this sync-ls)))
-
-    (define-syntax-rule (recur task)
-      ;; Order the kids to do something.
-      ;; `task` takes a role and a molecule
-      (hash-for-each dic
-                     (lam (role kid)
-                       (task role kid))))
+      (for ([subject (remq this sync-ls)])
+        (task subject)))
 
     (define/public (clone-map)
       ;; Returns a mapping of the originals to their copies,
@@ -248,23 +232,20 @@
             [new-me  (new mole%)])
         (send new-me update data)  ; Clone the data
         (when no-touch?
-          (send new-me mark-no-touch))  ; Clone the information necessary
+          (send new-me mark-no-touch))  ; Clone no-touch
 
-        (hash-for-each
-         ;; Work with the kids
-         dic
-         (lam (role kid)
-           (let* ([cp-res (send kid clone-map)]
-                  [lu     (hash-ref cp-res kid)])
-             ;; Add the kids for `new-me`
-             (send new-me add-kid role lu)
-             ;; Change `the-map`
-             (hash-union! the-map cp-res))))
+        (for ([(role kid) dic])
+          ;; Work with the kids
+          (let* ([cp-res (send kid clone-map)]
+                 [lu     (hash-ref cp-res kid)])
+            ;; Add the kids for `new-me`
+            (send new-me add-kid role lu)
+            ;; Change `the-map`
+            (hash-union! the-map cp-res)))
 
         (hash-set!
          ;; Don't forget to map itself.
-         the-map
-         this new-me)
+         the-map this new-me)
 
         the-map))
 
@@ -272,22 +253,21 @@
       ;; The complete cloning interface (works for the root)
       ;; This is a major time consumer, be efficient.
       (let ([cns (clone-map)])
-        (hash-for-each cns
-                       (lam (orig clone)
-                         ;; Translate the entire sync list
-                         ;; to the copied version.
-                         (send clone set-sync-ls
-                           (map
-                            (lam (m)
-                              (hash-ref cns
-                                        m
-                                        (thunk
-                                         (error "Sync-ls has non-descendants."
-                                                this))))
-                            (send orig get-sync-ls))
-                           no-fail)))
-        ;; This will return the root's copy.
-        (hash-ref cns this)))
+        (for ([(orig clone) cns])
+          (send clone set-sync-ls
+            ;; Translate the entire sync list
+            ;; to the copied version.
+            (for/list ([m (send orig get-sync-ls)])
+              (hash-ref cns
+                        m
+                        (thunk
+                         (error "Sync-ls has non-descendants."
+                                this))))
+            no-fail))
+
+        (hash-ref
+         ;; Return the root's copy.
+         cns this)))
 
     (define/public (just-expand path)
       ;; Keep adding new kids
@@ -363,8 +343,8 @@
                       1
                       "This kid is new")
           (send c set-sync-ls
-            (map (lam (sy-i) (send sy-i refr role))
-                 sync-ls)
+            (for/list ([sy-i sync-ls])
+              (send sy-i refr role))
             no-fail)
           ;; Then let them carry over.
           (send c cascade (cdr path)))))
@@ -396,20 +376,16 @@
                                                   (send m-other get-height)))]
                       [height-before  (max-height)])
                  ;; Add the missing kids...
-                 (set-for-each
-                  ;; ... for us,
-                  (set-subtract their-roles
-                                our-roles)
-                  (lam (role)
-                    (update-role role '?DATA)))
+                 (for ([role (set-subtract their-roles
+                                           our-roles)])
+                   ;; ... for us,
+                   (update-role role '?DATA))
 
-                 (set-for-each
-                  ;; ... and for the other guy.
-                  (set-subtract our-roles
-                                their-roles)
-                  (lam (role)
-                    (send m-other update-role
-                      role '?DATA)))
+                 (for ([role (set-subtract our-roles
+                                           their-roles)])
+                   ;; ... and for the other guy.
+                   (send m-other update-role
+                     role '?DATA))
 
                  (when (> (max-height)
                           height-before)
@@ -434,17 +410,16 @@
                       merge
                       (thunk (escape 'CANT-SYNC))))))
 
-               (recur
-                ;; Our work is over: Recursively let all the kids sync.
-                ;; And `max-height` will be reduced by 1.
-                (lam (role c)
-                  (send c sync
-                    (send m-other refr role)
-                    (thunk (escape 'CONFLICT)))))))
+               (for ([(role kid) dic])
+                 ;; Our work is over: Recursively let all the kids sync.
+                 ;; And `max-height` will be reduced by 1.
+                 (send kid sync
+                   (send m-other refr role)
+                   (thunk (escape 'CONFLICT))))))
 
-           (when (memq result
-                       '(CONFLICT CANT-SYNC CYCLE))
-             (fail-con))]
+           (case result
+             [(CONFLICT CANT-SYNC CYCLE) (fail-con)]
+             [else                       (void)])]
 
           [(x x)
            ;; They're consistent atoms

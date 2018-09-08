@@ -73,9 +73,9 @@
 (send m2 update-path '[h i] T)
 
 (displayln "These three should be the same")
-(send a refr 'b)
-m2
-(send a refr 'f)
+(displayln (send a refr 'b))
+(displayln m2)
+(displayln (send a refr 'f))
 
 (send m2 update-path '[h q] R)
 (check-equal? (send m2 update-path
@@ -142,7 +142,7 @@ m2
  "Intro to variables"
  (def m (new mole%))
  (displayln "This should be a variable")
- m)
+ (displayln m))
 
 (test-case
  "Intro to variables 2"
@@ -183,7 +183,7 @@ m2
  (def m (new mole%))
  (send m update-role 'type wf)
  (displayln "This should also be a variable")
- m)
+ (displayln m))
 
 (test-case
  "Syncing with cycle"
