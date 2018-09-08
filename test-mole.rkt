@@ -128,7 +128,7 @@
  (send m1 update-role 'd '?DATA)
  (send m1 update-path '[d a] '?DATA)
  (send m1 update-path '[d b] '?DATA)
- (send m1 sync-path '[d a] '[d b])
+ (send m1 sync-paths '([d a] [d b]))
  (send m1 sync m2)
  (def TELE (Sym TELE))
  (send m2 update-path '[d b] TELE)
@@ -147,8 +147,8 @@
 (test-case
  "Intro to variables 2"
  (def m (new mole%))
- (send m sync-path '[a] '[b])
- (send m sync-path '[a] '[c d])
+ (send m sync-paths '([a] [b]))
+ (send m sync-paths '([a] [c d]))
  (send m update-role 'e '?DATA)
  (displayln "a, b and d should  be the same")
  (pdisplay m 25))
@@ -156,8 +156,8 @@
 (test-case
  "Hard variable example"
  (def m (new mole%))
- (send m sync-path '[a] '[b c])
- (send m sync-path '[e] '[b d])
+ (send m sync-paths '([a] [b c]))
+ (send m sync-paths '([e] [b d]))
  (displayln "a, c and d, e should  be the same")
  (pdisplay m 35))
 
@@ -165,18 +165,18 @@
 (test-case
  "no-sync usage"
  (def m (new mole%))
- (send m distinguish-paths '([a] [b]))
+ (send m distinguish '([a] [b]))
  (check-equal? "Of course it fails!"
-               (send m sync-path '[a] '[b] (thunk "Of course it fails!"))))
+               (send m sync-paths '([a] [b]) (thunk "Of course it fails!"))))
 
 (test-case
  "no-sync usage 2"
  (def m (new mole%))
- (send m distinguish-paths '([a] [b]))
- (send m sync-path '[a] '[c])
+ (send m distinguish '([a] [b]))
+ (send m sync-paths '([a] [c]))
  (check-equal? "Now it fails"
-               (send m sync-path
-                 '[c] '[b] (thunk "Now it fails"))))
+               (send m sync-paths
+                 '([c] [b]) (thunk "Now it fails"))))
 
 (test-case
  "Display"
@@ -188,18 +188,18 @@
 (test-case
  "Syncing with cycle"
  (def m (new mole%))
- (send m sync-path '[a b] '[c])
+ (send m sync-paths '([a b] [c]))
  (check-eq? #f
-            (send m sync-path '[a] '[c] (thunk #f)))
+            (send m sync-paths '([a] [c]) (thunk #f)))
  (check-eq? #f
-            (send m sync-path '[a] '[a b] (thunk #f))))
+            (send m sync-paths '([a] [a b]) (thunk #f))))
 
 (test-case
  "Syncing with cycle 2"
  (def m (new mole%))
- (send m sync-path '[a b] '[c])
+ (send m sync-paths '([a b] [c]))
  (check-eq? #f
-            (send m sync-path '[] '[a] (thunk #f))))
+            (send m sync-paths '([] [a]) (thunk #f))))
 
 (test-case
  "No touch"
@@ -216,3 +216,17 @@
  (send m1 mark-no-touch)
  (check-eq? #f
             (send m2 update A (thunk #f))))
+
+(test-case
+ "clone will preserve no-sync and no-touch"
+ (def m (new mole%))
+ (send m update-role 'a '?DATA)
+ (send m preserve '([a] [b]))
+ (send m update-role 'b '?DATA)
+ (send m distinguish '([a] [b]))
+
+ (def mc (send m copy))
+ (check-equal? (send (send mc refr 'b) get-no-sync)
+               (list (send mc refr 'a)))
+ (check-eq? #f
+            (send mc update-role 'b R (thunk #f))))

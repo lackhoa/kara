@@ -42,14 +42,12 @@
       (hash-keys dic))
     (define/public (get-kids)
       (hash-values dic))
-
-
+    (define/public (get-no-sync)
+      no-sync)
     (define/public (get-sync-ls)
       sync-ls)
-
     (define/public (get-ctor)
       (refr-data 'ctor))
-
     (define/public (get-type)
       (refr-data 'type))
 
@@ -153,7 +151,7 @@
             (void)])]
 
         [(or 'KNOWN-STRUCT
-            'UNKNOWN-STRUCT)
+             'UNKNOWN-STRUCT)
          (for ([kid (get-kids)])
            (send kid set-repr-env!
              env get-next))]
@@ -261,9 +259,17 @@
               (hash-ref cns
                         m
                         (thunk
-                         (error "Sync-ls has non-descendants."
+                         (error "sync-ls has non-descendants."
                                 this))))
-            no-fail))
+            no-fail)
+          (send clone set-no-sync
+            ;; Same thing with no-sync
+            (for/list ([m (send orig get-no-sync)])
+              (hash-ref cns
+                        m
+                        (thunk
+                         (error "no-sync-ls has non-descendants."
+                                this))))))
 
         (hash-ref
          ;; Return the root's copy.
@@ -301,7 +307,7 @@
                    ['?DATA (set-data val (thunk (escape 'NO-TOUCH)))
                            (inform
                             (lam (m) (send m set-data
-                                     val (thunk (escape 'NO-TOUCH)))))]
+                                       val (thunk (escape 'NO-TOUCH)))))]
                    ;; Conflict: available data is not equal.
                    [_      (escape 'CONFLICT)]))
 
@@ -332,8 +338,8 @@
       ;; Flush the sync list down to the
       ;; new descendants on a path.
       (when (and (not (null? path))
-               (> (length sync-ls)
-                  1))
+                 (> (length sync-ls)
+                    1))
         ;; Only work when we have something in the sync list.
         (let* ([role (car path)]
                [c    (refr role)])
@@ -445,35 +451,51 @@
              (send m-other copy)])
         (sync m-other fail-con)))
 
-    (define/public (sync-path p1
-                              p2
-                              [fail-con no-fail])
-      ;; Sync two descendants of this molecules.
-      ;; If they don't exist, expand them.
-      (when (eq? 'NOT-FOUND (ref p1))
-        (expand p1))
-      (when (eq? 'NOT-FOUND (ref p2))
-        (expand p2))
-      (send (ref p1) sync
-        (ref p2)
-        fail-con))
+    (define/public (sync-paths paths
+                               [fail-con no-fail])
+      ;; Sync two or more descendants.
+      (check-true (>= (length paths) 2)
+                  "sync-paths must be given than one paths")
 
-
-    (define/public (distinguish-paths paths)
-      ;; Do not let these molecules sync with each other.
-      ;; (note: overwrites existing no-sync policies)
       (let ([moles null])
         (for ([p paths])
           (match (ref p)
-            ['NOT-FOUND
-             (expand p)
-             (cons! (ref p) moles)]
+            ['NOT-FOUND  (expand p)
+                         (cons! (ref p) moles)]
+            [m           (cons! m moles)]))
 
-            [m  (cons! m moles)]))
+        (def result
+          (let/ec escape
+            (let ([master   (first moles)]
+                  [servants (list-tail moles 1)])
+              (for ([m servants])
+                (send m sync
+                  master (thunk (escape 'FAILURE)))))))
+
+        (when (eq? result 'FAILURE)
+          (fail-con))))
+
+    (define/public (distinguish paths)
+      ;; Do not let these molecules sync with each other.
+      ;; (note: overwrites existing no-sync policies)
+      ;; (note: error check is left to the user)
+      (let ([moles null])
+        (for ([p paths])
+          (match (ref p)
+            ['NOT-FOUND (expand p)
+                        (cons! (ref p) moles)]
+            [m          (cons! m moles)]))
 
         (for ([m moles])
           (send m set-no-sync (remq m
-                                    moles)))))))
+                                    moles)))))
+
+    (define/public (preserve paths)
+      (for ([p paths])
+        (match (ref p)
+          ['NOT-FOUND (expand p)
+                      (send (ref p) mark-no-touch)]
+          [m          (send m mark-no-touch)])))))
 
 
 (define-syntax update-ctors
