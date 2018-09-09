@@ -268,8 +268,8 @@
           (send new-kid just-expand (cdr path)))))
 
     (define/public (expand path)
-      (let ([lu (refr (car path))])
-        (match lu
+      (unless (null? path)
+        (match (refr (car path))
           ['NOT-FOUND
            (just-expand path)
            (inform (lam (m) (send m just-expand path)))
@@ -422,48 +422,37 @@
              (send m-other copy)])
         (sync m-other fail-con)))
 
+    (define/public (expand-and-get-paths paths)
+      (for      ([p paths]) (expand p))
+      (for/list ([p paths]) (ref p)))
+
     (define/public (sync-paths paths
                                [fail-con no-fail])
       ;; Sync two or more descendants.
       (check-true (>= (length paths) 2)
                   "sync-paths must be given than one paths")
 
-      (let ([moles null])
-        (for ([p paths])
-          (match (ref p)
-            ['NOT-FOUND  (expand p)
-                         (cons! (ref p) moles)]
-            [m           (cons! m moles)]))
+      (def result
+        (let/ec escape
+          (let* ([moles    (expand-and-get-paths paths)]
+                 [master   (first moles)]
+                 [servants (list-tail moles 1)])
+            (for ([m servants])
+              (send m sync
+                master (thunk (escape 'FAILURE)))))))
 
-        (def result
-          (let/ec escape
-            (let ([master   (first moles)]
-                  [servants (list-tail moles 1)])
-              (for ([m servants])
-                (send m sync
-                  master (thunk (escape 'FAILURE)))))))
-
-        (when (eq? result 'FAILURE)
-          (fail-con))))
+      (when (eq? result 'FAILURE)
+        (fail-con)))
 
     (define/public (distinguish paths)
       ;; Do not let these molecules sync with each other.
       ;; (note: overwrites existing no-sync policies)
-      ;; (note: error check is left to the user)
-      (let ([moles null])
-        (for ([p paths])
-          (match (ref p)
-            ['NOT-FOUND (expand p)
-                        (cons! (ref p) moles)]
-            [m          (cons! m moles)]))
-
+      ;; (note: error checking is left to the user)
+      (let ([moles (expand-and-get-paths paths)])
         (for ([m moles])
           (send m set-no-sync (remq m
                                     moles)))))
 
     (define/public (preserve paths)
-      (for ([p paths])
-        (match (ref p)
-          ['NOT-FOUND (expand p)
-                      (send (ref p) mark-no-touch)]
-          [m          (send m mark-no-touch)])))))
+      (for ([m (expand-and-get-paths paths)])
+        (send m mark-no-touch)))))
