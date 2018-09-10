@@ -51,6 +51,8 @@
       sync-ls)
     (define/public (get-type)
       type)
+    (define/public (get-expanded?)
+      expanded?)
 
     ;; Setters
     (define/public (set-data val fail-con)
@@ -60,6 +62,9 @@
 
     (define/public (set-type val)
       (set! type val))
+    (define/public (set-type-path path val)
+      (expand path)
+      (send (ref path) set-type val))
 
     (define/public (set-sync-ls ls fail-con)
       ;; Note that this method can fail.
@@ -73,9 +78,15 @@
 
     (define/public (mark-expanded)
       (set! expanded? #t))
+
     (define/public (mark-no-touch)
       (set! no-touch? #t))
 
+    (define/public (mark-no-touch-paths paths)
+      (for ([m expand-and-get-paths paths])
+        (send m mark-no-touch)))
+
+;;; Other methods
     (define/public (get-height)
       (match (get-kids)
         [(list)  0]
@@ -429,8 +440,8 @@
     (define/public (sync-paths paths
                                [fail-con no-fail])
       ;; Sync two or more descendants.
-      (check-true (>= (length paths) 2)
-                  "sync-paths must be given than one paths")
+      (check-false (null? paths)
+                   "sync-paths must be given than one paths")
 
       (def result
         (let/ec escape
@@ -450,9 +461,29 @@
       ;; (note: error checking is left to the user)
       (let ([moles (expand-and-get-paths paths)])
         (for ([m moles])
-          (send m set-no-sync (remq m
-                                    moles)))))
+          (send m set-no-sync
+            (remq m moles)))))
 
     (define/public (preserve paths)
       (for ([m (expand-and-get-paths paths)])
         (send m mark-no-touch)))))
+
+(define-syntax update-macro
+  (syntax-rules ()
+    [(_ mole)  (void)]
+
+    [(_ mole (path ctor) rest ...)
+     (send mole update-path
+       'path ctor)
+     (update-macro mole rest ...)]))
+
+(define-syntax partition
+  (syntax-rules ()
+    [(_ mole)  (void)]
+
+    [(_ mole (path paths ...) rest ...)
+     (let loop)
+     (let ([ls (list 'path 'paths ...)])
+       (send mole sync-paths          ls)
+       (send mole mark-no-touch-paths ls))
+     (partition mole rest ...)]))
