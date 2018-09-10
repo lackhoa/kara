@@ -242,28 +242,28 @@
         the-map))
 
     (define/public (copy)
-      ;; The complete cloning interface (works for the root)
-      ;; This is a major time consumer, be efficient.
+      ;; The complete cloning interface
+      ;; (clones everything besides non-descendants)
+      ;; A major time consumer, be efficient.
       (let ([cns (clone-map)])
         (for ([(orig clone) cns])
           (send clone set-sync-ls
-            ;; Translate the entire sync list
+            ;; Translate the sync list
             ;; to the copied version.
-            (for/list ([m (send orig get-sync-ls)])
-              (hash-ref cns
-                        m
-                        (thunk
-                         (error "sync-ls has non-descendants."
-                                this))))
+            (remq* (list 'NON-DESCENDANT)
+                   (for/list ([m (send orig get-sync-ls)])
+                     (hash-ref cns
+                               m
+                               (thunk 'NON-DESCENDANT))))
             no-fail)
+
           (send clone set-no-sync
             ;; Same thing with no-sync
-            (for/list ([m (send orig get-no-sync)])
-              (hash-ref cns
-                        m
-                        (thunk
-                         (error "no-sync-ls has non-descendants."
-                                this))))))
+            (remq* (list 'NON-DESCENDANT)
+                   (for/list ([m (send orig get-no-sync)])
+                     (hash-ref cns
+                               m
+                               (thunk 'NON-DESCENDANT))))))
 
         (hash-ref
          ;; Return the root's copy.
@@ -510,7 +510,8 @@
   ;; (provided, both are complete regarding the focused types)
   (let ([mclone  (send m copy)]
         [mrclone (send mr copy)])
-    (match (send mclone sync mrclone (thunk #f))
+    (match (send mclone sync
+             mrclone (thunk #f))
       [#f  #f]
       [_   (<= (complexity mr)
               (complexity m))])))
