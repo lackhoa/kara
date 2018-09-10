@@ -398,7 +398,7 @@
   (add1 (sum-list (map complexity
                        (send mole get-kids)))))
 
-(define (replaceable m mr)
+(define (replaceable? m mr)
   ;; mr can replace m
   ;; (provided, both are complete regarding the focused types)
   (let ([mclone  (send m copy)]

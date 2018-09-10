@@ -1,5 +1,6 @@
 #lang racket
-(require "lang/kara.rkt"
+(require racket/list
+         "lang/kara.rkt"
          "engine.rkt"
          "robin.rkt"
          "mole.rkt"
@@ -89,6 +90,28 @@
 
            (loop (queue-fn rest
                            new-nodes)))]))))
+
+(def (cleanup moles)
+  (let ([sorted (sort moles
+                      (lam (fst sec)
+                        (< (complexity fst)
+                           (complexity sec))))])
+    (match moles
+      [(list)  (list)]
+      [(cons start next)
+       (let loop ([primes (list start)]
+                  [next   next])
+         (match next
+           [(list)  primes]
+           [(cons fst rest)
+            (cond [(exists? (curry replaceable? fst)
+                            primes)
+                   rest]
+
+                  [else
+                   (let ([new-primes (append1 primes fst)])
+                     (append new-primes
+                             (loop new-primes rest)))])]))])))
 
 (def (bfs-enum mole)
   (general-enum mole append))
