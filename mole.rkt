@@ -88,12 +88,7 @@
         (send m mark-no-touch)))
 
 ;;; Other methods
-    (define/public (get-height)
-      (match (get-kids)
-        [(list)  0]
-        [kids    (add1 (apply max
-                         (for/list ([k (get-kids)])
-                           (send k get-height))))]))
+
 
     (define/public (add-kid role mole)
       (check-pred number? role
@@ -379,8 +374,8 @@
                    [their-roles    (list->seteq
                                     (send m-other get-roles))]
                    ;; Monitor the height to check for cycle
-                   [max-height     (thunk (max (get-height)
-                                               (send m-other get-height)))]
+                   [max-height     (thunk (max (height this)
+                                               (height m-other)))]
                    [height-before  (max-height)])
               ;; Add the missing kids...
               (for ([role (set-subtract their-roles
@@ -500,3 +495,22 @@
 
     (send mole distinguish
       (map car transform))))
+
+(define (height mole)
+  (match (send mole get-kids)
+    [(list)  0]
+    [kids    (add1 (apply max (map height kids)))]))
+
+(define (complexity mole)
+  (add1 (sum-list (map complexity
+                       (send mole get-kids)))))
+
+(define (replaceable m mr)
+  ;; mr can replace m
+  ;; (provided, both are complete regarding the focused types)
+  (let ([mclone  (send m copy)]
+        [mrclone (send mr copy)])
+    (match (send mclone sync mrclone (thunk #f))
+      [#f  #f]
+      [_   (<= (complexity mr)
+              (complexity m))])))

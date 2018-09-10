@@ -225,3 +225,14 @@
                (list (send mc refr 0)))
  (check-eq? #f
             (send mc update-role 1 R (thunk #f))))
+
+(test-case
+ "Replaceability"
+ (def m (new mole%))
+ (send m update-role 0 A)
+ (send m update-path '[0 0] B)
+ (def mr (new mole%))
+ (send mr update-role 0 A)
+ (check-eq? (replaceable m mr) #t "m can be replaced")
+ (check-eq? (replaceable mr m) #f "mr cannot be replaced")
+ (check-eq? (replaceable m m)  #t "m can be replaced by itself"))

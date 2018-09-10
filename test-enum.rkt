@@ -52,4 +52,11 @@
   (displayln m)
   (bfs m))
 
-(displayln (modus))
+;; (displayln (modus))
+
+(def (enum)
+  (def m (new mole%))
+  (send m set-type entailment)
+  (gen-get (bfs-enum m) 20))
+
+(enum)

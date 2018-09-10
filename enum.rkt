@@ -34,9 +34,9 @@
                                  [#t  (loop prest)])])]
                    [else  (loop prest)]))])))
 
-(def (general-search mole
-                     queue-fn
-                     [focused-types (list entailment)])
+(def (general-prove mole
+                    queue-fn
+                    [focused-types (list entailment)])
   ;; Returns: a single complete molecule, or 'NO-VALUE.
   (let/ec return
     (let loop ([nodes  (list (cons mole null))])
@@ -60,11 +60,38 @@
                            new-nodes)))]))))
 
 (def (bfs mole)
-  (general-search mole append))
+  (general-prove mole append))
 
 (def (dfs mole)
-  (general-search mole (flip append)))
+  (general-prove mole (flip append)))
 
+(def (general-enum mole
+                   queue-fn
+                   [focused-types (list entailment)])
+  ;; Returns: a stream of complete molecules
+  (generator ()
+    (let loop ([nodes  (list (cons mole null))])
+      (match nodes
+        [(list)  'DONE]
+
+        [(cons (cons mfocus target)
+               rest)
+         (let ([new-moles  (expand mfocus target)]
+               [new-nodes  null])
+           (for ([new-mole new-moles])
+             (match (get-target new-mole
+                                focused-types)
+               ['NO-MORE-TARGETS  (yield new-mole)]  ; Good news.
+               [new-target
+                (send (send new-mole ref target) mark-expanded) ; Tag it so we don't expand again
+                (cons! (cons new-mole new-target)
+                       new-nodes)]))
+
+           (loop (queue-fn rest
+                           new-nodes)))]))))
+
+(def (bfs-enum mole)
+  (general-enum mole append))
 
 (def (expand mole target)
   ;; Returns: a (possibly empty) list of consistent molecules,
