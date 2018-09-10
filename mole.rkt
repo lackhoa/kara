@@ -29,30 +29,19 @@
       ;; it is NOT synced among the items of `sync-ls`.
       (list))
 
-    (def expanded?
-      #f)
-    (def no-touch?
-      ;; if set to #t, will return failure
-      ;; when we try to update data
-      #f)
+    (def expanded? #f)
+
+    (def no-touch? #f)  ; If true, will not update data
 
     ;; Getters
-    (define/public (get-dic)
-      dic)
-    (define/public (get-data)
-      data)
-    (define/public (get-roles)
-      (hash-keys dic))
-    (define/public (get-kids)
-      (hash-values dic))
-    (define/public (get-no-sync)
-      no-sync)
-    (define/public (get-sync-ls)
-      sync-ls)
-    (define/public (get-type)
-      type)
-    (define/public (get-expanded?)
-      expanded?)
+    (define/public (get-dic)       dic)
+    (define/public (get-data)      data)
+    (define/public (get-roles)     (hash-keys dic))
+    (define/public (get-kids)      (hash-values dic))
+    (define/public (get-no-sync)   no-sync)
+    (define/public (get-sync-ls)   sync-ls)
+    (define/public (get-type)      type)
+    (define/public (get-expanded?) expanded?)
 
     ;; Setters
     (define/public (set-data val fail-con)
@@ -62,12 +51,8 @@
 
     (define/public (set-type val)
       (set! type val))
-    (define/public (set-type-path path val)
-      (expand path)
-      (send (ref path) set-type val))
 
     (define/public (set-sync-ls ls fail-con)
-      ;; Note that this method can fail.
       (check-pred list? ls
                   "Sync list must be non-empty")
 
@@ -83,13 +68,7 @@
     (define/public (mark-no-touch)
       (set! no-touch? #t))
 
-    (define/public (mark-no-touch-paths paths)
-      (for ([m (expand-and-get-paths paths)])
-        (send m mark-no-touch)))
-
 ;;; Other methods
-
-
     (define/public (add-kid role mole)
       (check-pred number? role
                   "Role is a number")
@@ -176,31 +155,6 @@
       (hash-ref dic
                 role
                 'NOT-FOUND))
-
-    (define/public (ref path)
-      ;; Reference a descendant.
-      (if (null? path)
-          this
-          (match (refr (car path))
-            ['NOT-FOUND 'NOT-FOUND]
-
-            [kid (send kid ref (cdr path))])))
-
-    (define/public (ref-data path)
-      ;; Reference the data of a kid.
-      (match (ref path)
-        ['NOT-FOUND '?DATA]
-        [kid        (send kid get-data)]))
-
-    (define/public (ref-type path)
-      (match (ref path)
-        ['NOT-FOUND '?TYPE]
-        [kid        (send kid get-type)]))
-
-    (define/public (refr-data path)
-      (match (refr path)
-        ['NOT-FOUND '?DATA]
-        [kid        (send kid get-data)]))
 
     (def (inform task)
       ;; Tell those in the sync list to do something.
@@ -308,26 +262,6 @@
           [(or 'NO-TOUCH 'CONFLICT)  (fail-con)]
           [_                        (void)])))
 
-    (define/public (update-path path
-                                val
-                                [fail-con no-fail])
-      ;; Just a convenience function
-      (match (ref path)
-        ['NOT-FOUND
-         (expand path)
-         (send (ref path) update val fail-con)]
-
-        [kid
-         (send kid update val fail-con)]))
-
-    (define/public (update-role role
-                                val
-                                [fail-con no-fail])
-      ;; Short-hand for the short-hand that is update-path.
-      (update-path (list role)
-                   val
-                   fail-con))
-
     (define/public (cascade path)
       ;; Flush the sync list down to the
       ;; new descendants on a path.
@@ -424,48 +358,7 @@
             CYCLE
             FAIL-LOW
             NO-TOUCH)  (fail-con)]
-          [else        (void)])))
-
-    (define/public (unify m-other
-                          [fail-con no-fail])
-      ;; Like sync, but the only difference is that
-      ;; it doesn't have an impact on `m-other`
-      (let ([m-other-clone
-             (send m-other copy)])
-        (sync m-other fail-con)))
-
-    (define/public (expand-and-get-paths paths)
-      (for      ([p paths]) (expand p))
-      (for/list ([p paths]) (ref p)))
-
-    (define/public (sync-paths paths
-                               [fail-con no-fail])
-      ;; Sync two or more descendants.
-      (check-false (null? paths)
-                   "sync-paths must be given than one paths")
-
-      (match (let/ec escape
-               (let* ([moles    (expand-and-get-paths paths)]
-                      [master   (first moles)]
-                      [servants (list-tail moles 1)])
-                 (for ([m servants])
-                   (send m sync
-                     master (thunk (escape 'FAILURE))))))
-        ['FAILURE  (fail-con)]
-        [_         (void)]))
-
-    (define/public (distinguish paths)
-      ;; Do not let these molecules sync with each other.
-      ;; (note: overwrites existing no-sync policies)
-      ;; (note: error checking is left to the user)
-      (let ([moles (expand-and-get-paths paths)])
-        (for ([m moles])
-          (send m set-no-sync
-            (remq m moles)))))
-
-    (define/public (preserve paths)
-      (for ([m (expand-and-get-paths paths)])
-        (send m mark-no-touch)))))
+          [else        (void)])))))
 
 
 ;;; Macros
@@ -515,3 +408,70 @@
       [#f  #f]
       [_   (<= (complexity mr)
               (complexity m))])))
+
+(define (ref mole path)
+  ;; Reference a descendant.
+  (if (null? path)
+      mole
+      (match (send mole refr (car path))
+        ['NOT-FOUND 'NOT-FOUND]
+        [kid        (ref kid (cdr path))])))
+
+(define (set-type-path mole path val)
+  (send mole expand path)
+  (send (ref mole path) set-type val))
+
+(define (ref-data mole path)
+  (match (ref mole path)
+    ['NOT-FOUND '?DATA]
+    [kid        (send kid get-data)]))
+
+(define (ref-type mole path)
+  (match (ref mole path)
+    ['NOT-FOUND '?TYPE]
+    [kid        (send kid get-type)]))
+
+(define (update-path mole path val
+                     [fail-con no-fail])
+  (match (ref mole path)
+    ['NOT-FOUND (send mole expand path)
+                (send (ref mole path) update
+                  val fail-con)]
+    [kid        (send kid update
+                  val fail-con)]))
+
+(define (expand-and-get-paths mole paths)
+  (for      ([p paths]) (send mole expand p))
+  (for/list ([p paths]) (ref mole p)))
+
+(define (sync-paths mole paths
+                    [fail-con no-fail])
+  (check-false (null? paths)
+               "sync-paths must be given than one paths")
+
+  (match (let/ec escape
+           (let* ([moles    (expand-and-get-paths mole paths)]
+                  [master   (first moles)]
+                  [servants (list-tail moles 1)])
+             (for ([m servants])
+               (send m sync
+                 master (thunk (escape 'FAILURE))))))
+    ['FAILURE  (fail-con)]
+    [_         (void)]))
+
+(define (preserve mole paths)
+  (for ([m  (expand-and-get-paths mole paths)])
+    (send m mark-no-touch)))
+
+(define (distinguish mole paths)
+  ;; Do not let these molecules sync with each other.
+  ;; note: overwrites existing no-sync policies
+  ;; note: error checking is left to the user
+  (let ([moles (expand-and-get-paths mole paths)])
+    (for ([m moles])
+      (send m set-no-sync
+        (remq m moles)))))
+
+(define (mark-no-touch-paths mole paths)
+  (for ([m (expand-and-get-paths mole paths)])
+    (send m mark-no-touch)))

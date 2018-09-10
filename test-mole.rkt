@@ -8,14 +8,14 @@
 ;;; "Elementary stuff"
 (def m1 (new mole%))
 
-(send m1 update-role 3 W)
+(update-path m1 '[3] W)
 
 (def d (send m1 refr 3))
 
 (check-eq? (send d get-data)
            W)
 
-(send m1 update-role 0 '?DATA)
+(update-path m1 '[0] '?DATA)
 
 (check-eqv? (length (send m1 get-roles))
             2)
@@ -25,17 +25,14 @@
 (check-equal? (send a get-sync-ls)
               (list a))
 
-(send m1 update-path
-  '[4]
-  '?DATA)
+(update-path m1 '[4] '?DATA)
 
 (def a-clone (send m1 refr 4))
 
 (send a-clone sync a)
 
 ;; Now we update-path a
-(send a update-path
-  '[5] X)
+(update-path a '[5] X)
 (def a-ad (send a refr 5))
 (check-eq? (send a-ad get-data)
            X)
@@ -46,18 +43,17 @@
            X)
 
 ;;; "another harder example"
-(send a update-path '[0 0] W)
-(send a update-path '[1 0] V)
+(update-path a '[0 0] W)
+(update-path a '[1 0] V)
 (check-equal?
- (send a sync-paths
-   '([0] [1])
-   (thunk "Will fail!"))
+ (sync-paths a '([0] [1])
+             (thunk "Will fail!"))
  "Will fail!")
 
 
 ;;; "More sync"
 ;; Let's go again with the sync
-(send a update-path '[6 7] V)
+(update-path a '[6 7] V)
 
 (send (send a refr 1) sync
   (send a refr 6) )
@@ -70,7 +66,7 @@
 ;;; "Try modifying f from somewhere else"
 (def m2 (new mole%))
 (send m2 sync (send a refr 1))
-(send m2 update-path '[3 1] T)
+(update-path m2 '[3 1] T)
 
 (newline)
 (displayln "These three should be the same")
@@ -78,27 +74,24 @@
 (displayln m2)
 (displayln (send a refr 6))
 
-(send m2 update-path '[3 2] R)
-(check-equal? (send m2 update-path
-                '[3 2]
-                Q
-                (thunk "Now we fail"))
+(update-path m2 '[3 2] R)
+(check-equal? (update-path m2 '[3 2] Q
+                           (thunk "Now we fail"))
               "Now we fail")
 
 (test-case
  "Sync from the upper level and change on the lower level"
  (def m3 (new mole%))
- (send m3 update-role 6 X)
- (send m3 update-role 10 '?DATA)
+ (update-path m3 '[6] X)
+ (update-path m3 '[10] '?DATA)
  (def m4 (new mole%))
- (send m4 update-role 8 Y)
- (send m4 update-role 3 Z)
- (send m4 update-role 6 '?DATA)
- (send m4 update-role 10 '?DATA)
+ (update-path m4 '[8] Y)
+ (update-path m4 '[3] Z)
+ (update-path m4 '[6] '?DATA)
+ (update-path m4 '[10] '?DATA)
  (send m3 sync m4)
- (send m3
-     update-role 10 S)
- (check-eq? (send m4 refr-data 10)
+ (update-path m3 '[10] S)
+ (check-eq? (send (send m4 refr 10) get-data)
             S))
 
 
@@ -110,32 +103,31 @@
                (list cp))
  (check-eq? (send test get-data)
             '?DATA)
- (send cp update-role 5 '?DATA)
- (send cp update-role 2 '?DATA)
+ (update-path cp '[5] '?DATA)
+ (update-path cp '[2] '?DATA)
  (def cpcp (send cp copy))
  ;; Now let's try the syncing
  (send (send cp refr 5)
      sync (send cp refr 2))
  (def cnop (send cp copy))
- (send cnop
-     update-path '[5 3] R)
- (check-eq? (send cnop ref-data '[5 3])
-            (send cnop ref-data '[2 3])))
+ (update-path cnop '[5 3] R)
+ (check-eq? (ref-data cnop '[5 3])
+            (ref-data cnop '[2 3])))
 
 (test-case
  "Telekinesis"
  (def m1 (new mole%))
  (def m2 (new mole%))
- (send m1 update-role 3 '?DATA)
- (send m1 update-path '[4 0] '?DATA)
- (send m1 update-path '[4 1] '?DATA)
- (send m1 sync-paths '([4 0] [3 1]))
+ (update-path m1 '[3] '?DATA)
+ (update-path m1 '[4 0] '?DATA)
+ (update-path m1 '[4 1] '?DATA)
+ (sync-paths m1 '([4 0] [3 1]))
  (send m1 sync m2)
  (def TELE (Sym TELE))
- (send m2 update-path '[4 1] TELE)
- (check-eq? (send m1 ref-data '[4 1])
+ (update-path m2 '[4 1] TELE)
+ (check-eq? (ref-data m1 '[4 1])
             TELE)
- (check-eqv? (length (send (send m1 ref '[4 0]) get-sync-ls))
+ (check-eqv? (length (send (ref m1 '[4 0]) get-sync-ls))
              4))
 
 (test-case
@@ -148,8 +140,8 @@
 (test-case
  "Intro to variables 2"
  (def m (new mole%))
- (send m sync-paths '([0] [1] [2 0]))
- (send m update-role '4 '?DATA)
+ (sync-paths m '([0] [1] [2 0]))
+ (update-path m '[4] '?DATA)
  (newline)
  (displayln "0, 1 and 2-0 should  be the same")
  (pdisplay m 25))
@@ -157,8 +149,8 @@
 (test-case
  "Hard variable example"
  (def m (new mole%))
- (send m sync-paths '([0] [1 0]))
- (send m sync-paths '([3] [2 1]))
+ (sync-paths m '([0] [1 0]))
+ (sync-paths m '([3] [2 1]))
  (newline)
  (displayln "0, 1-2 and 3, 2-1 should  be the same")
  (pdisplay m 35))
@@ -167,34 +159,34 @@
 (test-case
  "no-sync usage"
  (def m (new mole%))
- (send m distinguish '([0] [1]))
+ (distinguish m '([0] [1]))
  (check-equal? "Of course it fails!"
-               (send m sync-paths '([0] [1]) (thunk "Of course it fails!"))))
+               (sync-paths m '([0] [1]) (thunk "Of course it fails!"))))
 
 (test-case
  "no-sync usage 2"
  (def m (new mole%))
- (send m distinguish '([0] [1]))
- (send m sync-paths '([0] [2]))
+ (distinguish m '([0] [1]))
+ (sync-paths m '([0] [2]))
  (check-equal? "Now it fails"
-               (send m sync-paths
-                 '([2] [1]) (thunk "Now it fails"))))
+               (sync-paths m
+                           '([2] [1]) (thunk "Now it fails"))))
 
 (test-case
  "Syncing with cycle"
  (def m (new mole%))
- (send m sync-paths '([0 1] [2]))
+ (sync-paths m '([0 1] [2]))
  (check-eq? #f
-            (send m sync-paths '([0] [2]) (thunk #f)))
+            (sync-paths m '([0] [2]) (thunk #f)))
  (check-eq? #f
-            (send m sync-paths '([0] [0 1]) (thunk #f))))
+            (sync-paths m '([0] [0 1]) (thunk #f))))
 
 (test-case
  "Syncing with cycle 2"
  (def m (new mole%))
- (send m sync-paths '([0 1] [2]))
+ (sync-paths m '([0 1] [2]))
  (check-eq? #f
-            (send m sync-paths '([] [0]) (thunk #f))))
+            (sync-paths m '([] [0]) (thunk #f))))
 
 (test-case
  "No touch"
@@ -215,24 +207,25 @@
 (test-case
  "clone will preserve no-sync and no-touch"
  (def m (new mole%))
- (send m update-role 0 '?DATA)
- (send m preserve '([0] [1]))
- (send m update-role 1 '?DATA)
- (send m distinguish '([0] [1]))
+ (update-path m '[0] '?DATA)
+ (preserve m '([0] [1]))
+ (update-path m '[1] '?DATA)
+ (distinguish m '([0] [1]))
 
  (def mc (send m copy))
  (check-equal? (send (send mc refr 1) get-no-sync)
                (list (send mc refr 0)))
  (check-eq? #f
-            (send mc update-role 1 R (thunk #f))))
+            (update-path mc '[1] R
+                         (thunk #f))))
 
 (test-case
  "Replaceability"
  (def m (new mole%))
- (send m update-role 0 A)
- (send m update-path '[0 0] B)
+ (update-path m '[0] A)
+ (update-path m '[0 0] B)
  (def mr (new mole%))
- (send mr update-role 0 A)
+ (update-path mr '[0] A)
  (check-eq? (replaceable m mr) #t "m can be replaced")
  (check-eq? (replaceable mr m) #f "mr cannot be replaced")
  (check-eq? (replaceable m m)  #t "m can be replaced by itself"))

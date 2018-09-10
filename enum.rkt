@@ -23,7 +23,7 @@
     (cond [(stream-empty? lvl-stream)  'NO-MORE-TARGETS]
           [else
            (let* ([pfocus  (stream-first lvl-stream)]
-                  [mfocus  (send mole ref pfocus)]
+                  [mfocus  (ref mole pfocus)]
                   [prest   (stream-rest lvl-stream)])
              (cond [(memq (send mfocus get-type)
                           focused-types)
@@ -52,7 +52,7 @@
                                 focused-types)
                ['NO-MORE-TARGETS  (return new-mole)]  ; Good news.
                [new-target
-                (send (send new-mole ref target) mark-expanded) ; Tag it so we don't expand again
+                (send (ref new-mole target) mark-expanded) ; Tag it so we don't expand again
                 (cons! (cons new-mole new-target)
                        new-nodes)]))
 
@@ -83,7 +83,7 @@
                                 focused-types)
                ['NO-MORE-TARGETS  (yield new-mole)]  ; Good news.
                [new-target
-                (send (send new-mole ref target) mark-expanded) ; Tag it so we don't expand again
+                (send (ref new-mole target) mark-expanded) ; Tag it so we don't expand again
                 (cons! (cons new-mole new-target)
                        new-nodes)]))
 
@@ -97,11 +97,11 @@
   ;; Returns: a (possibly empty) list of consistent molecules,
   ;; whose constructors are finalized (and unique).
   ;; `target`: a path
-  (match (send mole ref-data target)
+  (match (ref-data mole target)
     ['?DATA
      ;; Many constructors to choose from.
      (let ([result null]
-           [type   (send mole ref-type target)])
+           [type   (ref-type mole target)])
        (check-false (eq? type '?TYPE))
 
        (for ([ctor type])
@@ -110,10 +110,9 @@
             (let* ([mclone
                     (send mole copy)])
               ;; Cloning is the biggest part
-              (send mclone update-path
-                target ctor)
+              (update-path mclone target ctor)
 
-              (match (process-ctor! (send mclone ref target)
+              (match (process-ctor! (ref mclone target)
                                     recs forms links)
                 ;; Send it off to process-ctor!
                 ['CONFLICT  (void)]
@@ -122,7 +121,7 @@
 
     [(Ctor _ recs forms links)
      ;; Already has a constructor, but haven't expanded it.
-     (match (process-ctor! (send mole ref target)
+     (match (process-ctor! (ref mole target)
                            recs forms links)
        ['CONFLICT null]
        [_         (list mole)])]))
@@ -135,18 +134,14 @@
   (let/cc escape
     (for ([ri recs]
           [i  (in-naturals)])
-      (send mole set-type-path
-        [list i] ri))
+      (set-type-path mole [list i] ri))
 
     (for ([fi forms])
       (match fi
         [(cons path constructor)
-         (send mole update-path
-           path
-           constructor
-           (thunk (escape 'CONFLICT)))]))
+         (update-path mole path constructor
+                      (thunk (escape 'CONFLICT)))]))
 
     (for ([li links])
-      (send mole sync-paths
-        li
-        (thunk (escape 'CONFLICT))))))
+      (sync-paths mole li
+                  (thunk (escape 'CONFLICT))))))
