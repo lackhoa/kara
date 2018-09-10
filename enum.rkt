@@ -8,61 +8,56 @@
          (all-from-out "types.rkt")
          (all-from-out "mole.rkt"))
 
-;; Returns: a stream of paths.
 (def (level-iter m [relative null])
+  ;; Returns: a stream of paths.
   (stream-cons relative
                (stream-interleave
-                (for ([role (send m get-roles)])
+                (for/list ([role (send m get-roles)])
                   (level-iter (send m refr role)
                               (pad relative role))))))
 
-;; Returns: a single complete molecule, or 'NO-VALUE.
+(def (get-target mole focused-types)
+  ;; Returns: a path | 'NO-MORE-TARGETS.
+  (let loop ([lvl-stream
+              (level-iter mole)])
+    (cond [(stream-empty? lvl-stream)  'NO-MORE-TARGETS]
+          [else
+           (let* ([pfocus  (stream-first lvl-stream)]
+                  [mfocus  (send mole ref pfocus)]
+                  [prest   (stream-rest lvl-stream)])
+             (cond [(memq (send mfocus get-type)
+                          focused-types)
+                    (match (send mfocus get-data)
+                      ['?DATA  pfocus]
+                      [_       (match (send mfocus get-expanded?)
+                                 [#f  pfocus]
+                                 [#t  (loop prest)])])]
+                   [else  (loop prest)]))])))
+
 (def (general-search mole
                      queue-fn
                      [focused-types (list entailment)])
-  (let loop ([nodes (list mole)])
-    (match nodes
-      [(list)  'NO-VALUE]
+  ;; Returns: a single complete molecule, or 'NO-VALUE.
+  (let/ec return
+    (let loop ([nodes  (list (cons mole null))])
+      (match nodes
+        [(list)  'NO-VALUE]
 
-      [(cons mfocus mrest)
-       (def next-target
-         ;; Returns: a path | 'NO-MORE-TARGETS.
-         (let loop ([lvl-stream
-                     (level-iter mfocus)])
-           (def (recur)
-             (loop (stream-rest lvl-stream)))
+        [(cons (cons mfocus target)
+               rest)
+         (let ([new-moles  (expand mfocus target)]
+               [new-nodes  null])
+           (for ([new-mole new-moles])
+             (match (get-target new-mole
+                                focused-types)
+               ['NO-MORE-TARGETS  (return new-mole)]  ; Good news.
+               [new-target
+                (send (send new-mole ref target) mark-expanded) ; Tag it so we don't expand again
+                (cons! (cons new-mole new-target)
+                       new-nodes)]))
 
-           (if (stream-empty? lvl-stream)
-               'NO-MORE-TARGETS
-               (let* ([pfocus
-                       (stream-first lvl-stream)]
-                      [mfocus
-                       (send mfocus ref pfocus)])
-
-                 (cond [(memq (send mfocus get-type)
-                              focused-types)
-                        (match (send mfocus get-ctor)
-                          ['?DATA  pfocus]
-
-                          [_  (match (send mfocus get-expanded?)
-                                [#f  pfocus]
-                                [#t  (recur)])])]
-
-                       [else  (recur)])))))
-
-       (match next-target
-         ;; Good news.
-         ['NO-MORE-TARGETS  mfocus]
-
-         [target
-          (let ([new-moles
-                 (expand mfocus target)])
-            (for ([new-mole new-moles])
-              ;; Tag it so we don't expand again
-              (send new-mole mark-expanded))
-
-            (loop (queue-fn mrest
-                            new-moles)))])])))
+           (loop (queue-fn rest
+                           new-nodes)))]))))
 
 (def (bfs mole)
   (general-search mole append))
@@ -71,23 +66,25 @@
   (general-search mole (flip append)))
 
 
-;; Returns: a (possibly empty) list of consistent molecules,
-;; whose constructors are finalized (and unique).
-;; `target`: a path
 (def (expand mole target)
-  (match (send mole ref-ctor target)
+  ;; Returns: a (possibly empty) list of consistent molecules,
+  ;; whose constructors are finalized (and unique).
+  ;; `target`: a path
+  (match (send mole ref-data target)
     ['?DATA
      ;; Many constructors to choose from.
-     (let ([result null])
-       (for ([ctor (send mole ref-type target)])
+     (let ([result null]
+           [type   (send mole ref-type target)])
+       (check-false (eq? type '?TYPE))
+
+       (for ([ctor type])
          (match ctor
            [(Ctor _ recs forms links)
             (let* ([mclone
                     (send mole copy)])
               ;; Cloning is the biggest part
               (send mclone update-path
-                (pad target 'ctor)
-                ctor)
+                target ctor)
 
               (match (process-ctor! (send mclone ref target)
                                     recs forms links)

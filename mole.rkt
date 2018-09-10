@@ -74,7 +74,8 @@
       (cond [(set-empty? (set-intersect no-sync
                                         ls))
              (set! sync-ls ls)]
-            [else  (fail-con)]))
+            [else
+             (fail-con)]))
 
     (define/public (mark-expanded)
       (set! expanded? #t))
@@ -83,7 +84,7 @@
       (set! no-touch? #t))
 
     (define/public (mark-no-touch-paths paths)
-      (for ([m expand-and-get-paths paths])
+      (for ([m (expand-and-get-paths paths)])
         (send m mark-no-touch)))
 
 ;;; Other methods
@@ -194,14 +195,17 @@
       ;; Reference the data of a kid.
       (match (ref path)
         ['NOT-FOUND '?DATA]
+        [kid        (send kid get-data)]))
 
-        [kid (send kid get-data)]))
+    (define/public (ref-type path)
+      (match (ref path)
+        ['NOT-FOUND '?TYPE]
+        [kid        (send kid get-type)]))
 
     (define/public (refr-data path)
       (match (refr path)
         ['NOT-FOUND '?DATA]
-
-        [kid (send kid get-data)]))
+        [kid        (send kid get-data)]))
 
     (def (inform task)
       ;; Tell those in the sync list to do something.
@@ -366,8 +370,9 @@
             (match* (data (send m-other get-data))
               ;; Syncing the data
               [(x x)        (void)]
-              [('?DATA od)  (update od)]
-              [(_ '?DATA)   (send m-other update data)]
+              [('?DATA od)  (update od (thunk (escape 'NO-TOUCH)))]
+              [(_ '?DATA)   (send m-other update
+                              data (thunk (escape 'NO-TOUCH)))]
               [(_ _)        (escape 'CONFLICT)])
 
             (let* ([our-roles      (list->seteq (get-roles))]
@@ -422,8 +427,9 @@
           [(CONFLICT
             CANT-SYNC
             CYCLE
-            FAIL-LOW) (fail-con)]
-          [else       (void)])))
+            FAIL-LOW
+            NO-TOUCH)  (fail-con)]
+          [else        (void)])))
 
     (define/public (unify m-other
                           [fail-con no-fail])
@@ -443,17 +449,15 @@
       (check-false (null? paths)
                    "sync-paths must be given than one paths")
 
-      (def result
-        (let/ec escape
-          (let* ([moles    (expand-and-get-paths paths)]
-                 [master   (first moles)]
-                 [servants (list-tail moles 1)])
-            (for ([m servants])
-              (send m sync
-                master (thunk (escape 'FAILURE)))))))
-
-      (when (eq? result 'FAILURE)
-        (fail-con)))
+      (match (let/ec escape
+               (let* ([moles    (expand-and-get-paths paths)]
+                      [master   (first moles)]
+                      [servants (list-tail moles 1)])
+                 (for ([m servants])
+                   (send m sync
+                     master (thunk (escape 'FAILURE))))))
+        ['FAILURE  (fail-con)]
+        [_         (void)]))
 
     (define/public (distinguish paths)
       ;; Do not let these molecules sync with each other.
@@ -468,22 +472,31 @@
       (for ([m (expand-and-get-paths paths)])
         (send m mark-no-touch)))))
 
+
+;;; Macros
 (define-syntax update-macro
   (syntax-rules ()
     [(_ mole)  (void)]
 
     [(_ mole (path ctor) rest ...)
-     (send mole update-path
-       'path ctor)
-     (update-macro mole rest ...)]))
+     (begin
+       (send mole update-path
+         'path ctor)
+       (update-macro mole rest ...))]))
 
-(define-syntax partition
+(define-syntax partition-helper
   (syntax-rules ()
-    [(_ mole)  (void)]
+    [(_)  null]
+    [(_ (path paths ...) rest ...)
+     (cons (list 'path 'paths ...)
+           (partition-helper rest ...))]))
 
-    [(_ mole (path paths ...) rest ...)
-     (let loop)
-     (let ([ls (list 'path 'paths ...)])
-       (send mole sync-paths          ls)
-       (send mole mark-no-touch-paths ls))
-     (partition mole rest ...)]))
+(define-syntax-rule (partition-macro mole part parts ...)
+  (let ([transform (partition-helper part parts ...)])
+    (for ([paths transform])
+      ;; Sync and mark no touch
+      (send mole sync-paths paths)
+      (send mole mark-no-touch-paths paths))
+
+    (send mole distinguish
+      (map car transform))))

@@ -81,9 +81,9 @@
 
 (def AS
   ;; (=> (-> (-> A
-  ;;          (-> B C))
-  ;;       (-> (-> A B)
-  ;;          (-> A C))))
+  ;;             (-> B C))
+  ;;         (-> (-> A B)
+  ;;             (-> A C))))
   (Ctor 'AS=>
         (recs)
         (forms ([0]     Implication)
@@ -99,8 +99,8 @@
 
 (def AB
   ;; (=> (-> (-> B C)
-  ;;       (-> (-> A B)
-  ;;          (-> A C))))
+  ;;         (-> (-> A B)
+  ;;             (-> A C))))
   (Ctor 'AB=>
         (recs)
         (forms ([0]     Implication)
@@ -111,17 +111,18 @@
 
         (links ([0 1 0 0] [0 1 1 0])
                ([0 0 0]   [0 1 0 1])
-               ([0 1 1 1]))))
+               ([0 1 1 1] [0 0 1]))))
 
 (def MP
   ;; (=> A
   ;;    (=> (-> B A))
   ;;    (=> B))
   (Ctor 'MP=>
-        (recs entailment
+        (recs wf
+              entailment
               entailment)
 
         (forms ([1 0] Implication))  ; (-> B A)
 
-        (links ([0] [1 1])
-               ([1 0] [2]))))
+        (links ([0]     [1 0 1])  ; A
+               ([1 0 0] [2 0])))) ; B
