@@ -218,14 +218,3 @@
  (check-eq? #f
             (update-path mc '[1] R
                          (thunk #f))))
-
-(test-case
- "Replaceability"
- (def m (new mole%))
- (update-path m '[0] A)
- (update-path m '[0 0] B)
- (def mr (new mole%))
- (update-path mr '[0] A)
- (check-eq? (replaceable? m mr) #t "m can be replaced")
- (check-eq? (replaceable? mr m) #f "mr cannot be replaced")
- (check-eq? (replaceable? m m)  #t "m can be replaced by itself"))

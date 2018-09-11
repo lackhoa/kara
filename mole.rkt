@@ -5,7 +5,7 @@
 (provide (all-defined-out))
 
 (def (no-fail)
-  ;; The failure continuation that you're
+  ;; The FAIL continuation that you're
   ;; confident not gonna be called.
   (error "I did not expect this to fail!"))
 
@@ -69,13 +69,14 @@
       (set! no-touch? #t))
 
 ;;; Other methods
-    (define/public (add-kid role mole)
+    (define/public (add-kid role mole fail-con)
       (check-pred number? role
                   "Role is a number")
       (check-class mole mole%
                    "Kid is a molecule")
 
-      (hash-set! dic role mole))
+      (cond [no-touch?  (fail-con)]
+            [else       (hash-set! dic role mole)]))
 
     (define/public (set-no-sync ls)
       ;; This method is intended to be used
@@ -176,18 +177,22 @@
           (send new-me set-data data no-fail)
           (send new-me set-type type)
           (when expanded?
-            (send new-me mark-expanded))
-          (when no-touch?
-            (send new-me mark-no-touch)))
+            (send new-me mark-expanded)))
 
         (for ([(role kid) dic])
           ;; Work with the kids
           (let* ([cp-res (send kid clone-map)]
                  [lu     (hash-ref cp-res kid)])
             ;; Add the kids for `new-me`
-            (send new-me add-kid role lu)
+            (send new-me add-kid
+              role lu no-fail)
             ;; Change `the-map`
             (hash-union! the-map cp-res)))
+
+        (when no-touch?
+          ;; note: this step must be done afterwards,
+          ;; otherwise we wouldn't be able to add kids
+          (send new-me mark-no-touch))
 
         (hash-set!
          ;; Don't forget to map itself.
@@ -204,46 +209,63 @@
           (send clone set-sync-ls
             ;; Translate the sync list
             ;; to the copied version.
-            (remq* (list 'NON-DESCENDANT)
-                   (for/list ([m (send orig get-sync-ls)])
-                     (hash-ref cns
-                               m
-                               (thunk 'NON-DESCENDANT))))
+            (set-remove (for/list ([m (send orig get-sync-ls)])
+                          (hash-ref cns
+                                    m
+                                    (thunk 'NON-DESCENDANT)))
+                        'NON-DESCENDANT)
             no-fail)
 
           (send clone set-no-sync
             ;; Same thing with no-sync
-            (remq* (list 'NON-DESCENDANT)
-                   (for/list ([m (send orig get-no-sync)])
-                     (hash-ref cns
-                               m
-                               (thunk 'NON-DESCENDANT))))))
+            (set-remove (for/list ([m (send orig get-no-sync)])
+                          (hash-ref cns
+                                    m
+                                    (thunk 'NON-DESCENDANT)))
+                        'NON-DESCENDANT)))
 
         (hash-ref
          ;; Return the root's copy.
          cns this)))
 
-    (define/public (just-expand path)
+    (define/public (just-expand path fail-con)
       ;; Keep adding new kids
       ;; until the path is exhausted.
       (unless (null? path)
-        (let ([new-kid (new mole%)])
-          (add-kid (car path) new-kid)
-          (send new-kid just-expand (cdr path)))))
+        (match (let/ec escape
+                 (let ([new-kid (new mole%)])
+                   (add-kid (car path)
+                            new-kid
+                            (thunk (escape 'FAIL)))
+                   (send new-kid just-expand
+                     (cdr path)
+                     (thunk (escape 'FAIL)))))
+          ['FAIL  (fail-con)]
+          [_      (void)])))
 
-    (define/public (expand path)
+    (define/public (expand path
+                           [fail-con no-fail])
       (unless (null? path)
-        (match (refr (car path))
-          ['NOT-FOUND
-           (just-expand path)
-           (inform (lam (m) (send m just-expand path)))
-           ;; The order is important: we must add all
-           ;; components to refer to them in the sync list.
-           (cascade path)
-           (inform (lam (m) (send m cascade path)))]
+        (match (let/ec escape
+                 (match (refr (car path))
+                   ['NOT-FOUND
+                    (just-expand path
+                                 (thunk (escape 'FAIL)))
+                    (inform (lam (m)
+                              (send m just-expand
+                                path
+                                (thunk (escape 'FAIL)))))
+                    ;; The order is important: we must add all
+                    ;; components to refer to them in the sync list.
+                    (cascade path)
+                    (inform (lam (m) (send m cascade path)))]
 
-          [kid
-           (send kid expand (cdr path))])))
+                   [kid
+                    (send kid expand
+                      (cdr path)
+                      (thunk (escape 'FAIL)))]))
+          ['FAIL  (fail-con)]
+          [_      (void)])))
 
     (define/public (update val
                            [fail-con no-fail])
@@ -315,12 +337,15 @@
               (for ([role (set-subtract their-roles
                                         our-roles)])
                 ;; ... for us,
-                (expand (list role)))
+                (expand (list role)
+                        (thunk (escape 'FAIL-LOW))))
 
               (for ([role (set-subtract our-roles
                                         their-roles)])
                 ;; ... for the other guy.
-                (send m-other expand (list role)))
+                (send m-other expand
+                  (list role)
+                  (thunk (escape 'FAIL-LOW))))
 
               (when (> (max-height)
                        height-before)
@@ -398,17 +423,6 @@
   (add1 (sum-list (map complexity
                        (send mole get-kids)))))
 
-(define (replaceable? m mr)
-  ;; mr can replace m
-  ;; (provided, both are complete regarding the focused types)
-  (let ([mclone  (send m copy)]
-        [mrclone (send mr copy)])
-    (match (send mclone sync
-             mrclone (thunk #f))
-      [#f  #f]
-      [_   (<= (complexity mr)
-              (complexity m))])))
-
 (define (ref mole path)
   ;; Reference a descendant.
   (if (null? path)
@@ -418,7 +432,7 @@
         [kid        (ref kid (cdr path))])))
 
 (define (set-type-path mole path val)
-  (send mole expand path)
+  (send mole expand path no-fail)
   (send (ref mole path) set-type val))
 
 (define (ref-data mole path)
@@ -433,18 +447,25 @@
 
 (define (update-path mole path val
                      [fail-con no-fail])
-  (match (ref mole path)
-    ['NOT-FOUND (send mole expand path)
-                (send (ref mole path) update
-                  val fail-con)]
-    [kid        (send kid update
-                  val fail-con)]))
+  (match (let/ec escape
+           (match (ref mole path)
+             ['NOT-FOUND (send mole expand
+                           path
+                           (thunk (escape 'FAIL)))
+                         (send (ref mole path) update
+                           val no-fail)]
+             [kid        (send kid update
+                           val
+                           (thunk (escape 'FAIL)))]))
+    ['FAIL  (fail-con)]
+    [_      (void)]))
 
 (define (expand-and-get-paths mole paths)
   (for      ([p paths]) (send mole expand p))
   (for/list ([p paths]) (ref mole p)))
 
-(define (sync-paths mole paths
+(define (sync-paths mole
+                    paths
                     [fail-con no-fail])
   (check-false (null? paths)
                "sync-paths must be given than one paths")
@@ -455,9 +476,10 @@
                   [servants (list-tail moles 1)])
              (for ([m servants])
                (send m sync
-                 master (thunk (escape 'FAILURE))))))
-    ['FAILURE  (fail-con)]
-    [_         (void)]))
+                 master
+                 (thunk (escape 'FAIL))))))
+    ['FAIL  (fail-con)]
+    [_      (void)]))
 
 (define (preserve mole paths)
   (for ([m  (expand-and-get-paths mole paths)])

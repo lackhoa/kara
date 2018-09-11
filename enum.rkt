@@ -91,27 +91,6 @@
            (loop (queue-fn rest
                            new-nodes)))]))))
 
-(def (cleanup moles)
-  (let ([sorted (sort moles
-                      (lam (fst sec)
-                        (< (complexity fst)
-                           (complexity sec))))])
-    (match moles
-      [(list)  (list)]
-      [(cons start next)
-       (let loop ([primes (list start)]
-                  [next   next])
-         (match next
-           [(list)  primes]
-           [(cons fst rest)
-            (cond [(exists? (curry replaceable? fst)
-                            primes)
-                   rest]
-
-                  [else
-                   (let ([new-primes (append1 primes fst)])
-                     (append new-primes
-                             (loop new-primes rest)))])]))])))
 
 (def (bfs-enum mole)
   (general-enum mole append))
@@ -168,3 +147,65 @@
     (for ([li links])
       (sync-paths mole li
                   (thunk (escape 'CONFLICT))))))
+
+(def (ccs mole)
+  ;; Function to get the conclusion
+  (send mole refr 0))
+
+(def (cleanup moles)
+  (let ([sorted
+         ;; Sort according to complexity of the conclusion
+         (sort moles
+               (lam (small large)
+                 (< (complexity (ccs small))
+                    (complexity (ccs large)))))])
+    (match sorted
+      [(list)  (list)]
+      [(cons start focus)
+       (let loop ([primes (list start)]
+                  [focus   focus])
+         (match focus
+           [(list)  primes]
+           [(cons fst rest)
+            (let ([ccs-replaceable?
+                   (lam (m1 m2) (replaceable? (ccs m1)
+                                            (ccs m2)))])
+              (match (exists (curry ccs-replaceable? fst)
+                             primes)
+                [#f       (loop (append1 primes fst)
+                                rest)]
+                [witness  (displayln (cons (ccs witness)
+                                           (ccs fst)))
+                          (loop primes rest)]))]))])))
+
+(def (unify? m1 m2)
+  (match (send (send m1 copy) sync
+           (send m2 copy) (thunk 'FAIL))
+    ['FAIL  #f]
+    [_      #t]))
+
+
+
+(define (replaceable? m mr)
+  ;; mr can replace m
+  ;; (provided, both are complete regarding the focused types)
+  (def (hardened mole)
+    (def (mole->list mole)
+      (flatten (cons mole
+                     (map mole->list
+                          (send mole get-kids)))))
+
+    (let* ([clone (send mole copy)]
+           [all   (mole->list clone)])
+      (for ([m all])
+        (send m mark-no-touch)
+        (send m set-no-sync
+          ;; Disallow any additional internal synchronization.
+          (set-subtract all (send m get-sync-ls))))
+
+      clone))
+
+  (let ([m-hard   (hardened m)]
+        [mr-clone (send mr copy)])
+    (send m-hard sync
+      mr-clone (thunk #f))))

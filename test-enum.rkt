@@ -57,6 +57,8 @@
 (def (enum)
   (def m (new mole%))
   (send m set-type entailment)
-  (gen-get (bfs-enum m) 20))
+  (gen->list (bfs-enum m) 20))
 
-(enum)
+(let* ([enum-res (enum)]
+       [enum-cl  (cleanup enum-res)])
+  (pdisplay enum-cl))
