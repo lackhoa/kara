@@ -55,10 +55,11 @@
 (def G (Sym G)) (def F (Sym F)) (def L (Sym L))
 
 (def Implication
-  (Ctor '->
-        (recs wf wf)
-        (forms)
-        (links)))
+  (let ([m (new mole%)])
+    (update-macro
+     m
+     ([] '->))
+    m))
 
 ;; Logical Entailment: only conclusion is necessary.
 (def entailment
@@ -66,13 +67,33 @@
 
 (def AI
   ;; => A->A
-  (Ctor 'AI=>
-        (recs)
-        (forms ([0]   Implication))
-        (links ([0 0] [0 1]))))
+  (let ([m (new mole%)])
+    (update-macro
+     m
+     ([]  'AI=>)
+     ([0] Implication))
+
+    (sync-macro
+     m
+     ([0 0] [0 1]))
+
+    m))
 
 (def AK
   ;; => A -> (B->A)
+  (let ([m (new mole%)])
+    (update-macro
+     m
+     ([]  'AK=>)
+     ([0] Implication))
+
+    (sync-macro
+     m
+     ([0 0] [0 1]))
+
+    m))
+
+(def AK
   (Ctor 'AK=>
         (recs)
         (forms ([0]   Implication)

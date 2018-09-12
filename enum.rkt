@@ -92,6 +92,9 @@
                            new-nodes)))]))))
 
 
+(def (efficient-enum [old] new))
+
+
 (def (bfs-enum mole)
   (general-enum mole append))
 
@@ -183,7 +186,6 @@
            (send m2 copy) (thunk 'FAIL))
     ['FAIL  #f]
     [_      #t]))
-
 
 
 (define (replaceable? m mr)

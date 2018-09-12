@@ -9,160 +9,140 @@
   ;; confident not gonna be called.
   (error "I did not expect this to fail!"))
 
+
+(struct mole% (data      ; '?DATA | symbols
+               dic       ; hashtable of role-kid
+               sync-ls   ; a list of molecules
+
+               type      ; '?TYPE | type (stream of model molecules)
+               no-sync   ; a list of molecules
+               expanded? ; whether or not this is well-formed
+               no-touch? ; whether or not this can be updated
+               ))
+
+(def (make-mole)
+  (mole% '?DATA (hasheq) null
+         '?TYPE null #f #f))
+
+(def (get-roles mole)
+  (hash-keys (mole%-dic mole)))
+
+(def (get-kids mole)
+  (hash-values (mole%-dic mole)))
+
+(def (set-data mole new-data fail-con)
+  (match (mole%-no-touch? mole)
+    [#t  (fail-con)]
+    [#f  (struct-copy mole% mole
+                      [data new-data])]))
+
+(def (set-type mole new-type fail-con)
+  (struct-copy mole% mole
+               [type new-type]))
+
+(def (set-sync-ls mole new-sync-ls fail-con)
+  (check-pred list? new-sync-ls
+              "Sync list must be non-empty")
+
+  (cond [(set-empty? (set-intersect no-sync
+                                    new-sync-ls))
+         (struct-copy mole% mole
+                      [sync-ls new-sync-ls])]
+        [else  (fail-con)]))
+
+(def (mark-expanded mole)
+  (struct-copy mole% mole
+               [expanded? #t]))
+
+(def (mark-expanded mole)
+  (struct-copy mole% mole
+               [expanded? #t]))
+
+(def (add-kid mole role kid fail-con)
+  (check-pred number? role
+              "Role is a number")
+  (check-class mole mole%
+               "Kid is a molecule")
+  (cond [no-touch?  (fail-con)]
+        [else
+         (struct-copy mole% mole
+                      [dic (hash-set (mole%-dic mole)
+                                     role
+                                     kid)])]))
+
+(def (set-no-sync mole new-no-sync)
+  ;; This method is intended to be used
+  ;; for setting up new molecules as proof goals,
+  (let ([sync-ls (mole%-sync-ls mole)])
+    (cond [(set-empty? (set-intersect new-no-sync sync-ls))
+           (struct-copy mole% mole
+                        [no-sync new-no-sync])]
+          [else
+           (error "SET-NO-SYNC -- Illegal state" sync-ls ls)])))
+
+(def (classify)
+  ;; For representation purpose only
+  (match* ((get-kids mole) data)
+    [((list) '?DATA)  'BLANK]
+    [((list) _)       'ATOM]
+    [(_ _)            'STRUCT]))
+
+(define/public (repr)
+  (repr-core (make-repr-env (make-hasheq)
+                            (let ([count 64])
+                              ;; The counting closure
+                              (thunk (set! count (add1 count))
+                                     (integer->char count))))))
+
+(def (make-repr-env mole env get-next)
+  ;; Sort out which variables are
+  ;; represented by which symbol.
+  (def (hash-set-many ht ls val)
+    (let loop ([ls ls] [ht ht])
+      (match ls
+        [(list)  ht]
+        [(cons item rest)
+         (loop rest (hash-set ht item val))])))
+
+  (match (classify)
+    ['BLANK   (match (hash-ref env this 'UNBOUND)
+                ['UNBOUND (hash-set-many env sync-ls (get-next))]
+                [_
+                 ;; Already bound
+                 env])]
+    ['ATOM    env]
+    ['STRUCT  (let loop ([kids  (get-kids mole)]
+                         [env   env])
+                (match kids
+                  [(list) env]
+                  [(cons kid rest)
+                   (loop rest (make-repr-env kid env get-next))]))]))
+
+(define/public (repr-core mole env)
+  (match (classify mole)
+    ['BLANK   (hash-ref env mole)]
+    ['ATOM    (mole%-data mole)]
+    ['STRUCT  (cons (match (mole%-data mole) ['?DATA '?] [any any])
+                    (for/list ([role
+                                (range (add1 (apply max (get-roles))) #|The ceiling|#)])
+                      (match (refr mole role)
+                        ['NOT-FOUND  '-]
+                        [kid         (repr-core kid env)])))]))
+
+(define/public (refr mole role)
+  ;; Like `ref`, but reference a direct kid
+  (hash-ref (mole%-dic mole)  role  'NOT-FOUND))
+
+;; (def (inform task)
+;;   ;; Tell those in the sync list to do something.
+;;   ;; `task` is a function takes a molecule.
+;;   (check-pred procedure? task)
+;;   (for ([subject (remq this sync-ls)])
+;;     (task subject)))
+
 (def mole%
   (class* object% (writable<%>)
-    (super-new)  ; Initializer
 
-;;; Fields
-    (def data '?DATA)  ; '?DATA | constructor
-    (def type '?TYPE)  ; '?TYPE | type (stream of constructor)
-
-    (def dic (make-hasheq))
-
-    (def sync-ls
-      ;; The sync list is synced among its items,
-      ;; and everything is synced with itself.
-      (list this))
-
-    (def no-sync
-      ;; The list of items this molecule cannot sync with
-      ;; it is NOT synced among the items of `sync-ls`.
-      (list))
-
-    (def expanded? #f)
-
-    (def no-touch? #f)  ; If true, will not update data
-
-    ;; Getters
-    (define/public (get-dic)       dic)
-    (define/public (get-data)      data)
-    (define/public (get-roles)     (hash-keys dic))
-    (define/public (get-kids)      (hash-values dic))
-    (define/public (get-no-sync)   no-sync)
-    (define/public (get-sync-ls)   sync-ls)
-    (define/public (get-type)      type)
-    (define/public (get-expanded?) expanded?)
-
-    ;; Setters
-    (define/public (set-data val fail-con)
-      (match no-touch?
-        [#t  (fail-con)]
-        [#f  (set! data val)]))
-
-    (define/public (set-type val)
-      (set! type val))
-
-    (define/public (set-sync-ls ls fail-con)
-      (check-pred list? ls
-                  "Sync list must be non-empty")
-
-      (cond [(set-empty? (set-intersect no-sync
-                                        ls))
-             (set! sync-ls ls)]
-            [else
-             (fail-con)]))
-
-    (define/public (mark-expanded)
-      (set! expanded? #t))
-
-    (define/public (mark-no-touch)
-      (set! no-touch? #t))
-
-;;; Other methods
-    (define/public (add-kid role mole fail-con)
-      (check-pred number? role
-                  "Role is a number")
-      (check-class mole mole%
-                   "Kid is a molecule")
-
-      (cond [no-touch?  (fail-con)]
-            [else       (hash-set! dic role mole)]))
-
-    (define/public (set-no-sync ls)
-      ;; This method is intended to be used
-      ;; for setting up new molecules as proof goals,
-      (if (set-empty? (set-intersect ls sync-ls))
-          (set! no-sync ls)
-          (error "SET-NO-SYNC -- Illegal state" sync-ls ls)))
-
-    (define/public (custom-display port)
-      (display (repr) port))
-
-    (define/public (custom-write port)
-      (write (cons data
-                   (hash->list dic))
-             port))
-
-    (define/public (repr)
-      (let* ([env  (make-hasheq)])
-        (set-repr-env! env
-                       (let ([count 64])
-                         ;; The counting closure
-                         (thunk (set! count (add1 count))
-                                (integer->char count))))
-        (repr-core env)))
-
-    (def (classify)
-      (match* ((get-kids) data)
-        [((list) '?DATA)  'BLANK]
-        [((list) _)       'ATOM]
-        [(_ _)            'STRUCT]))
-
-    (define/public (set-repr-env! env get-next)
-      ;; Sort out which variables are
-      ;; represented by which symbol.
-      (match (classify)
-        ['BLANK  (match (hash-ref env
-                                  this
-                                  'UNBOUND)
-                   ['UNBOUND (let ([new-symbol  (get-next)])
-                               (for ([m sync-ls])
-                                 (hash-set! env
-                                            m
-                                            new-symbol)))]
-                   [_
-                    ;; Already bound
-                    (void)])]
-
-        ['ATOM  (void)]
-
-        ['STRUCT
-         (for ([kid (get-kids)])
-           (send kid set-repr-env!
-             env get-next))]))
-
-    (define/public (repr-core env)
-      (match (classify)
-        ['BLANK  (hash-ref env this)]
-
-        ['ATOM   data]
-
-        ['STRUCT
-         (let ([leader (match data
-                         ['?DATA            '?]
-                         [(Ctor ldr _ _ _)  ldr])])
-           (cons leader
-                 (let ([ceiling
-                        (add1 (apply max (get-roles)))])
-                   (for/list ([role
-                               (range ceiling)])
-                     (match (refr role)
-                       ['NOT-FOUND  '|.|]
-                       [kid
-                        (send kid repr-core env)])))))]))
-
-    (define/public (refr role)
-      ;; Like `ref`, but reference a direct kid
-      (hash-ref dic
-                role
-                'NOT-FOUND))
-
-    (def (inform task)
-      ;; Tell those in the sync list to do something.
-      ;; `task` is a function takes a molecule.
-      (check-pred procedure? task)
-      (for ([subject (remq this sync-ls)])
-        (task subject)))
 
     (define/public (clone-map)
       ;; Returns a mapping of the originals to their copies,
@@ -210,18 +190,14 @@
             ;; Translate the sync list
             ;; to the copied version.
             (set-remove (for/list ([m (send orig get-sync-ls)])
-                          (hash-ref cns
-                                    m
-                                    (thunk 'NON-DESCENDANT)))
+                          (hash-ref cns m 'NON-DESCENDANT))
                         'NON-DESCENDANT)
             no-fail)
 
           (send clone set-no-sync
             ;; Same thing with no-sync
             (set-remove (for/list ([m (send orig get-no-sync)])
-                          (hash-ref cns
-                                    m
-                                    (thunk 'NON-DESCENDANT)))
+                          (hash-ref cns m 'NON-DESCENDANT))
                         'NON-DESCENDANT)))
 
         (hash-ref
@@ -277,7 +253,7 @@
                    ['?DATA (set-data val (thunk (escape 'NO-TOUCH)))
                            (inform
                             (lam (m) (send m set-data
-                                     val (thunk (escape 'NO-TOUCH)))))]
+                                       val (thunk (escape 'NO-TOUCH)))))]
                    ;; Conflict: available data is not equal.
                    [_      (escape 'CONFLICT)]))
 
@@ -288,8 +264,8 @@
       ;; Flush the sync list down to the
       ;; new descendants on a path.
       (when (and (not (null? path))
-               (> (length sync-ls)
-                  1))
+                 (> (length sync-ls)
+                    1))
         ;; Only work when we have something in the sync list.
         (let* ([role (car path)]
                [c    (refr role)])
@@ -315,75 +291,70 @@
       (unless (memq m-other sync-ls)
         ;; Fact: The two sync sets are mutually exclusive
         ;; Start out with syncing data
-        (def result
-          ;; The control is going to be all over the place.
-          (let/ec escape
-            (match* (data (send m-other get-data))
-              ;; Syncing the data
-              [(x x)        (void)]
-              [('?DATA od)  (update od (thunk (escape 'NO-TOUCH)))]
-              [(_ '?DATA)   (send m-other update
-                              data (thunk (escape 'NO-TOUCH)))]
-              [(_ _)        (escape 'CONFLICT)])
+        (match (let/ec escape
+                 (match* (data (send m-other get-data))
+                   ;; Syncing the data
+                   [(x x)        (void)]
+                   [('?DATA od)  (update od (thunk (escape 'NO-TOUCH)))]
+                   [(_ '?DATA)   (send m-other update
+                                   data (thunk (escape 'NO-TOUCH)))]
+                   [(_ _)        (escape 'CONFLICT)])
 
-            (let* ([our-roles      (list->seteq (get-roles))]
-                   [their-roles    (list->seteq
-                                    (send m-other get-roles))]
-                   ;; Monitor the height to check for cycle
-                   [max-height     (thunk (max (height this)
-                                               (height m-other)))]
-                   [height-before  (max-height)])
-              ;; Add the missing kids...
-              (for ([role (set-subtract their-roles
-                                        our-roles)])
-                ;; ... for us,
-                (expand (list role)
-                        (thunk (escape 'FAIL-LOW))))
+                 (let* ([our-roles      (list->seteq (get-roles))]
+                        [their-roles    (list->seteq
+                                         (send m-other get-roles))]
+                        ;; Monitor the height to check for cycle
+                        [max-height     (thunk (max (height this)
+                                                    (height m-other)))]
+                        [height-before  (max-height)])
+                   ;; Add the missing kids...
+                   (for ([role (set-subtract their-roles
+                                             our-roles)])
+                     ;; ... for us,
+                     (expand (list role)
+                             (thunk (escape 'FAIL-LOW))))
 
-              (for ([role (set-subtract our-roles
-                                        their-roles)])
-                ;; ... for the other guy.
-                (send m-other expand
-                  (list role)
-                  (thunk (escape 'FAIL-LOW))))
+                   (for ([role (set-subtract our-roles
+                                             their-roles)])
+                     ;; ... for the other guy.
+                     (send m-other expand
+                       (list role)
+                       (thunk (escape 'FAIL-LOW))))
 
-              (when (> (max-height)
-                       height-before)
-                ;; Remember the cycle check?
-                (escape 'CYCLE)))
+                   (when (> (max-height)
+                            height-before)
+                     ;; Remember the cycle check?
+                     (escape 'CYCLE)))
 
-            (let ([merge
-                   (append sync-ls
-                           (send m-other get-sync-ls))])
-              ;; Establish the syncing among the two roots.
-              ;; Note that we do not cascade, to preserve the
-              ;; symmetry of the following recursive calls.
-              ;; This may fail because of user constraint.
-              (set-sync-ls merge
-                           (thunk (escape 'CANT-SYNC)))
+                 (let ([merge
+                        (append sync-ls
+                                (send m-other get-sync-ls))])
+                   ;; Establish the syncing among the two roots.
+                   ;; Note that we do not cascade, to preserve the
+                   ;; symmetry of the following recursive calls.
+                   ;; This may fail because of user constraint.
+                   (set-sync-ls merge
+                                (thunk (escape 'CANT-SYNC)))
 
-              (inform
-               ;; Since `sync-ls` now also includes molecules on
-               ;; 'the other side', we can inform them in one message.
-               (lam (m)
-                 (send m set-sync-ls
-                   merge
-                   (thunk (escape 'CANT-SYNC))))))
+                   (inform
+                    ;; Since `sync-ls` now also includes molecules on
+                    ;; 'the other side', we can inform them in one message.
+                    (lam (m)
+                      (send m set-sync-ls
+                        merge
+                        (thunk (escape 'CANT-SYNC))))))
 
-            (for ([(role kid) dic])
-              ;; Our work is over: Recursively let all the kids sync.
-              ;; And `max-height` will be reduced by 1.
-              (send kid sync
-                (send m-other refr role)
-                (thunk (escape 'FAIL-LOW))))))
+                 (for ([(role kid) dic])
+                   ;; Our work is over: Recursively let all the kids sync.
+                   ;; And `max-height` will be reduced by 1.
+                   (send kid sync
+                     (send m-other refr role)
+                     (thunk (escape 'FAIL-LOW))))
 
-        (case result
-          [(CONFLICT
-            CANT-SYNC
-            CYCLE
-            FAIL-LOW
-            NO-TOUCH)  (fail-con)]
-          [else        (void)])))))
+                 'OK)
+
+          ['OK  (void)]
+          [_    (fail-con)])))))
 
 
 ;;; Macros
@@ -397,33 +368,23 @@
          'path ctor)
        (update-macro mole rest ...))]))
 
-(define-syntax partition-helper
+(define-syntax sync-macro
   (syntax-rules ()
-    [(_)  null]
-    [(_ (path paths ...) rest ...)
-     (cons (list 'path 'paths ...)
-           (partition-helper rest ...))]))
+    [(_m )  (void)]
+    [(_ m (path paths ...) rest ...)
+     (begin (sync-paths m 'path 'paths ...)
+            (sync-macro m rest ...))]))
 
-(define-syntax-rule (partition-macro mole part parts ...)
-  (let ([transform (partition-helper part parts ...)])
-    (for ([paths transform])
-      ;; Sync and mark no touch
-      (send mole sync-paths paths)
-      (send mole mark-no-touch-paths paths))
-
-    (send mole distinguish
-      (map car transform))))
-
-(define (height mole)
+(def (height mole)
   (match (send mole get-kids)
     [(list)  0]
     [kids    (add1 (apply max (map height kids)))]))
 
-(define (complexity mole)
+(def (complexity mole)
   (add1 (sum-list (map complexity
                        (send mole get-kids)))))
 
-(define (ref mole path)
+(def (ref mole path)
   ;; Reference a descendant.
   (if (null? path)
       mole
@@ -431,22 +392,22 @@
         ['NOT-FOUND 'NOT-FOUND]
         [kid        (ref kid (cdr path))])))
 
-(define (set-type-path mole path val)
+(def (set-type-path mole path val)
   (send mole expand path no-fail)
   (send (ref mole path) set-type val))
 
-(define (ref-data mole path)
+(def (ref-data mole path)
   (match (ref mole path)
     ['NOT-FOUND '?DATA]
     [kid        (send kid get-data)]))
 
-(define (ref-type mole path)
+(def (ref-type mole path)
   (match (ref mole path)
     ['NOT-FOUND '?TYPE]
     [kid        (send kid get-type)]))
 
-(define (update-path mole path val
-                     [fail-con no-fail])
+(def (update-path mole path val
+                  [fail-con no-fail])
   (match (let/ec escape
            (match (ref mole path)
              ['NOT-FOUND (send mole expand
@@ -460,13 +421,13 @@
     ['FAIL  (fail-con)]
     [_      (void)]))
 
-(define (expand-and-get-paths mole paths)
+(def (expand-and-get-paths mole paths)
   (for      ([p paths]) (send mole expand p))
   (for/list ([p paths]) (ref mole p)))
 
-(define (sync-paths mole
-                    paths
-                    [fail-con no-fail])
+(def (sync-paths mole
+                 paths
+                 [fail-con no-fail])
   (check-false (null? paths)
                "sync-paths must be given than one paths")
 
@@ -481,11 +442,11 @@
     ['FAIL  (fail-con)]
     [_      (void)]))
 
-(define (preserve mole paths)
+(def (preserve mole paths)
   (for ([m  (expand-and-get-paths mole paths)])
     (send m mark-no-touch)))
 
-(define (distinguish mole paths)
+(def (distinguish mole paths)
   ;; Do not let these molecules sync with each other.
   ;; note: overwrites existing no-sync policies
   ;; note: error checking is left to the user
@@ -494,6 +455,6 @@
       (send m set-no-sync
         (remq m moles)))))
 
-(define (mark-no-touch-paths mole paths)
+(def (mark-no-touch-paths mole paths)
   (for ([m (expand-and-get-paths mole paths)])
     (send m mark-no-touch)))
