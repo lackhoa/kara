@@ -9,129 +9,117 @@
   ;; confident not gonna be called.
   (error "I did not expect this to fail!"))
 
+;;; Molecules
+(def (make-mole key data kid sib)
+  ;; data : 'no-dat  | symbol
+  ;; kid  : 'no-kid  | mole
+  ;; sib  : 'no-sib  | mole
+  (list data kid sib))
 
-(struct mole% (data      ; '?DATA | symbols
-               dic       ; hashtable of role-kid
-               sync-ls   ; a list of molecules
+(def (new-mole)
+  (list 'no-dat 'no-kid 'no-sib))
 
-               type      ; '?TYPE | type (stream of model molecules)
-               no-sync   ; a list of molecules
-               expanded? ; whether or not this is well-formed
-               no-touch? ; whether or not this can be updated
-               ))
+;;; Getters for molecule
+(def mole-data first)
+(def mole-kids second)
+(def mole-sib  third)
 
-(def (make-mole)
-  (mole% '?DATA (hasheq) null
-         '?TYPE null #f #f))
+;;; Setters for molecule
+(def (repeat times item)
+  (match (<= times 0)
+    [#t  null]
+    [#f  (cons item
+               (repeat (sub1 times) item))]))
 
-(def (get-roles mole)
-  (hash-keys (mole%-dic mole)))
+(def (set-data mole path new-data)
+  (check-pred symbol? data)
+  (match path
+    [(list)  (make-mole new-data
+                        (mole-kid mole)
+                        (mole-sib mole))]
+    [_       (set-data (ref (expand mole path) path)
+                       null
+                       new-data)]))
 
-(def (get-kids mole)
-  (hash-values (mole%-dic mole)))
+(def (expand mole path)
+  (match path
+    [(list)  mole]
+    [(cons next rest)
+     (make-mole (mole-data mole)
+                (list-update
+                 (append (mole-kids mole)
+                         (repeat (- (sub1 (length (mole-kids mole)))
+                                    next)
+                                 (new-mole)))
+                 next
+                 (lam (m) (expand m rest)))
+                sib)]))
 
-(def (set-data mole new-data fail-con)
-  (match (mole%-no-touch? mole)
-    [#t  (fail-con)]
-    [#f  (struct-copy mole% mole
-                      [data new-data])]))
+(def (ref mole path)
+  (match path
+    [(list)            mole]
+    [(cons next rest)
+     (let ([kids  (mole-kids mole)])
+       (match (<= next (sub1 (length kids)))
+         [#t  (list-ref kids next)]
+         [#f  (new-mole)]))]))
 
-(def (set-type mole new-type fail-con)
-  (struct-copy mole% mole
-               [type new-type]))
+(def (make-dir root sync)
+  ;; root : A molecule
+  ;; sync : A list of sets of synchronized paths
+  (list root sync))
 
-(def (set-sync-ls mole new-sync-ls fail-con)
-  (check-pred list? new-sync-ls
-              "Sync list must be non-empty")
+(def (new-dir)
+  (list (new-mole) null))
 
-  (cond [(set-empty? (set-intersect no-sync
-                                    new-sync-ls))
-         (struct-copy mole% mole
-                      [sync-ls new-sync-ls])]
-        [else  (fail-con)]))
+;;; Getters for directories
+(def dir-root first)
+(def dir-sync second)
 
-(def (mark-expanded mole)
-  (struct-copy mole% mole
-               [expanded? #t]))
+;;; Setters for directories
+(def (dir-set-data dir path data)
+  (make-dir (set-data (dir-root dir) path data)
+            (dir-sync dir)))
 
-(def (mark-expanded mole)
-  (struct-copy mole% mole
-               [expanded? #t]))
 
-(def (add-kid mole role kid fail-con)
-  (check-pred number? role
-              "Role is a number")
-  (check-class mole mole%
-               "Kid is a molecule")
-  (cond [no-touch?  (fail-con)]
-        [else
-         (struct-copy mole% mole
-                      [dic (hash-set (mole%-dic mole)
-                                     role
-                                     kid)])]))
+;;; Core methods for directories
+(def (update val
+             path
+             [fail-con no-fail])
+  ;; Updating and syncing the data.
+  ;; `fail-con`: the action to do in case of inconsistency.
+  (match path
+    [null  (unless (eq? data val)
+             (match (let/ec escape
+                      (match data
+                        ['?DATA (set-data val (thunk (escape 'NO-TOUCH)))
+                                (inform
+                                 (lam (m) (send m set-data
+                                          val (thunk (escape 'NO-TOUCH)))))]
+                        ;; Conflict: available data is not equal.
+                        [_      (escape 'CONFLICT)])
+                      'ok)
 
-(def (set-no-sync mole new-no-sync)
-  ;; This method is intended to be used
-  ;; for setting up new molecules as proof goals,
-  (let ([sync-ls (mole%-sync-ls mole)])
-    (cond [(set-empty? (set-intersect new-no-sync sync-ls))
-           (struct-copy mole% mole
-                        [no-sync new-no-sync])]
-          [else
-           (error "SET-NO-SYNC -- Illegal state" sync-ls ls)])))
+               ['ok  (void)]
+               [_    (fail-con)]))]))
 
-(def (classify)
-  ;; For representation purpose only
-  (match* ((get-kids mole) data)
-    [((list) '?DATA)  'BLANK]
-    [((list) _)       'ATOM]
-    [(_ _)            'STRUCT]))
 
-(define/public (repr)
-  (repr-core (make-repr-env (make-hasheq)
-                            (let ([count 64])
-                              ;; The counting closure
-                              (thunk (set! count (add1 count))
-                                     (integer->char count))))))
 
-(def (make-repr-env mole env get-next)
-  ;; Sort out which variables are
-  ;; represented by which symbol.
-  (def (hash-set-many ht ls val)
-    (let loop ([ls ls] [ht ht])
-      (match ls
-        [(list)  ht]
-        [(cons item rest)
-         (loop rest (hash-set ht item val))])))
 
-  (match (classify)
-    ['BLANK   (match (hash-ref env this 'UNBOUND)
-                ['UNBOUND (hash-set-many env sync-ls (get-next))]
-                [_
-                 ;; Already bound
-                 env])]
-    ['ATOM    env]
-    ['STRUCT  (let loop ([kids  (get-kids mole)]
-                         [env   env])
-                (match kids
-                  [(list) env]
-                  [(cons kid rest)
-                   (loop rest (make-repr-env kid env get-next))]))]))
 
-(define/public (repr-core mole env)
-  (match (classify mole)
-    ['BLANK   (hash-ref env mole)]
-    ['ATOM    (mole%-data mole)]
-    ['STRUCT  (cons (match (mole%-data mole) ['?DATA '?] [any any])
-                    (for/list ([role
-                                (range (add1 (apply max (get-roles))) #|The ceiling|#)])
-                      (match (refr mole role)
-                        ['NOT-FOUND  '-]
-                        [kid         (repr-core kid env)])))]))
 
-(define/public (refr mole role)
-  ;; Like `ref`, but reference a direct kid
-  (hash-ref (mole%-dic mole)  role  'NOT-FOUND))
+
+
+
+
+
+
+
+
+
+
+
+
 
 ;; (def (inform task)
 ;;   ;; Tell those in the sync list to do something.
@@ -143,6 +131,47 @@
 (def mole%
   (class* object% (writable<%>)
 
+    (define/public (repr)
+      (repr-core (make-repr-env (make-hasheq)
+                                (let ([count 64])
+                                  ;; The counting closure
+                                  (thunk (set! count (add1 count))
+                                         (integer->char count))))))
+
+    (define/public (repr-core mole env)
+      (match (classify mole)
+        ['BLANK   (hash-ref env mole)]
+        ['ATOM    (mole%-data mole)]
+        ['STRUCT  (cons (match (mole%-data mole) ['?DATA '?] [any any])
+                        (for/list ([role
+                                    (range (add1 (apply max (get-roles))) #|The ceiling|#)])
+                          (match (refr mole role)
+                            ['NOT-FOUND  '-]
+                            [kid         (repr-core kid env)])))]))
+
+    (def (make-repr-env mole env get-next)
+      ;; Sort out which variables are
+      ;; represented by which symbol.
+      (def (hash-set-many ht ls val)
+        (let loop ([ls ls] [ht ht])
+          (match ls
+            [(list)  ht]
+            [(cons item rest)
+             (loop rest (hash-set ht item val))])))
+
+      (match (classify)
+        ['BLANK   (match (hash-ref env this 'UNBOUND)
+                    ['UNBOUND (hash-set-many env sync-ls (get-next))]
+                    [_
+                     ;; Already bound
+                     env])]
+        ['ATOM    env]
+        ['STRUCT  (let loop ([kids  (get-kids mole)]
+                             [env   env])
+                    (match kids
+                      [(list) env]
+                      [(cons kid rest)
+                       (loop rest (make-repr-env kid env get-next))]))]))
 
     (define/public (clone-map)
       ;; Returns a mapping of the originals to their copies,
@@ -243,29 +272,14 @@
           ['FAIL  (fail-con)]
           [_      (void)])))
 
-    (define/public (update val
-                           [fail-con no-fail])
-      ;; Updating and syncing the data.
-      ;; `fail-con`: the function to in case of inconsistency.
-      (unless (eq? data val)
-        (match (let/ec escape
-                 (match data
-                   ['?DATA (set-data val (thunk (escape 'NO-TOUCH)))
-                           (inform
-                            (lam (m) (send m set-data
-                                       val (thunk (escape 'NO-TOUCH)))))]
-                   ;; Conflict: available data is not equal.
-                   [_      (escape 'CONFLICT)]))
 
-          [(or 'NO-TOUCH 'CONFLICT)  (fail-con)]
-          [_                        (void)])))
 
     (define/public (cascade path)
       ;; Flush the sync list down to the
       ;; new descendants on a path.
       (when (and (not (null? path))
-                 (> (length sync-ls)
-                    1))
+               (> (length sync-ls)
+                  1))
         ;; Only work when we have something in the sync list.
         (let* ([role (car path)]
                [c    (refr role)])
