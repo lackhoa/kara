@@ -12,49 +12,20 @@
 ;;; Molecules
 (def (make-mole key data kid sib)
   ;; data : 'no-dat  | symbol
-  ;; kid  : 'no-kid  | mole
-  ;; sib  : 'no-sib  | mole
-  (list data kid sib))
+  ;; kids : 'no-kid  | moles
+  (list data kids sync-st))
 
-(def (new-mole)
-  (list 'no-dat 'no-kid 'no-sib))
+(def (new-mole path)
+  (list 'no-dat
+        'no-kid
+        (seteq path)))
 
 ;;; Getters for molecule
 (def mole-data first)
 (def mole-kids second)
-(def mole-sib  third)
+(def mole-sync third)
 
 ;;; Setters for molecule
-(def (repeat times item)
-  (match (<= times 0)
-    [#t  null]
-    [#f  (cons item
-               (repeat (sub1 times) item))]))
-
-(def (set-data mole path new-data)
-  (check-pred symbol? data)
-  (match path
-    [(list)  (make-mole new-data
-                        (mole-kid mole)
-                        (mole-sib mole))]
-    [_       (set-data (ref (expand mole path) path)
-                       null
-                       new-data)]))
-
-(def (expand mole path)
-  (match path
-    [(list)  mole]
-    [(cons next rest)
-     (make-mole (mole-data mole)
-                (list-update
-                 (append (mole-kids mole)
-                         (repeat (- (sub1 (length (mole-kids mole)))
-                                    next)
-                                 (new-mole)))
-                 next
-                 (lam (m) (expand m rest)))
-                sib)]))
-
 (def (ref mole path)
   (match path
     [(list)            mole]
@@ -64,47 +35,45 @@
          [#t  (list-ref kids next)]
          [#f  (new-mole)]))]))
 
-(def (make-dir root sync)
-  ;; root : A molecule
-  ;; sync : A list of sets of synchronized paths
-  (list root sync))
+(def (do-inform mole proc)
+  )
 
-(def (new-dir)
-  (list (new-mole) null))
+(def (update mole
+             [path null]
+             [new-data 'no-dat])
+  (def (update-one mol path new-data)
+    (match path
+      [(list)
+       (match* ((mole-data mol) new-data)
+         [('no-dat 'no-dat)   'ok]
+         [('no-dat new-data)  (make-mole new-data
+                                         (mole-sync mol))]
+         [(_ _)               'conflict])]
 
-;;; Getters for directories
-(def dir-root first)
-(def dir-sync second)
-
-;;; Setters for directories
-(def (dir-set-data dir path data)
-  (make-dir (set-data (dir-root dir) path data)
-            (dir-sync dir)))
-
-
-;;; Core methods for directories
-(def (update val
-             path
-             [fail-con no-fail])
-  ;; Updating and syncing the data.
-  ;; `fail-con`: the action to do in case of inconsistency.
-  (match path
-    [null  (unless (eq? data val)
-             (match (let/ec escape
-                      (match data
-                        ['?DATA (set-data val (thunk (escape 'NO-TOUCH)))
-                                (inform
-                                 (lam (m) (send m set-data
-                                          val (thunk (escape 'NO-TOUCH)))))]
-                        ;; Conflict: available data is not equal.
-                        [_      (escape 'CONFLICT)])
-                      'ok)
-
-               ['ok  (void)]
-               [_    (fail-con)]))]))
-
-
-
+      [(cons next-id rest-path)
+       (let ([kids  (mole-kids mole)])
+         (match (<= next-id
+                   (last-index kids))
+           [#t  (match (expand (list-ref kids next-id)
+                               rest-path)
+                  ['conflict  'conflict]
+                  [exm        (make-mole (mole-data mole)
+                                         (list-update kids
+                                                      next-id
+                                                      exm))])]
+           [#f  (make-mole (mole-data mole)
+                           (list-update
+                            (append (mole-sync mole)
+                                    (for/list ([i (range (add1 (last-index kids))
+                                                         (add1 next-id))])
+                                      (make-mole 'no-dat
+                                                 (for/seteq ([p (mole-sync mole)])
+                                                   (pad p i)))))
+                            next-id
+                            (lam (m) (expand m rest-path)))
+                           (mole-sync mole))]))]))
+  (do-inform mole (lam (m)
+                    (update-one m path new-data))))
 
 
 
@@ -112,21 +81,6 @@
 
 
 
-
-
-
-
-
-
-
-
-
-;; (def (inform task)
-;;   ;; Tell those in the sync list to do something.
-;;   ;; `task` is a function takes a molecule.
-;;   (check-pred procedure? task)
-;;   (for ([subject (remq this sync-ls)])
-;;     (task subject)))
 
 (def mole%
   (class* object% (writable<%>)
@@ -232,21 +186,6 @@
         (hash-ref
          ;; Return the root's copy.
          cns this)))
-
-    (define/public (just-expand path fail-con)
-      ;; Keep adding new kids
-      ;; until the path is exhausted.
-      (unless (null? path)
-        (match (let/ec escape
-                 (let ([new-kid (new mole%)])
-                   (add-kid (car path)
-                            new-kid
-                            (thunk (escape 'FAIL)))
-                   (send new-kid just-expand
-                     (cdr path)
-                     (thunk (escape 'FAIL)))))
-          ['FAIL  (fail-con)]
-          [_      (void)])))
 
     (define/public (expand path
                            [fail-con no-fail])
