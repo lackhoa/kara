@@ -18,6 +18,9 @@
   (check-true (> (set-count sync-ls) 0))
   (list sync-ls data kids))
 
+(def (make-root)
+  (make-mol '([])))
+
 ;;; Getters for molcule
 (def mol-sync first)
 (def mol-data second)
@@ -100,86 +103,184 @@
          [#f  'not-found]))]))
 
 (def (ref-data root path)
-  ;; Convenience method
+  ;; Programmer convenience method
   (match (ref root path)
     ['not-found  'no-dat]
     [mol         (mol-data mol)]))
 
-(def (replace mol path new)
-  (let loop ([path path]
-             [m    mol])
-    (match path
-      [(list)               new]
-      [(cons next-id rest)
-       (mol-update-kids
-        m
-        (lam (kids)
-          (list-set kids
-                    next-id
-                    (loop rest
-                          (list-ref kids next-id)))))])))
+(def (ref-kids root path)
+  ;; Programmer convenience method
+  (match (ref root path)
+    ['not-found  null]
+    [mol         (mol-kids mol)]))
 
-(def (do-inform root mol proc)
-  ;; returns the root with `proc` done to `mol` and its associates.
+(def (ref-sync root path)
+  ;; Programmer convenience method
+  (match (ref root path)
+    ['not-found  (list path)]
+    [mol         (mol-sync mol)]))
+
+(def (do&inform root path proc)
+  ;; returns the root with `proc` done to `ref path` and its associates.
   ;; proc: mol -> mol | 'conflict
-  (let loop ([sync-ls (mol-sync mol)]
-             [root    root])
+
+  (def (replace mol path new)
+    ;; Crucial auxiliary function
+    (let loop ([path  path]
+               [m     mol])
+      (match path
+        [(list)               new]
+        [(cons next-id rest)
+         (mol-update-kids m
+                          (lam (kids)
+                            (list-set kids
+                                      next-id
+                                      (loop rest (list-ref kids next-id)))))])))
+
+  (let loop ([sync-ls  (ref-sync root path)])
     (match sync-ls
       [(list)                 root]
       [(cons next-path rest)
        (match (proc (ref root next-path))
          ['conflict  'conflict]
-         [new-mol    (let ([root (replace root
-                                          next-path
-                                          new-mol)])
-                       (loop rest root))])])))
+         [new-mol    (set! root (replace root
+                                         next-path
+                                         new-mol))
+                     (loop rest)])])))
 
 (def (update root
-             [path null]
+             path
              [val  'no-dat])
-  ;; Public interface
-  (let loop ([root  root]
-             [rel   null]
-             [path  path])
-    (let ([mol  (ref root rel)])
-      (match path
-        [(list)
-         (match* ((mol-data mol) val)
-           [(any any)    root]
-           [('no-dat _)  (do-inform root
-                                    mol
-                                    (lam (m) (mol-set-data m val)))]
-           [(_ _)        'conflict])]
+  ;; Public data-updating/expanding interface
+  ;; if val is 'no-dat, do not overwrite existing data
+  (let loop ([rel  #|path so far|# null]
+             [path #|path left|#   path])
+    (match path
+      [(list)  (match* ((ref-data root rel) val)
+                 [(any any)    root]
+                 [('no-dat _)  (do&inform root
+                                          rel
+                                          (lam (m) (mol-set-data m val)))]
+                 [(_ 'no-dat)  root]
+                 [(_ _)        'conflict])]
 
-        [(cons next-id rest-path)
-         (let ([kids  (mol-kids mol)])
-           (match (<= next-id
-                     (last-index kids))
-             [#t  (loop root
-                        (pad rel next-id)
-                        rest-path)]
-             [#f  (let ([root (do-inform root
-                                         mol
-                                         (lam (m)
-                                           (mol-set-kids m
-                                                         (let ([fillers (for/list ([i (range (add1 (last-index kids))
-                                                                                             (add1 next-id))])
-                                                                          (make-mol (for/list ([p (mol-sync m)])
-                                                                                      ;; Just the sync list
-                                                                                      (pad p i))))])
-                                                           (append kids fillers)))))])
-                    (loop root
-                          (pad rel next-id)
-                          rest-path))]))]))))
+      [(cons next-id rest-path)
+       (let ([kids  (ref-kids root rel)])
+         (when (<= (last-index kids)
+                  next-id)
+           (set! root
+                 (do&inform root
+                            rel
+                            (lam (m)
+                              (mol-set-kids m
+                                            (let ([fillers (for/list ([i (range (add1 (last-index kids))
+                                                                                (add1 next-id))])
+                                                             (make-mol (for/list ([p (mol-sync m)])
+                                                                         ;; Just the sync list
+                                                                         (pad p i))))])
+                                              (append kids fillers))))))))
+       (loop (pad rel next-id)
+             rest-path)])))
+
+
+
+(def (kids-indices root path)
+  ;; Programmer's utility
+  (range (length (ref-kids root path))))
 
 (def (sync root p1 p2)
-  (let* ([m1 (ref root p1)]
-         [m2 (ref root p2)]
-         [combined (append (mol-sync m1)
-                           (mol-sync m2))])
-    (let ([root (replace root
-                         p1
-                         (mol-set-sync m1 combined))])
-      (replace root
-               p2
-               (mol-set-sync m2 combined)))))
+  ;; Establish a new synchronization, expand if needed.
+
+  (def (height mol)
+    (match (mol-kids mol)
+      [(list)  0]
+      [kids    (add1 (apply max (map height kids)))]))
+
+  (begin (set! root (update root p1))
+         (set! root (update root p2))
+         #|Make sure the paths exist|#)
+
+  (match (member p1 (ref-sync root p2))
+    [(not #f)  root]
+    [#f        (let/ec escape
+                 (match* ((ref-data root p1)
+                          (ref-data root p2))
+                   [(x x)  (void)]
+
+                   [('no-dat other-dat)
+                    (set! root (update root p1 other-dat))]
+
+                   [(dat 'no-dat)
+                    (set! root (update root p2 dat))]
+
+                   [(_ _)  (escape 'conflict)])
+
+                 (let* ([mh  (lam (root)
+                               (max (height (ref root p1))
+                                    (height (ref root p2))))]
+                        [oh  (mh root)  #|monitor the old height|#]
+                        [i1  (last-index (ref-kids root p1))]
+                        [i2  (last-index (ref-kids root p2))])
+                   ;; Add the missing kids
+                   (cond [(= i1 i2)  root]
+                         [(< i1 i2)  (set! root (update root
+                                                        (pad p1 i2)))]
+                         [(> i1 i2)  (set! root (update root
+                                                        (pad p2 i1)))])
+                   (when (> (mh root) oh)
+                     ;; The max height cannot increase, or it's a cycle
+                     (escape 'conflict)))
+
+                 (let ([combined (append (ref-sync root p1)
+                                         (ref-sync root p2))])
+                   ;; Establish the connection
+                   (set! root
+                         (do&inform root
+                                    p1
+                                    (lam (m)
+                                      (mol-set-sync m combined))))
+                   (set! root
+                         (do&inform root
+                                    p2
+                                    (lam (m)
+                                      (mol-set-sync m combined)))))
+
+                 (for ([i  (kids-indices root p1)])
+                   ;; Our job is over, let the kids sync
+                   (match (sync root
+                                (pad p1 i)
+                                (pad p2 i))
+                     ['conflict  (escape 'conflict)]
+                     [new-root   (set! root new-root)]))
+
+                 root)]))
+
+(def (copy root path new-path)
+  ;; Public interface
+
+  (def (swap-prefix ls)
+    (for/list ([li  (filter (lam (x) (list-prefix? path x))
+                            ls   #|Weed out the non-descendants|#)])
+      (append new-path
+              (list-tail li (length path)))))
+
+  (let loop ([rel  null])
+    (let ([focus      (append path rel)]
+          [focus-new  (append new-path rel)])
+      (set! root
+            (replace root
+                     focus-new
+                     (make-mol (swap-prefix (ref-sync root focus)
+                                            #|copied sync list|#)
+                               (ref-data root focus))))
+      (for ([i  (kids-indices root focus)])
+        (set! root  (loop (pad rel i)))))
+    root))
+
+(def (complexity mol)
+  ;; Crucial theoretical number.
+  (+ (if (eq? (mol-data mol) 'no-dat)
+         0
+         1)
+     (sum-list (map complexity
+                    (mol-kids mol)))))
