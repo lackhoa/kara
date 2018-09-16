@@ -4,7 +4,7 @@
          "mole.rkt"
          rackunit)
 
-(def (dmr root mol)
+(def (dm root [mol root])
   (displayln (mol-repr root mol)))
 
 (test-case
@@ -22,14 +22,14 @@
  (set! root (update root '[1]))
  (set! root (sync root '[0] '[1]))
  (set! root (update root '[0] 'A))
- (check-eq? (ref-data root '[0])
-            (ref-data root '[1]))
+ (check-eq? (ref-data root '[1])
+            'A)
  (set! root (update root '[0 0] 'B))
- (check-eq? (ref-data root '[0 0])
-            (ref-data root '[1 0]))
+ (check-eq? (ref-data root '[1 0])
+            'B)
  (set! root (update root '[1 2] 'C))
  (check-eq? (ref-data root '[0 2])
-            (ref-data root '[1 2]))
+            'C)
  (check-eq? (update root '[1 2] 'D)
             'conflict))
 
@@ -44,8 +44,8 @@
  (set! root (update root '[4]))
  (set! root (sync root '[3] '[4]))
  (set! root (update root '[5]))
- (displayln "0, 1-0 and 3, 4 should be the same")
- (dmr root root))
+ (displayln "0, 1-0 and 3, 4 are the same")
+ (dm root root))
 
 (test-case
  "Synchronization"
@@ -56,24 +56,46 @@
             (ref-data root '[1]))
 
  (set! root (update root '[2] 'B))
- (check-eq? 'conflict
-            (sync root '[0] '[2])))
+ (check-eq? (sync root '[0] '[2])
+            'conflict))
 
 (test-case
  "Cyclical synchronization"
  (def root (make-root))
  (set! root (update root '[0 0]))
  (set! root (sync root '[0 0] '[1]))
- (check-eq? 'conflict
-            (sync root '[0] '[1]))
- (check-eq? 'conflict
-            (sync root '[2] '[2 3 4])))
+ (check-eq? (sync root '[0] '[1])
+            'conflict)
+ (check-eq? (sync root '[2] '[2 3 4])
+            'conflict))
 
 (test-case
- "Cloning"
- (def root (make-root))
- (set! root (update root '[0] 'K))
- (set! root (update root '[0 0] 'L))
- (set! root (sync root '[1] '[0 0]))
- (set! root (copy root '[0] '[2]))
- (dmr root root))
+ "Inter-root synchronization"
+ (def r1 (make-root))
+ (set! r1 (sync r1 '[0] '[1]))
+
+ (def r2 (make-root))
+ (set! r2 (pull r2 r1 '[] '[]))
+ (displayln "0 and 1 are the same")
+ (dm r2))
+
+(test-case
+ "Inter-root cycle"
+ (def r1 (make-root))
+ (set! r1 (sync r1 '[0] '[1]))
+
+ (def r2 (make-root))
+ (set! r2 (sync r2 '[1] '[0 0]))
+ (check-eq? (pull r2 r1 '[] '[])
+            'conflict))
+
+(test-case
+ "Inter-root advanced"
+ (def model (make-root))
+ (set! model (sync model '[0] '[1 0]))
+
+ (def r (make-root))
+ (set! r (update r '[0] 'N))
+ (set! r (pull r model '[] '[]))
+ (check-eq? (ref-data r '[1 0])
+            'N))
