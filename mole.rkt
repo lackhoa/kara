@@ -1,7 +1,14 @@
 #lang racket
 (require "lang/kara.rkt"
          racket/hash)
-(provide (all-defined-out))
+(provide mol-repr
+         update
+         sync
+         make-root
+         pull
+         ref-data
+         ref-sync
+         ref-kids)
 
 (def (no-fail)
   ;; The FAIL continuation that you're
@@ -44,7 +51,6 @@
 
 ;; Other methods for molecules
 (def (mol-repr root mol)
-  ;; Public interface
   (def (blank? mol)
     (match* ((mol-data mol) (mol-kids mol))
       [('no-dat (list))  #t]
@@ -55,26 +61,20 @@
                       get-next!)
     ;; Sort out which variables are
     ;; represented by which symbol.
-    (def (hash-set-many ht ls val)
-      (let loop ([ls ls] [ht ht])
-        (match ls
-          [(list)            ht]
-          [(cons item rest)
-           (loop rest (hash-set ht item val))])))
-
     (match (blank? mol)
       [#t  (match (hash-ref in-env mol 'unbound)
              ['unbound  (hash-set-many in-env
-                                       (for/list ([p (mol-sync mol)])
-                                         (ref root p))
+                                       (map (lam (p)  (ref root p))
+                                            (mol-sync mol))
                                        (get-next!))]
              [_         in-env])]
-      [#f  (let loop ([kids  (mol-kids mol)]
-                      [env   in-env])
-             (match kids
-               [(list)           env]
-               [(cons kid rest)
-                (loop rest (make-repr-env kid env get-next!))]))]))
+      [#f  (let ([kids  (mol-kids mol)]
+                 [env   in-env])
+             (for ([kid  kids])
+               (set! env (make-repr-env kid
+                                        env
+                                        get-next!)))
+             env)]))
 
   (def (mol-repr-core mol env)
     (match (blank? mol)
@@ -82,8 +82,8 @@
       [#f  (cons (match (mol-data mol)
                    ['no-dat  '?]
                    [any      any])
-                 (for/list ([k (mol-kids mol)])
-                   (mol-repr-core k env)))]))
+                 (map (lam (kid)  (mol-repr-core kid env))
+                      (mol-kids mol)))]))
 
   (mol-repr-core mol (make-repr-env mol
                                     (hasheq)
@@ -95,27 +95,23 @@
 (def (ref root path)
   (match path
     [(list)            root]
-    [(cons next rest)
-     (let ([kids  (mol-kids root)])
-       (match (<= next (sub1 (length kids)))
-         [#t  (ref (list-ref kids next)
-                   rest)]
-         [#f  'not-found]))]))
+    [(cons next rest)  (let ([kids  (mol-kids root)])
+                         (match (<= next (last-index kids))
+                           [#t  (ref (list-ref kids next)
+                                     rest)]
+                           [#f  'not-found]))]))
 
 (def (ref-data root path)
-  ;; Programmer convenience method
   (match (ref root path)
     ['not-found  'no-dat]
     [mol         (mol-data mol)]))
 
 (def (ref-kids root path)
-  ;; Programmer convenience method
   (match (ref root path)
     ['not-found  null]
     [mol         (mol-kids mol)]))
 
 (def (ref-sync root path)
-  ;; Programmer convenience method
   (match (ref root path)
     ['not-found  (list path)]
     [mol         (mol-sync mol)]))
@@ -136,22 +132,19 @@
 (def (do&inform root path proc)
   ;; returns the root with `proc` done to `ref path` and its associates.
   ;; proc: mol -> mol | 'conflict
-
-  (let loop ([sync-ls  (ref-sync root path)])
-    (match sync-ls
-      [(list)                 root]
-      [(cons next-path rest)
-       (match (proc (ref root next-path))
-         ['conflict  'conflict]
-         [new-mol    (set! root (replace root
-                                         next-path
-                                         new-mol))
-                     (loop rest)])])))
+  (let/ec escape
+    (for ([p  (ref-sync root path)])
+      (match (proc (ref root p))
+        ['conflict  (escape 'conflict)]
+        [new-mol    (set! root (replace root
+                                        p
+                                        new-mol))]))
+    root))
 
 (def (update root
              path
              [val  'no-dat])
-  ;; Public data-updating/expanding interface
+  ;; Used to update or expand
   ;; if val is 'no-dat, do not overwrite existing data
   (let loop ([rel  #|path so far|# null]
              [path #|path left|#   path])
@@ -160,30 +153,32 @@
                  [(any any)    root]
                  [('no-dat _)  (do&inform root
                                           rel
-                                          (lam (m) (mol-set-data m val)))]
+                                          (lam (m)  (mol-set-data m val)))]
                  [(_ 'no-dat)  root]
                  [(_ _)        'conflict])]
 
       [(cons next-id rest-path)
        (let ([kids  (ref-kids root rel)])
-         (when (<= (last-index kids)
+         (when (< (last-index kids)
                   next-id)
            (set! root
-                 (do&inform root
-                            rel
-                            (lam (m)
-                              (mol-set-kids m
-                                            (let ([fillers (for/list ([i (range (add1 (last-index kids))
-                                                                                (add1 next-id))])
-                                                             (make-mol (for/list ([p (mol-sync m)])
-                                                                         ;; Just the sync list
-                                                                         (pad p i))))])
-                                              (append kids fillers))))))))
+             (do&inform
+              root
+              rel
+              (lam (m)
+                (mol-set-kids
+                 m
+                 (let* ([missing-indices  (range (add1 (last-index kids))
+                                                 (add1 next-id))]
+                        [fillers  (for/list ([i missing-indices])
+                                    (make-mol (for/list ([p (mol-sync m)])
+                                                (pad p i))
+                                              #|empty mole with inherited sync list|#))])
+                   (append kids fillers))))))))
        (loop (pad rel next-id)
              rest-path)])))
 
 (def (kids-indices root path)
-  ;; Programmer's utility
   (range (length (ref-kids root path))))
 
 (def (height mol)
@@ -194,7 +189,6 @@
 
 (def (sync root p1 p2)
   ;; Establish a new synchronization, expand if needed.
-
   (begin
     #|Make sure the paths exist|#
     (set! root (update root p1))
@@ -237,11 +231,11 @@
                                 (ref-sync root fp2)))])
         #|Establish the connections|#
         (set! root
-              (do&inform root fp1 (lam (m)
-                                    (mol-set-sync m combined))))
+          (do&inform root fp1 (lam (m)
+                                (mol-set-sync m combined))))
         (set! root
-              (do&inform root fp2 (lam (m)
-                                    (mol-set-sync m combined)))))
+          (do&inform root fp2 (lam (m)
+                                (mol-set-sync m combined)))))
 
       (for ([i  (kids-indices root fp1)])
         ;; Our job is over, let the kids sync
@@ -302,11 +296,11 @@
                           (swap-prefix (ref-sync r1 fp1)  p1 p2)))])
         #|Establish the connections|#
         (set! r1
-              (do&inform r1 fp1 (lam (m)
-                                  (mol-set-sync m s1))))
+          (do&inform r1 fp1 (lam (m)
+                              (mol-set-sync m s1))))
         (set! r2
-              (do&inform r2 fp2 (lam (m)
-                                  (mol-set-sync m s2)))))
+          (do&inform r2 fp2 (lam (m)
+                              (mol-set-sync m s2)))))
 
       (for ([i  (kids-indices r1 fp1)])
         ;; Our job is over, let the kids sync
@@ -325,8 +319,10 @@
 
 (def (complexity mol)
   ;; Crucial theoretical number.
-  (+ (if (eq? (mol-data mol) 'no-dat)
-         0
-         1)
+  (+ (match (eq? (mol-data mol)
+                 'no-dat)
+       [#t  0]
+       [#f  1])
+     (sub1 (length (mol-sync mol)))
      (sum-list (map complexity
                     (mol-kids mol)))))
