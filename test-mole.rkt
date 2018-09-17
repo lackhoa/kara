@@ -4,8 +4,8 @@
          "mole.rkt"
          rackunit)
 
-(def (dm root [mol root])
-  (displayln (mol-repr root mol)))
+(def (dm root)
+  (displayln (mol-repr root)))
 
 (test-case
  "Introduction"
@@ -45,7 +45,7 @@
  (set! root (sync root '[3] '[4]))
  (set! root (update root '[5]))
  (displayln "0, 1-0 and 3, 4 are the same")
- (dm root root))
+ (dm root))
 
 (test-case
  "Synchronization"

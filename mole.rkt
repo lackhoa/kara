@@ -16,6 +16,8 @@
   (error "I did not expect this to fail!"))
 
 ;;; Molcules
+(struct mol% (sync data kids) #:prefab)
+
 (def (make-mol sync-ls
                [data    'no-dat]
                [kids    null])
@@ -23,38 +25,17 @@
   ;; kids    : 'no-kid  | mols
   ;; sync-ls : mols (at least one path)
   (check-true (> (set-count sync-ls) 0))
-  (list sync-ls data kids))
+  (mol% sync-ls data kids))
 
 (def (new-root)
   (make-mol '([])))
 
-;;; Getters for molcule
-(def mol-sync first)
-(def mol-data second)
-(def mol-kids third)
-
-;;; Setters for molecule
-(def (mol-set-sync mol val)
-  (list-set mol 0 val))
-(def (mol-set-data mol val)
-  (list-set mol 1 val))
-(def (mol-set-kids mol val)
-  (list-set mol 2 val))
-
-;;; Updaters for molecule
-(def (mol-update-sync mol proc)
-  (mol-set-sync mol
-                (proc (mol-sync mol))))
-(def (mol-update-kids mol proc)
-  (mol-set-kids mol
-                (proc (mol-kids mol))))
-
 ;; Other methods for molecules
 (def (mol-repr root [path null])
   (def (blank? mol)
-    (match* ((mol-data mol) (mol-kids mol))
-      [('no-dat (list))  #t]
-      [(_       _)       #f]))
+    (match mol
+      [(mol% _ 'no-dat (list))  #t]
+      [_                        #f]))
 
   (def (make-repr-env mol
                       in-env
@@ -65,10 +46,10 @@
       [#t  (match (hash-ref in-env mol 'unbound)
              ['unbound  (hash-set-many in-env
                                        (map (lam (p)  (ref root p))
-                                            (mol-sync mol))
+                                            (mol%-sync mol))
                                        (get-next!))]
              [_         in-env])]
-      [#f  (let ([kids  (mol-kids mol)]
+      [#f  (let ([kids  (mol%-kids mol)]
                  [env   in-env])
              (for ([kid  kids])
                (set! env (make-repr-env kid
@@ -79,11 +60,11 @@
   (def (mol-repr-core mol env)
     (match (blank? mol)
       [#t  (hash-ref env mol)]
-      [#f  (cons (match (mol-data mol)
+      [#f  (cons (match (mol%-data mol)
                    ['no-dat  '?]
                    [any      any])
                  (map (lam (kid)  (mol-repr-core kid env))
-                      (mol-kids mol)))]))
+                      (mol%-kids mol)))]))
 
   (mol-repr-core (ref root path)
                  (make-repr-env (ref root path)
@@ -96,7 +77,7 @@
 (def (ref root path)
   (match path
     [(list)            root]
-    [(cons next rest)  (let ([kids  (mol-kids root)])
+    [(cons next rest)  (let ([kids  (mol%-kids root)])
                          (match (<= next (last-index kids))
                            [#t  (ref (list-ref kids next)
                                      rest)]
@@ -104,18 +85,18 @@
 
 (def (ref-data root path)
   (match (ref root path)
-    ['not-found  'no-dat]
-    [mol         (mol-data mol)]))
+    ['not-found      'no-dat]
+    [(mol% _ dat _)  dat]))
 
 (def (ref-kids root path)
   (match (ref root path)
-    ['not-found  null]
-    [mol         (mol-kids mol)]))
+    ['not-found       null]
+    [(mol% _ _ kids)  kids]))
 
 (def (ref-sync root path)
   (match (ref root path)
-    ['not-found  (list path)]
-    [mol         (mol-sync mol)]))
+    ['not-found        (list path)]
+    [(mol% sync _ _ )  sync]))
 
 (def (replace mol path new)
   ;; Crucial auxiliary function
@@ -124,11 +105,11 @@
     (match path
       [(list)               new]
       [(cons next-id rest)
-       (mol-update-kids m
-                        (lam (kids)
-                          (list-set kids
-                                    next-id
-                                    (loop rest (list-ref kids next-id)))))])))
+       (struct-copy mol% m
+                    [kids  (list-set (mol%-kids m)
+                                     next-id
+                                     (loop rest (list-ref (mol%-kids m)
+                                                          next-id)))])])))
 
 (def (do&inform root path proc)
   ;; returns the root with `proc` done to `ref path` and its associates.
@@ -154,7 +135,7 @@
                  [(any any)    root]
                  [('no-dat _)  (do&inform root
                                           rel
-                                          (lam (m)  (mol-set-data m val)))]
+                                          (lam (m)  (struct-copy mol% m [data val])))]
                  [(_ 'no-dat)  root]
                  [(_ _)        'conflict])]
 
@@ -167,15 +148,14 @@
               root
               rel
               (lam (m)
-                (mol-set-kids
-                 m
-                 (let* ([missing-indices  (range (add1 (last-index kids))
-                                                 (add1 next-id))]
-                        [fillers  (for/list ([i missing-indices])
-                                    (make-mol (for/list ([p (mol-sync m)])
-                                                (pad p i))
-                                              #|empty mole with inherited sync list|#))])
-                   (append kids fillers))))))))
+                (struct-copy mol% m
+                             [kids (let* ([missing-indices  (range (add1 (last-index kids))
+                                                                   (add1 next-id))]
+                                          [fillers  (for/list ([i missing-indices])
+                                                      (make-mol (for/list ([p (mol%-sync m)])
+                                                                  (pad p i))
+                                                                #|empty mole with inherited sync list|#))])
+                                     (append kids fillers))]))))))
        (loop (pad rel next-id)
              rest-path)])))
 
@@ -184,7 +164,7 @@
 
 (def (height mol)
   ;; Used for synchronization
-  (match (mol-kids mol)
+  (match (mol%-kids mol)
     [(list)  0]
     [kids    (add1 (apply max (map height kids)))]))
 
@@ -233,10 +213,10 @@
         #|Establish the connections|#
         (set! root
           (do&inform root fp1 (lam (m)
-                                (mol-set-sync m combined))))
+                                (struct-copy mol% m [sync combined]))))
         (set! root
           (do&inform root fp2 (lam (m)
-                                (mol-set-sync m combined)))))
+                                (struct-copy mol% m [sync combined])))))
 
       (for ([i  (kids-indices root fp1)])
         ;; Our job is over, let the kids sync
@@ -298,10 +278,10 @@
         #|Establish the connections|#
         (set! r1
           (do&inform r1 fp1 (lam (m)
-                              (mol-set-sync m s1))))
+                              (struct-copy mol% m [sync s1]))))
         (set! r2
           (do&inform r2 fp2 (lam (m)
-                              (mol-set-sync m s2)))))
+                              (struct-copy mol% m [sync s2])))))
 
       (for ([i  (kids-indices r1 fp1)])
         ;; Our job is over, let the kids sync
@@ -320,10 +300,10 @@
 
 (def (complexity mol)
   ;; Theoretical number.
-  (+ (match (eq? (mol-data mol)
+  (+ (match (eq? (mol%-data mol)
                  'no-dat)
        [#t  0]
        [#f  1])
-     (sub1 (length (mol-sync mol)))
+     (sub1 (length (mol%-sync mol)))
      (sum-list (map complexity
-                    (mol-kids mol)))))
+                    (mol%-kids mol)))))

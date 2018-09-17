@@ -5,6 +5,15 @@
          "mole.rkt"
          "enum.rkt")
 
-(displayln (mol-repr ai))
-(displayln (mol-repr ak))
-(displayln (mol-repr as))
+(def dm (compose pdisplay mol-repr))
+
+(call-with-output-file "data"
+  #:exists 'truncate
+  (lam (out)
+    (write ai out)))
+
+(call-with-input-file "data"
+  (lam (in)
+    (dm (read in))
+    (dm (read in))
+    (dm (read in))))
