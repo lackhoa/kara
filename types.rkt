@@ -65,34 +65,6 @@
 (def entailment
   (union AI AK AS AB MP))
 
-(def AI
-  ;; => A->A
-  (let ([m (new mole%)])
-    (update-macro
-     m
-     ([]  'AI=>)
-     ([0] Implication))
-
-    (sync-macro
-     m
-     ([0 0] [0 1]))
-
-    m))
-
-(def AK
-  ;; => A -> (B->A)
-  (let ([m (new mole%)])
-    (update-macro
-     m
-     ([]  'AK=>)
-     ([0] Implication))
-
-    (sync-macro
-     m
-     ([0 0] [0 1]))
-
-    m))
-
 (def AK
   (Ctor 'AK=>
         (recs)
@@ -100,23 +72,7 @@
                ([0 1] Implication))
         (links ([0 0] [0 1 1]))))
 
-(def AS
-  ;; (=> (-> (-> A
-  ;;             (-> B C))
-  ;;         (-> (-> A B)
-  ;;             (-> A C))))
-  (Ctor 'AS=>
-        (recs)
-        (forms ([0]     Implication)
-               ([0 0]   Implication)
-               ([0 0 1] Implication)  ; (-> B C)
-               ([0 1]   Implication)
-               ([0 1 0] Implication)  ; (-> A B)
-               ([0 1 1] Implication)) ; (-> A C)
 
-        (links ([0 0 0]   [0 1 0 0] [0 1 1 0])
-               ([0 0 1 0] [0 1 0 1])
-               ([0 0 1 1] [0 1 1 1]))))
 
 (def AB
   ;; (=> (-> (-> B C)

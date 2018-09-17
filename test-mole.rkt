@@ -9,7 +9,7 @@
 
 (test-case
  "Introduction"
- (def root (make-root))
+ (def root (new-root))
  (set! root (update root '[0] 'I))
  (set! root (update root '[0 0] 'A))
  (check-eq? (update root '[0 0] 'NOT-A)
@@ -17,7 +17,7 @@
 
 (test-case
  "Update working with sync"
- (def root (make-root))
+ (def root (new-root))
  (set! root (update root '[0]))
  (set! root (update root '[1]))
  (set! root (sync root '[0] '[1]))
@@ -35,7 +35,7 @@
 
 (test-case
  "Representation"
- (def root (make-root))
+ (def root (new-root))
  (set! root (update root '[0]))
  (set! root (update root '[1 0]))
  (set! root (sync root '[0] '[1 0]))
@@ -49,7 +49,7 @@
 
 (test-case
  "Synchronization"
- (def root (make-root))
+ (def root (new-root))
  (set! root (update root '[0] 'A))
  (set! root (sync root '[0] '[1]))
  (check-eq? (ref-data root '[0])
@@ -61,7 +61,7 @@
 
 (test-case
  "Cyclical synchronization"
- (def root (make-root))
+ (def root (new-root))
  (set! root (update root '[0 0]))
  (set! root (sync root '[0 0] '[1]))
  (check-eq? (sync root '[0] '[1])
@@ -71,30 +71,30 @@
 
 (test-case
  "Inter-root synchronization"
- (def r1 (make-root))
+ (def r1 (new-root))
  (set! r1 (sync r1 '[0] '[1]))
 
- (def r2 (make-root))
+ (def r2 (new-root))
  (set! r2 (pull r2 r1 '[] '[]))
  (displayln "0 and 1 are the same")
  (dm r2))
 
 (test-case
  "Inter-root cycle"
- (def r1 (make-root))
+ (def r1 (new-root))
  (set! r1 (sync r1 '[0] '[1]))
 
- (def r2 (make-root))
+ (def r2 (new-root))
  (set! r2 (sync r2 '[1] '[0 0]))
  (check-eq? (pull r2 r1 '[] '[])
             'conflict))
 
 (test-case
  "Inter-root advanced"
- (def model (make-root))
+ (def model (new-root))
  (set! model (sync model '[0] '[1 0]))
 
- (def r (make-root))
+ (def r (new-root))
  (set! r (update r '[0] 'N))
  (set! r (pull r model '[] '[]))
  (check-eq? (ref-data r '[1 0])

@@ -4,7 +4,7 @@
 (provide mol-repr
          update
          sync
-         make-root
+         new-root
          pull
          ref-data
          ref-sync
@@ -25,7 +25,7 @@
   (check-true (> (set-count sync-ls) 0))
   (list sync-ls data kids))
 
-(def (make-root)
+(def (new-root)
   (make-mol '([])))
 
 ;;; Getters for molcule
@@ -50,7 +50,7 @@
                 (proc (mol-kids mol))))
 
 ;; Other methods for molecules
-(def (mol-repr root mol)
+(def (mol-repr root [path null])
   (def (blank? mol)
     (match* ((mol-data mol) (mol-kids mol))
       [('no-dat (list))  #t]
@@ -85,12 +85,13 @@
                  (map (lam (kid)  (mol-repr-core kid env))
                       (mol-kids mol)))]))
 
-  (mol-repr-core mol (make-repr-env mol
-                                    (hasheq)
-                                    (let ([count 64])
-                                      ;; The counting closure
-                                      (thunk (set! count (add1 count))
-                                             (integer->char count))))))
+  (mol-repr-core (ref root path)
+                 (make-repr-env (ref root path)
+                                (hasheq)
+                                (let ([count 64])
+                                  ;; The counting closure
+                                  (thunk (set! count (add1 count))
+                                         (integer->char count))))))
 
 (def (ref root path)
   (match path
@@ -318,7 +319,7 @@
     [(cons new-home _)  new-home]))
 
 (def (complexity mol)
-  ;; Crucial theoretical number.
+  ;; Theoretical number.
   (+ (match (eq? (mol-data mol)
                  'no-dat)
        [#t  0]
