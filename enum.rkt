@@ -7,14 +7,15 @@
 
 (def (complexity root [path null])
   ;; Used to compare generality.
-  (+ (match (eq? (ref-data root path)
-                 'no-dat)
-       [#t  0]
-       [#f  1])
-     (sub1 (length (filter (curryr list-prefix? path)
-                           (ref-sync root path))))
-     (sum-list (map (curry complexity root)
-                    (kids-paths root path)))))
+  (let loop ([p path])
+    (+ (match (eq? (ref-data root p)
+                   'no-dat)
+         [#t  0]
+         [#f  1])
+       (sub1 (length (filter (curry list-prefix? path)
+                             (ref-sync root p))))
+       (sum-list (map loop
+                      (kids-paths root p))))))
 
 (def (replaceable? r1 r2 p1 p2)
   ;; See if r1-p1 is replaceable by r2-p2
@@ -43,3 +44,19 @@
              newer))
 
     newer))
+
+(def (cleanup mols)
+  (let loop ([i    1]
+             [mols (sort mols (lam (x y) (< (complexity x '[0])
+                                          (complexity y '[0]))))])
+    (match (<= i (last-index mols))
+      [#t  (let ([contested   (list-ref mols i)]
+                 [contestants (take mols i)])
+             (match (let/ec replace?
+                      (for ([contestant contestants])
+                        (when (replaceable? contested contestant '[0] '[0])
+                          (replace? #t)))
+                      #f)
+               [#t  (loop i        (drop-pos mols i))]
+               [#f  (loop (add1 i) mols)]))]
+      [#f  mols])))

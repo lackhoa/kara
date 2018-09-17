@@ -12,7 +12,6 @@
 (call-with-output-file "data"
   #:exists 'truncate
   (lam (out)
-    (for ([m (enum null axioms)])
+    (for ([m  (cleanup (enum null axioms))])
       (dm m out)
-      (displayln (ref-data m '[0 1]))
       (newline out))))

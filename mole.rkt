@@ -232,34 +232,33 @@
 
 (def (pull host       guest
            [to null]  [from null])
+  (def (migrate root from to)
+    (def (swap-prefix ls pre new-pre)
+      ;; This is very useful for some reason
+      (for/list ([li  (filter (lam (x) (list-prefix? pre x))
+                              ls   #|Weed out the non-descendants|#)])
+        (append new-pre
+                (list-tail li (length pre)))))
 
-  (def (swap-prefix ls pre new-pre)
-    ;; This is very useful for some reason
-    (for/list ([li  (filter (lam (x) (list-prefix? pre x))
-                            ls   #|Weed out the non-descendants|#)])
-      (append new-pre
-              (list-tail li (length pre)))))
-
-  (def (migrate host guest to from)
-    ;; Migrate guest-from to host-to
-    (def immi (let loop ([p  from])
-                (mol% (swap-prefix (ref-sync guest p) from to)
-                      (ref-data guest p)
-                      (for/list ([kid-path  (kids-paths guest p)])
-                        (loop kid-path)))))
-    (replace (update host to)  to  immi))
-
-  (def (detach root path)
-    ;; Turn root-path into a root (with some loss of information)
-    (let loop ([p  path])
-      (mol% (swap-prefix (ref-sync root p)  path  '[])
+    ;; Migrate the molecule from `from` to `to`
+    (let loop ([p  from])
+      (mol% (swap-prefix (ref-sync root p)  from  to)
             (ref-data root p)
             (for/list ([kid-path  (kids-paths root p)])
               (loop kid-path)))))
 
+  (def (attach root branch to from)
+    (replace (update root to)
+             to
+             (migrate branch from to)))
+
+  (def (detach root path)
+    ;; Turn root-path into a root (with some loss of information)
+    (migrate root path '[]))
+
   (let* ([unifier (new-root)]
-         [unifier (migrate unifier host  '[0] '[])]
-         [unifier (migrate unifier guest '[1] from)])
+         [unifier (attach unifier host  '[0] '[])]
+         [unifier (attach unifier guest '[1] '[])])
     (match (sync unifier
                  (append '[0] to)
                  (append '[1] from))

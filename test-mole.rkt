@@ -108,15 +108,25 @@
 
 (test-case
  "Advanced shit"
- (def sy sync)
  (newline)
 
  (def rt mp)
  (set! rt (pull rt ai '[1]))
- (displayln "AI AK")
+ (displayln "Conclusion says (-> A (-> B A))")
  (dm (pull rt ak '[2]))
 
  (def rt2 mp)
  (set! rt2 (pull rt2 ak '[1]))
- (displayln "AK AI")
+ (displayln "Conclusion says (-> A (-> B B))")
  (dm (pull rt2 ai '[2])))
+
+(test-case
+ "Advanced Pulling"
+ (def r1 (new-root))
+
+ (def r2 (new-root))
+ (set! r2 (sync r2 '[0 0] '[0 1]))
+
+ (newline)
+ (displayln "0 and 1 are the same")
+ (dm (pull r1 r2 '[] '[0])))
