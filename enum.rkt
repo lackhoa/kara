@@ -1,50 +1,45 @@
 #lang racket
 (require "lang/kara.rkt"
-         "mole.rkt")
+         "mole.rkt"
+         "types.rkt")
 
-(provide ai ak as)
+(provide (all-defined-out))
 
-(def up update)
-(def sy sync)
+(def (complexity root [path null])
+  ;; Used to compare generality.
+  (+ (match (eq? (ref-data root path)
+                 'no-dat)
+       [#t  0]
+       [#f  1])
+     (sub1 (length (filter (curryr list-prefix? path)
+                           (ref-sync root path))))
+     (sum-list (map (curry complexity root)
+                    (kids-paths root path)))))
 
-(def ai
-  ;; A -> A
-  (sy (up (up (new-root)
-              '[]
-              'ai=>)
-          '[0]
-          '->)
-      '[0 0]
-      '[0 1]))
+(def (replaceable? r1 r2 p1 p2)
+  ;; See if r1-p1 is replaceable by r2-p2
+  (match (pull r1 r2 p1 p2)
+    ['conflict  #f]
+    [pulled     (= (complexity r1 p1)
+                   (complexity pulled p1))]))
 
-(def ak
-  ;; (-> A (-> B A))
-  (sy (up (up (up (new-root)
-                  '[]
-                  'ak=>)
-              '[0]
-              '->)
-          '[0 1]
-          '->)
-      '[0 0]
-      '[0 1 1]))
+(def (enum old new)
+  (def (make-mp fun arg)
+    (let* ([res (pull mp  fun '[1] '[])]
+           [res (pull res arg '[2] '[])])
+      res))
 
-(def as
-  ;; (=> (-> (-> A
-  ;;             (-> B C))
-  ;;         (-> (-> A B)
-  ;;             (-> A C))))
-  (let* ([r  (new-root)]
-         [r  (up r '[] 'as=>)]
-         [r  (up r '[0] '->)]
-         [r  (up r '[0 0] '->)]
-         [r  (up r '[0 0 1] '->)]
-         [r  (up r '[0 1] '->)]
-         [r  (up r '[0 1 0] '->)]
-         [r  (up r '[0 1 1] '->)]
+  (let ([newer null])
+    (for* ([ro  old] [rn  new])
+      (cons! (make-mp ro rn)
+             newer)
+      (cons! (make-mp rn ro)
+             newer))
 
-         [r  (sy r '[0 0 0] '[0 1 0 0])]
-         [r  (sy r '[0 0 0] '[0 1 1 0])]
-         [r  (sy r '[0 0 1 0] '[0 1 0 1])]
-         [r  (sy r '[0 0 1 1] '[0 1 1 1])])
-    r))
+    (for ([pair (in-combinations new 2)])
+      (cons! (make-mp (first pair) (second pair))
+             newer)
+      (cons! (make-mp (second pair) (first pair))
+             newer))
+
+    newer))

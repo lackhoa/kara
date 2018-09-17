@@ -3,17 +3,16 @@
 
 (require "lang/kara.rkt"
          "mole.rkt"
-         "enum.rkt")
+         "enum.rkt"
+         "types.rkt")
 
-(def dm (compose pdisplay mol-repr))
+(def (dm mol [port (current-output-port)])
+  (pdisplay (mol-repr mol) 35 port))
 
 (call-with-output-file "data"
   #:exists 'truncate
   (lam (out)
-    (write ai out)))
-
-(call-with-input-file "data"
-  (lam (in)
-    (dm (read in))
-    (dm (read in))
-    (dm (read in))))
+    (for ([m (enum null axioms)])
+      (dm m out)
+      (displayln (ref-data m '[0 1]))
+      (newline out))))

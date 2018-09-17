@@ -2,6 +2,7 @@
 #lang racket
 (require "lang/kara.rkt"
          "mole.rkt"
+         "types.rkt"
          rackunit)
 
 (def (dm root)
@@ -71,13 +72,18 @@
 
 (test-case
  "Inter-root synchronization"
- (def r1 (new-root))
- (set! r1 (sync r1 '[0] '[1]))
+ (def model1 (sync (new-root) '[0] '[1]))
+ (def model2 (sync (new-root) '[1] '[2]))
+ ;; (def model3 (update (new-root) '[] 'T))
+ (def model3 (new-root))
 
- (def r2 (new-root))
- (set! r2 (pull r2 r1 '[] '[]))
- (displayln "0 and 1 are the same")
- (dm r2))
+ (def r (new-root))
+ (set! r (pull r model1))
+ (set! r (pull r model2))
+ (set! r (pull r model3 '[1]))
+ (set! r (sync r '[2] '[3]))
+ (displayln "0, 1, 2 and 3 and are the same, with T being the data")
+ (dm r))
 
 (test-case
  "Inter-root cycle"
@@ -99,3 +105,18 @@
  (set! r (pull r model '[] '[]))
  (check-eq? (ref-data r '[1 0])
             'N))
+
+(test-case
+ "Advanced shit"
+ (def sy sync)
+ (newline)
+
+ (def rt mp)
+ (set! rt (pull rt ai '[1]))
+ (displayln "AI AK")
+ (dm (pull rt ak '[2]))
+
+ (def rt2 mp)
+ (set! rt2 (pull rt2 ak '[1]))
+ (displayln "AK AI")
+ (dm (pull rt2 ai '[2])))

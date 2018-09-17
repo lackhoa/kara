@@ -8,7 +8,8 @@
          pull
          ref-data
          ref-sync
-         ref-kids)
+         ref-kids
+         kids-paths)
 
 (def (no-fail)
   ;; The FAIL continuation that you're
@@ -68,7 +69,7 @@
 
   (mol-repr-core (ref root path)
                  (make-repr-env (ref root path)
-                                (hasheq)
+                                (hash)
                                 (let ([count 64])
                                   ;; The counting closure
                                   (thunk (set! count (add1 count))
@@ -159,8 +160,11 @@
        (loop (pad rel next-id)
              rest-path)])))
 
-(def (kids-indices root path)
-  (range (length (ref-kids root path))))
+(def (kids-paths root path)
+  ;; Very helpful utility.
+  (let ([kids-indices  (range (length (ref-kids root path)))])
+    (for/list ([i  kids-indices])
+      (pad path i))))
 
 (def (height mol)
   ;; Used for synchronization
@@ -218,92 +222,46 @@
           (do&inform root fp2 (lam (m)
                                 (struct-copy mol% m [sync combined])))))
 
-      (for ([i  (kids-indices root fp1)])
+      (for ([new-fp1 (kids-paths root fp1)]
+            [new-fp2 (kids-paths root fp2)])
         ;; Our job is over, let the kids sync
-        (match (loop (pad fp1 i)
-                     (pad fp2 i))
+        (match (loop new-fp1 new-fp2)
           ['conflict  (escape 'conflict)]
           [new-root   (set! root new-root)]))
       root)))
 
-(def (tele-sync r1 r2 p1 p2)
-  ;; The multi-root version of sync, the equivalent of unification.
+(def (pull host       guest
+           [to null]  [from null])
+
   (def (swap-prefix ls pre new-pre)
+    ;; This is very useful for some reason
     (for/list ([li  (filter (lam (x) (list-prefix? pre x))
                             ls   #|Weed out the non-descendants|#)])
       (append new-pre
               (list-tail li (length pre)))))
 
-  (begin
-    #|Make sure the paths exist|#
-    (set! r1 (update r1 p1))
-    (set! r2 (update r2 p2)))
+  (def (migrate host guest to from)
+    ;; Migrate guest-from to host-to
+    (def immi (let loop ([p  from])
+                (mol% (swap-prefix (ref-sync guest p) from to)
+                      (ref-data guest p)
+                      (for/list ([kid-path  (kids-paths guest p)])
+                        (loop kid-path)))))
+    (replace (update host to)  to  immi))
 
-  (let loop ([fp1  p1]
-             [fp2  p2])
-    (let/ec escape
-      (match* ((ref-data r1 fp1)
-               (ref-data r2 fp2))
-        [(x x)                (void)]
-        [('no-dat other-dat)  (set! r1  (update r1 fp1 other-dat))]
-        [(dat 'no-dat)        (set! r2  (update r2 fp2 dat))]
-        [(_ _)                (escape 'conflict)])
+  (def (detach root path)
+    ;; Turn root-path into a root (with some loss of information)
+    (let loop ([p  path])
+      (mol% (swap-prefix (ref-sync root p)  path  '[])
+            (ref-data root p)
+            (for/list ([kid-path  (kids-paths root p)])
+              (loop kid-path)))))
 
-      (let* ([mh  (max (height (ref r1 fp1))
-                       (height (ref r2 fp2)))
-                  #|watch the height to detect cycle|#
-                  #|since these two roots are separated,
-                  the check is different|#]
-             [i1  (last-index (ref-kids r1 fp1))]
-             [i2  (last-index (ref-kids r2 fp2))])
-        ;; Add the missing kids
-        (cond [(< i1 i2)
-               (set! r1 (update r1 (pad fp1 i2)))
-               (when (> (height (ref r1 fp1))
-                        mh)
-                 (escape 'conflict))]
-
-              [(> i1 i2)
-               (set! r2 (update r2 (pad fp2 i1)))
-               (when (> (height (ref r2 fp2))
-                        mh)
-                 (escape 'conflict))]))
-
-      (let ([s1  (remove-duplicates
-                  (append (ref-sync r1 fp1)
-                          (swap-prefix (ref-sync r2 fp2)  p2 p1)))]
-            [s2  (remove-duplicates
-                  (append (ref-sync r2 fp2)
-                          (swap-prefix (ref-sync r1 fp1)  p1 p2)))])
-        #|Establish the connections|#
-        (set! r1
-          (do&inform r1 fp1 (lam (m)
-                              (struct-copy mol% m [sync s1]))))
-        (set! r2
-          (do&inform r2 fp2 (lam (m)
-                              (struct-copy mol% m [sync s2])))))
-
-      (for ([i  (kids-indices r1 fp1)])
-        ;; Our job is over, let the kids sync
-        (match (loop (pad fp1 i)
-                     (pad fp2 i))
-          ['conflict       (escape 'conflict)]
-          [(cons nr1 nr2)  (begin (set! r1 nr1)
-                                  (set! r2 nr2))]))
-
-      (cons r1 r2))))
-
-(def (pull home  guest  p-home  p-guest)
-  (match (tele-sync home  guest  p-home  p-guest)
-    ['conflict          'conflict]
-    [(cons new-home _)  new-home]))
-
-(def (complexity mol)
-  ;; Theoretical number.
-  (+ (match (eq? (mol%-data mol)
-                 'no-dat)
-       [#t  0]
-       [#f  1])
-     (sub1 (length (mol%-sync mol)))
-     (sum-list (map complexity
-                    (mol%-kids mol)))))
+  (let* ([unifier (new-root)]
+         [unifier (migrate unifier host  '[0] '[])]
+         [unifier (migrate unifier guest '[1] from)])
+    (match (sync unifier
+                 (append '[0] to)
+                 (append '[1] from))
+      ['conflict  'conflict]
+      [unified    (detach unified '[0])])))
