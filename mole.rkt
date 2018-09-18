@@ -1,15 +1,9 @@
 #lang racket
 (require "lang/kara.rkt"
          racket/hash)
-(provide mol-repr
-         update
-         sync
-         new-root
-         pull
-         ref-data
-         ref-sync
-         ref-kids
-         kids-paths)
+(provide mol-repr update sync new-root
+         pull attach detach ref-data
+         ref-sync ref-kids kids-paths)
 
 (def (no-fail)
   ;; The FAIL continuation that you're
@@ -230,37 +224,37 @@
           [new-root   (set! root new-root)]))
       root)))
 
-(def (pull host       guest
-           [to null]  [from null])
-  (def (migrate root from to)
-    (def (swap-prefix ls pre new-pre)
-      ;; This is very useful for some reason
-      (for/list ([li  (filter (lam (x) (list-prefix? pre x))
-                              ls   #|Weed out the non-descendants|#)])
-        (append new-pre
-                (list-tail li (length pre)))))
+(def (migrate root from to)
+  ;; Migrate the molecule from root-`from` to ?-`to`
+  ;; Enables `attach` and `detach`
+  (def (swap-prefix ls pre new-pre)
+    (for/list ([li  (filter (lam (x) (list-prefix? pre x))
+                            ls   #|Weed out the non-descendants|#)])
+      (append new-pre
+              (list-tail li (length pre)))))
 
-    ;; Migrate the molecule from `from` to `to`
-    (let loop ([p  from])
-      (mol% (swap-prefix (ref-sync root p)  from  to)
-            (ref-data root p)
-            (for/list ([kid-path  (kids-paths root p)])
-              (loop kid-path)))))
+  (let loop ([p  from])
+    (mol% (swap-prefix (ref-sync root p)  from  to)
+          (ref-data root p)
+          (for/list ([kid-path  (kids-paths root p)])
+            (loop kid-path)))))
 
-  (def (attach root branch to from)
-    (replace (update root to)
-             to
-             (migrate branch from to)))
+(def (attach root branch to)
+  (replace (update root to)
+           to
+           (migrate branch '[] to)))
 
-  (def (detach root path)
-    ;; Turn root-path into a root (with some loss of information)
-    (migrate root path '[]))
+(def (detach root from)
+  ;; Convert root-path into a root
+  (migrate root from '[]))
 
+(def (pull host  guest  [to null])
+  ;; It's like synchronizing, but with different roots
   (let* ([unifier (new-root)]
-         [unifier (attach unifier host  '[0] '[])]
-         [unifier (attach unifier guest '[1] '[])])
+         [unifier (attach unifier host  '[0])]
+         [unifier (attach unifier guest '[1])])
     (match (sync unifier
                  (append '[0] to)
-                 (append '[1] from))
+                 '[1])
       ['conflict  'conflict]
       [unified    (detach unified '[0])])))

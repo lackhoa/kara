@@ -12,6 +12,6 @@
 (call-with-output-file "data"
   #:exists 'truncate
   (lam (out)
-    (for ([m  (cleanup (enum null axioms))])
+    (for ([m  (cdr (main))])
       (dm m out)
       (newline out))))

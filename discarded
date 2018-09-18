@@ -1,0 +1,4 @@
+(-> (-> A B) (-> A A))
+Replaced by
+(-> A (-> B B))
+

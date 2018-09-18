@@ -74,7 +74,6 @@
  "Inter-root synchronization"
  (def model1 (sync (new-root) '[0] '[1]))
  (def model2 (sync (new-root) '[1] '[2]))
- ;; (def model3 (update (new-root) '[] 'T))
  (def model3 (new-root))
 
  (def r (new-root))
@@ -82,7 +81,7 @@
  (set! r (pull r model2))
  (set! r (pull r model3 '[1]))
  (set! r (sync r '[2] '[3]))
- (displayln "0, 1, 2 and 3 and are the same, with T being the data")
+ (displayln "0, 1, 2 and 3 and are the same")
  (dm r))
 
 (test-case
@@ -92,7 +91,7 @@
 
  (def r2 (new-root))
  (set! r2 (sync r2 '[1] '[0 0]))
- (check-eq? (pull r2 r1 '[] '[])
+ (check-eq? (pull r2 r1 '[])
             'conflict))
 
 (test-case
@@ -102,7 +101,7 @@
 
  (def r (new-root))
  (set! r (update r '[0] 'N))
- (set! r (pull r model '[] '[]))
+ (set! r (pull r model))
  (check-eq? (ref-data r '[1 0])
             'N))
 
@@ -119,14 +118,3 @@
  (set! rt2 (pull rt2 ak '[1]))
  (displayln "Conclusion says (-> A (-> B B))")
  (dm (pull rt2 ai '[2])))
-
-(test-case
- "Advanced Pulling"
- (def r1 (new-root))
-
- (def r2 (new-root))
- (set! r2 (sync r2 '[0 0] '[0 1]))
-
- (newline)
- (displayln "0 and 1 are the same")
- (dm (pull r1 r2 '[] '[0])))
