@@ -23,43 +23,42 @@
     [r1-pulled  (= (complexity r1)
                    (complexity r1-pulled))]))
 
-(def (enum old new)
-  ;; Return a list of molecules created from `old` and `new`
+(def (enum combined uncombined)
+  ;; Return a list of molecules created from `combined` and `uncombined`
   (def (make-mp fun arg)
     (let* ([res (pull mp  fun '[1])]
            [res (pull res arg '[2])])
       res))
 
-  (let ([newer null])
-    (for* ([ro  old] [rn  new])
-      (cons! (make-mp ro rn)
-             newer)
-      (cons! (make-mp rn ro)
-             newer))
+  (let ([new null])
+    ;; (c + u)^2 - c^2 = u^2 + c*u + u*c
+    (for* ([rc  combined] [ru  uncombined])
+      ;; Cartesian product
+      (cons! (make-mp rc ru) new)
+      (cons! (make-mp ru rc) new))
 
-    (for ([pair (in-combinations new 2)])
-      (cons! (make-mp (first pair) (second pair))
-             newer)
-      (cons! (make-mp (second pair) (first pair))
-             newer))
+    (for* ([u1  uncombined] [u2  uncombined])
+      (cons! (make-mp u1 u2) new))
 
-    newer))
+    new))
 
-(def (cleanup old new)
-  ;; Clean up old + new, returns the remaining bases
+(def (cleanup basis new)
+  ;; Clean up old basis + new, returns the remaining basis
   ;; Remember: old molecules can still be contested
-  (def conclusion
-    (let ([ht  (hasheq)])
-      (lam (m)
-        (match (hash-ref ht m 'not-found)
-          ['not-found  (let ([res  (detach m '[0])])
-                         (set! ht (hash-set ht m res))
-                         res)]
-          [val         val]))))
+  (def-mem (conclusion m)
+    (detach m '[0]))
 
-  (let ([mols  (sort (append old new)
-                     (lam (x y) (< (complexity (conclusion x))
-                                 (complexity (conclusion y)))))])
+  (call-with-output-file "discarded"
+    #:exists 'truncate
+    (lam (out)
+      (void)))
+
+  (let ([mols  (sort (append basis new)
+                     (lam (x y) (or (< (complexity (conclusion x))
+                                    (complexity (conclusion y)))
+                                 (< (complexity x)
+                                    (complexity y)))))])
+
     (let loop ([contestants  (list (car mols))]
                [contested    (cdr mols)])
       (match contested
@@ -67,15 +66,16 @@
         [(cons fst rst)  (match (let/ec replace?
                                   (for ([contestant contestants])
                                     (when (and (or (memq contestant new)
-                                                (memq contested  new)
+                                                (memq fst        new)
                                                 #|If both are old then they're orthogonal|#)
                                              (replaceable? (conclusion fst)
                                                            (conclusion contestant)))
+
                                       (call-with-output-file "discarded"
-                                        #:exists 'truncate
+                                        #:exists 'append
                                         (lam (out)
                                           (displayln (mol-repr (conclusion fst)) out)
-                                          (displayln "Replaced by" out)
+                                          (displayln "<=" out)
                                           (displayln (mol-repr (conclusion contestant)) out)
                                           (newline out)))
 
@@ -84,9 +84,10 @@
                            [#t  (loop contestants            rst)]
                            [#f  (loop (cons fst contestants) rst)])]))))
 
-(def (main [old null] [new axioms])
-  (let* ([newer-raw  (enum old new)]
-         [familiar   (append old new)]
-         [new-pool   (cleanup familiar newer-raw)])
-    (cons (set-intersect new-pool familiar)
-          (set-intersect new-pool newer-raw))))
+(def (main [combined null]
+           [uncombined axioms])
+  (let* ([basis      (append combined uncombined)]
+         [new        (enum combined uncombined)]
+         [new-pool   (cleanup basis new)])
+    (cons (set-intersect new-pool basis)
+          (set-intersect new-pool new))))
