@@ -23,37 +23,40 @@
     [r1-pulled  (= (complexity r1)
                    (complexity r1-pulled))]))
 
-(def (enum combined uncombined)
-  ;; Return a list of molecules created from `combined` and `uncombined`
+(def (enum mixed unmixed)
+  ;; Return a list of molecules created by mixing up
+  ;; `mixed` and `unmixed`
   (def (make-mp fun arg)
-    (let* ([res (pull mp  fun '[1])]
-           [res (pull res arg '[2])])
-      res))
+    (pull (pull mp fun '[1]) arg '[2]))
 
-  (let ([new null])
-    ;; (c + u)^2 - c^2 = u^2 + c*u + u*c
-    (for* ([rc  combined] [ru  uncombined])
+  (let* ([new          null]
+         [maybe-cons!  (lam (x) (unless (eq? x 'conflict)
+                                (cons! x new)))])
+
+    ;; (A + B)^2 - B^2 = A^2 + A*B + B*A
+    (for* ([r1  mixed]
+           [r2  unmixed])
       ;; Cartesian product
-      (cons! (make-mp rc ru) new)
-      (cons! (make-mp ru rc) new))
+      (maybe-cons! (make-mp r1 r2))
+      (maybe-cons! (make-mp r2 r1)))
 
-    (for* ([u1  uncombined] [u2  uncombined])
-      (cons! (make-mp u1 u2) new))
+    (for* ([r1  unmixed]
+           [r2  unmixed])
+      (maybe-cons! (make-mp r1 r2)))
 
     new))
 
-(def (cleanup basis new)
-  ;; Clean up old basis + new, returns the remaining basis
-  ;; Remember: old molecules can still be contested
+(def (cleanup cleaned new)
+  ;; Clean up cleaned + new, returns the remaining pool
+  ;; Note: The old cleaned pool can still be contested
   (def-mem (conclusion m)
     (detach m '[0]))
 
   (call-with-output-file "discarded"
     #:exists 'truncate
-    (lam (out)
-      (void)))
+    (lam (out) (void)))
 
-  (let ([mols  (sort (append basis new)
+  (let ([mols  (sort (append cleaned new)
                      (lam (x y) (or (< (complexity (conclusion x))
                                     (complexity (conclusion y)))
                                  (< (complexity x)
@@ -84,10 +87,13 @@
                            [#t  (loop contestants            rst)]
                            [#f  (loop (cons fst contestants) rst)])]))))
 
-(def (main [combined null]
-           [uncombined axioms])
-  (let* ([basis      (append combined uncombined)]
-         [new        (enum combined uncombined)]
-         [new-pool   (cleanup basis new)])
-    (cons (set-intersect new-pool basis)
-          (set-intersect new-pool new))))
+(def (main [l1 null] [l2 axioms])
+  ;; l1 is clean and mixed
+  ;; l2 is clean and unmixed
+  ;; => old+new: clean and unmixed
+  ;; Returns: two lists with the same characteristics.
+  (let* ([l3     (enum l1 l2)]
+         [l12    (append l1 l2)]
+         [cl123  (cleanup l12 l3)])
+    (cons (set-intersect cl123 l12)
+          (set-intersect cl123 l3))))

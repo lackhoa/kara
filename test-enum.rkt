@@ -25,19 +25,19 @@
 
 ;; (call-with-input-file "data"
 ;;   (lam (in)
-;;     (let ([old-new (read in)])
-;;       (let ([result (main (car old-new)
-;;                           (cdr old-new))])
-;;         ;; Write the data
-;;         (call-with-output-file "data1"
-;;           #:exists 'truncate
-;;           (lam (out)
-;;             (write result out)))
+;;     (match (read in)
+;;       [(cons mixed unmixed)
+;;        (let ([result (main mixed unmixed)])
+;;          ;; Write the data
+;;          (call-with-output-file "data1"
+;;            #:exists 'truncate
+;;            (lam (out)
+;;              (write result out)))
 
-;;         (call-with-output-file "debug1"
-;;           #:exists 'truncate
-;;           (lam (out)
-;;             (for ([m (cdr result)])
-;;               ;; Display for human
-;;               (dm m out)
-;;               (newline out))))))))
+;;          (call-with-output-file "debug1"
+;;            #:exists 'truncate
+;;            (lam (out)
+;;              (for ([m (cdr result)])
+;;                ;; Display for human
+;;                (dm m out)
+;;                (newline out)))))])))
