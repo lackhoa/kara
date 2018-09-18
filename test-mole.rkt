@@ -118,3 +118,36 @@
  (set! rt2 (pull rt2 ak '[1]))
  (displayln "Conclusion says (-> A (-> B B))")
  (dm (pull rt2 ai '[2])))
+
+(test-case
+ "Emergency"
+ (def (replaceable? r1 r2)
+   ;; Check if r1 is replaceable by r2
+   (def (complexity root)
+     ;; Used to compare generality of two roots
+     (let loop ([p null])
+       (+ (match (eq? (ref-data root p)
+                      'no-dat)
+            [#t  (sub1 (length (ref-sync root p)))]
+            [#f  1])
+          (sum-list (map loop
+                         (kids-paths root p))))))
+
+   (match (pull r1 r2)
+     ['conflict  #f]
+     [r1-pulled  (pydisplay (complexity r1)
+                            (complexity r1-pulled))
+                 (dm r1)
+                 (dm r1-pulled)
+                 (= (complexity r1)
+                    (complexity r1-pulled))]))
+
+ ;; (-> A (-> B A))
+ (def r1 (detach ak '[0]))
+ ;; (-> (-> A B) (-> C (-> A B)))
+ (def up update)
+ (def sync sy)
+ (def r2
+   (sy (sy (up (up (up (up (new-root) '[] '->) '[0] '->) '[1] '->) '[1 1] '->) '[0 0] '[1 1 0]) '[0 1] '[1 1 1]))
+
+ (replaceable? r2 r1))

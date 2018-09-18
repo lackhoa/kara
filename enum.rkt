@@ -10,9 +10,8 @@
   (let loop ([p null])
     (+ (match (eq? (ref-data root p)
                    'no-dat)
-         [#t  0]
+         [#t  (sub1 (length (ref-sync root p)))]
          [#f  1])
-       (sub1 (length (ref-sync root p)))
        (sum-list (map loop
                       (kids-paths root p))))))
 
@@ -52,7 +51,7 @@
   (def-mem (conclusion m)
     (detach m '[0]))
 
-  (call-with-output-file "discarded"
+  (call-with-output-file "db/discarded"
     #:exists 'truncate
     (lam (out) (void)))
 
@@ -74,7 +73,7 @@
                                              (replaceable? (conclusion fst)
                                                            (conclusion contestant)))
 
-                                      (call-with-output-file "discarded"
+                                      (call-with-output-file "db/discarded"
                                         #:exists 'append
                                         (lam (out)
                                           (displayln (mol-repr (conclusion fst)) out)

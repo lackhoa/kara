@@ -173,6 +173,11 @@
     (set! root (update root p1))
     (set! root (update root p2)))
 
+  (def max-height
+    #|watch the height to detect cycle|#
+    (max (height (ref root p1))
+         (height (ref root p2))))
+
   (let loop ([fp1  p1] [fp2  p2])
     (let/ec escape
       (when (member fp1 (ref-sync root fp2))
@@ -186,11 +191,8 @@
         [(dat 'no-dat)        (set! root  (update root fp2 dat))]
         [(_ _)                (escape 'conflict)])
 
-      (let* ([mh  (max (height (ref root fp1))
-                       (height (ref root fp2)))
-                  #|watch the height to detect cycle|#]
-             [i1  (last-index (ref-kids root fp1))]
-             [i2  (last-index (ref-kids root fp2))])
+      (let ([i1  (last-index (ref-kids root fp1))]
+            [i2  (last-index (ref-kids root fp2))])
         ;; Add the missing kids
         (cond [(< i1 i2)
                (set! root (update root
@@ -200,9 +202,9 @@
                (set! root (update root
                                   (pad fp2 i1)))])
 
-        (when (> (max (height (ref root fp1))
-                      (height (ref root fp2)))
-                 mh)
+        (when (> (max (height (ref root p1))
+                      (height (ref root p2)))
+                 max-height)
           (escape 'conflict)))
 
       (let ([combined  (remove-duplicates
