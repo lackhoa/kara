@@ -5,94 +5,33 @@
 
 (provide (all-defined-out))
 
-(def (complexity root)
-  ;; Used to compare generality of two roots
-  (let loop ([p null])
-    (+ (match (eq? (ref-data root p)
-                   'no-dat)
-         [#t  (sub1 (length (ref-sync root p)))]
-         [#f  1])
-       (sum-list (map loop
-                      (kids-paths root p))))))
+(def (instance? r1 r2)
+  ;; Returns true iff r1 is an instance of r2.
+  (def (same? root p1 p2)
+    (or (member p1 (ref-sync root p2))
+       (and (eq? (ref-data root p1)
+               (ref-data root p2))
+          (eq? (length (ref-kids root p1))
+               (length (ref-kids root p2))
+               #|If this isn't true, the code below wouldn't work|#)
+          (for/and ([pk1 (kids-paths root p1)]
+                    [pk2 (kids-paths root p2)])
+            (same? root pk1 pk2)))))
 
-(def (replaceable? r1 r2)
-  ;; Check if r1 is replaceable by r2
-  (match (pull r1 r2)
-    ['conflict  #f]
-    [r1-pulled  (= (complexity r1)
-                   (complexity r1-pulled))]))
+  (let loop ([path null])
+    (and (or (eq? (ref-data r2 path)
+               'no-dat)
+          (eq? (ref-data r1 path)
+               (ref-data r2 path)))
 
-(def (enum mixed unmixed)
-  ;; Return a list of molecules created by mixing up
-  ;; `mixed` and `unmixed`
-  (def (make-mp fun arg)
-    (pull (pull mp fun '[1]) arg '[2]))
+       (andmap (lam (p)  (same? r1 path p))
+               (ref-sync r2 path))
 
-  (let* ([new          null]
-         [maybe-cons!  (lam (x) (unless (eq? x 'conflict)
-                                (cons! x new)))])
+       (<= (length (ref-kids r2 path))
+          (length (ref-kids r1 path)))
 
-    ;; (A + B)^2 - B^2 = A^2 + A*B + B*A
-    (for* ([r1  mixed]
-           [r2  unmixed])
-      ;; Cartesian product
-      (maybe-cons! (make-mp r1 r2))
-      (maybe-cons! (make-mp r2 r1)))
+       (andmap (lam (kid-path)  (loop kid-path))
+               (kids-paths r2 path)))))
 
-    (for* ([r1  unmixed]
-           [r2  unmixed])
-      (maybe-cons! (make-mp r1 r2)))
-
-    new))
-
-(def (cleanup cleaned new)
-  ;; Clean up cleaned + new, returns the remaining pool
-  ;; Note: The old cleaned pool can still be contested
-  (def-mem (conclusion m)
-    (detach m '[0]))
-
-  (call-with-output-file "db/discarded"
-    #:exists 'truncate
-    (lam (out) (void)))
-
-  (let ([mols  (sort (append cleaned new)
-                     (lam (x y) (or (< (complexity (conclusion x))
-                                    (complexity (conclusion y)))
-                                 (< (complexity x)
-                                    (complexity y)))))])
-
-    (let loop ([contestants  (list (car mols))]
-               [contested    (cdr mols)])
-      (match contested
-        [(list)          contestants]
-        [(cons fst rst)  (match (let/ec replace?
-                                  (for ([contestant contestants])
-                                    (when (and (or (memq contestant new)
-                                                (memq fst        new)
-                                                #|If both are old then they're orthogonal|#)
-                                             (replaceable? (conclusion fst)
-                                                           (conclusion contestant)))
-
-                                      (call-with-output-file "db/discarded"
-                                        #:exists 'append
-                                        (lam (out)
-                                          (displayln (mol-repr (conclusion fst)) out)
-                                          (displayln "<=" out)
-                                          (displayln (mol-repr (conclusion contestant)) out)
-                                          (newline out)))
-
-                                      (replace? #t)))
-                                  #f)
-                           [#t  (loop contestants            rst)]
-                           [#f  (loop (cons fst contestants) rst)])]))))
-
-(def (main [l1 null] [l2 axioms])
-  ;; l1 is clean and mixed
-  ;; l2 is clean and unmixed
-  ;; => old+new: clean and unmixed
-  ;; Returns: two lists with the same characteristics.
-  (let* ([l3     (enum l1 l2)]
-         [l12    (append l1 l2)]
-         [cl123  (cleanup l12 l3)])
-    (cons (set-intersect cl123 l12)
-          (set-intersect cl123 l3))))
+(def (make-mp fun arg)
+  (pull (pull mp fun '[1]) arg '[2]))
