@@ -3,7 +3,8 @@
          racket/hash)
 (provide mol-repr update sync new-root
          pull attach detach ref-data
-         ref-sync ref-kids kids-paths)
+         ref-sync ref-kids kids-paths
+         dm)
 
 (def (no-fail)
   ;; The FAIL continuation that you're
@@ -260,3 +261,6 @@
                  '[1])
       ['conflict  'conflict]
       [unified    (detach unified '[0])])))
+
+(def (dm mol [port (current-output-port)])
+  (pdisplay (mol-repr mol) 35 port))

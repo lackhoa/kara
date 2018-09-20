@@ -40,5 +40,48 @@
        (andmap (lam (kid-path)  (loop kid-path))
                (kids-paths model path)))))
 
-(def (make-mp fun arg)
-  (pull (pull mp fun '[1]) arg '[2]))
+
+(def (main database)
+  (def (make-mp fun arg)
+    (pull (pull mp fun '[1]) arg '[2]))
+
+  (def (conclusion root)
+    (detach root '[0]))
+
+  (def (log-discard m1 m2)
+    (displayln "Discard happened")
+    (let ([mr1  (mol-repr (detach m1 '[0]))]
+          [mr2  (mol-repr (detach m2 '[0]))])
+      (unless (equal? mr1 mr2)
+        (displayln mr1)
+        (displayln "Replaced by")
+        (displayln mr2)
+        (newline))))
+
+  (let ([mixed  (shuffle database)]
+        [i      -1])
+    (let loop ([new-db null]
+               [m1     (car mixed)]
+               [mixed  (cdr mixed)])
+      (set! i (add1 i))
+      (match mixed
+        [(list)          (cons m1 new-db)]
+        [(cons m2 mrst)  (match (< i 3)
+                           [#t  (match (make-mp m1 m2)
+                                  ['conflict  (loop (cons m1 new-db)
+                                                    m2
+                                                    mrst)]
+                                  [m3         (loop (cons m3 (cons m1 new-db))
+                                                    m2
+                                                    mrst)])]
+
+                           [#f  (match (instance? (conclusion m1)
+                                                  (conclusion m2))
+                                  [#t  (log-discard m1 m2)
+                                       (loop new-db  m2  mrst)]
+                                  [#f  (match (instance? m2 m1)
+                                         [#t  (log-discard m2 m1)
+                                              (loop new-db  m1  mrst)]
+                                         [#f  (loop (cons m1 new-db)
+                                                    m2
+                                                    mrst)])])])]))))

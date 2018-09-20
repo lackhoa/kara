@@ -5,9 +5,6 @@
          "types.rkt"
          rackunit)
 
-(def (dm root)
-  (displayln (mol-repr root)))
-
 (test-case
  "Introduction"
  (def root (new-root))
