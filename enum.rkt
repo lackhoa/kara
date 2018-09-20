@@ -49,14 +49,13 @@
     (detach root '[0]))
 
   (def (log-discard m1 m2)
-    (displayln "Discard happened")
     (let ([mr1  (mol-repr (detach m1 '[0]))]
           [mr2  (mol-repr (detach m2 '[0]))])
       (unless (equal? mr1 mr2)
-        (displayln mr1)
+        (newline) (displayln mr1)
         (displayln "Replaced by")
-        (displayln mr2)
-        (newline))))
+        (displayln mr2) (newline))
+      (display "x")))
 
   (let ([mixed  (shuffle database)]
         [i      -1])
@@ -66,22 +65,29 @@
       (set! i (add1 i))
       (match mixed
         [(list)          (cons m1 new-db)]
-        [(cons m2 mrst)  (match (< i 3)
-                           [#t  (match (make-mp m1 m2)
-                                  ['conflict  (loop (cons m1 new-db)
-                                                    m2
-                                                    mrst)]
-                                  [m3         (loop (cons m3 (cons m1 new-db))
-                                                    m2
-                                                    mrst)])]
+        [(cons m2 mrst)
+         (match (< i 2)
+           [#t  (match (make-mp m1 m2)
+                  ['conflict  (loop (cons m1 new-db)
+                                    m2
+                                    mrst)]
+                  [m3         (match (> (height (conclusion m3))
+                                        10)
+                                [#t  (loop (cons m1 new-db)  m2  mrst)  #|Gotta do w/o this one|#]
+                                [#f  (loop (cons (pull (update (new-root) '[] 'mp=>)
+                                                       (conclusion m3)
+                                                       '[0] #|We cannot store the entire proof|#)
+                                                 (cons m1 new-db))
+                                           m2
+                                           mrst)])])]
 
-                           [#f  (match (instance? (conclusion m1)
-                                                  (conclusion m2))
-                                  [#t  (log-discard m1 m2)
-                                       (loop new-db  m2  mrst)]
-                                  [#f  (match (instance? m2 m1)
-                                         [#t  (log-discard m2 m1)
-                                              (loop new-db  m1  mrst)]
-                                         [#f  (loop (cons m1 new-db)
-                                                    m2
-                                                    mrst)])])])]))))
+           [#f  (match (instance? (conclusion m1)
+                                  (conclusion m2))
+                  [#t  (log-discard m1 m2)
+                       (loop new-db  m2  mrst)]
+                  [#f  (match (instance? m2 m1)
+                         [#t  (log-discard m2 m1)
+                              (loop new-db  m1  mrst)]
+                         [#f  (loop (cons m1 new-db)
+                                    m2
+                                    mrst)])])])]))))

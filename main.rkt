@@ -31,5 +31,5 @@
             (dm (detach m '[0]) out)
             (newline out)))))))
 
-(mix&react 1)
+(mix&react 1000)
 (view-data)

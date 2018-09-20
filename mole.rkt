@@ -4,7 +4,7 @@
 (provide mol-repr update sync new-root
          pull attach detach ref-data
          ref-sync ref-kids kids-paths
-         dm)
+         dm height)
 
 (def (no-fail)
   ;; The FAIL continuation that you're
