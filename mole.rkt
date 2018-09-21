@@ -6,160 +6,53 @@
          ref-sync ref-kids kids-paths
          dm height)
 
-(def (no-fail)
-  ;; The FAIL continuation that you're
-  ;; confident not gonna be called.
-  (error "I did not expect this to fail!"))
-
 ;;; Molcules
-(struct mol% (sync data kids) #:prefab)
+(struct mol% (sync [data #:mutable]
+                   [kids #:mutable]) #:prefab)
 
-(def (make-mol sync-ls
-               [data    'no-dat]
+(def (make-mol [data    'no-dat]
                [kids    null])
-  ;; data    : 'no-dat  | symbol
-  ;; kids    : 'no-kid  | mols
-  ;; sync-ls : mols (at least one path)
-  (check-true (> (set-count sync-ls) 0))
-  (mol% sync-ls data kids))
+  ;; data     : 'no-dat | symbol
+  ;; kids     : [mol | valid path]
+  (mol% data kids))
 
 (def (new-root)
-  (make-mol '([])))
+  (make-mol))
 
-;; Other methods for molecules
-(def (mol-repr root [path null])
-  (def (blank? mol)
-    (match mol
-      [(mol% _ 'no-dat (list))  #t]
-      [_                        #f]))
-
-  (def (make-repr-env mol
-                      in-env
-                      get-next!)
-    ;; Sort out which variables are
-    ;; represented by which symbol.
-    (match (blank? mol)
-      [#t  (match (hash-ref in-env mol 'unbound)
-             ['unbound  (hash-set-many in-env
-                                       (map (lam (p)  (ref root p))
-                                            (mol%-sync mol))
-                                       (get-next!))]
-             [_         in-env])]
-      [#f  (let ([kids  (mol%-kids mol)]
-                 [env   in-env])
-             (for ([kid  kids])
-               (set! env (make-repr-env kid
-                                        env
-                                        get-next!)))
-             env)]))
-
-  (def (mol-repr-core mol env)
-    (match (blank? mol)
-      [#t  (hash-ref env mol)]
-      [#f  (cons (match (mol%-data mol)
-                   ['no-dat  '?]
-                   [any      any])
-                 (map (lam (kid)  (mol-repr-core kid env))
-                      (mol%-kids mol)))]))
-
-  (mol-repr-core (ref root path)
-                 (make-repr-env (ref root path)
-                                (hash)
-                                (let ([count 64])
-                                  ;; The counting closure
-                                  (thunk (set! count (add1 count))
-                                         (integer->char count))))))
-
-(def (ref root path)
+(def (ref mol path)
   (match path
-    [(list)            root]
-    [(cons next rest)  (let ([kids  (mol%-kids root)])
-                         (match (<= next (last-index kids))
-                           [#t  (ref (list-ref kids next)
-                                     rest)]
-                           [#f  'not-found]))]))
+    ['[]             mol]
+    [(cons nxt rst)  (let ([kids  (mol%-kids mol)])
+                       (match (<= nxt (last-index kids))
+                         [#t  (loop kid rst)]
+                         [#f  'not-found]))]))
 
-(def (ref-data root path)
-  (match (ref root path)
-    ['not-found      'no-dat]
-    [(mol% _ dat _)  dat]))
+(def (ref-data mol path)
+  (match (ref mol path)
+    ['not-found     'no-dat]
+    [(mol% data _)  data]))
 
-(def (ref-kids root path)
-  (match (ref root path)
-    ['not-found       null]
-    [(mol% _ _ kids)  kids]))
+(def (ref-kids mol path)
+  (match (ref mol path)
+    ['not-found     null]
+    [(mol% _ kids)  kids]))
 
-(def (ref-sync root path)
-  (match (ref root path)
-    ['not-found        (list path)]
-    [(mol% sync _ _ )  sync]))
+(def (update mol path [val 'no-dat])
+  (def (expand mol next-id)
+    (set-mol%-kids! mol
+                    (let ([fillers (build-list (- nxt  (last-index (mol%-kids mol)))
+                                               (lam (_)  (make-mol)))])
+                      (append kids fillers))))
 
-(def (replace mol path new)
-  ;; Crucial auxiliary function
-  (let loop ([path  path]
-             [m     mol])
-    (match path
-      [(list)               new]
-      [(cons next-id rest)
-       (struct-copy mol% m
-                    [kids  (list-set (mol%-kids m)
-                                     next-id
-                                     (loop rest (list-ref (mol%-kids m)
-                                                          next-id)))])])))
-
-(def (do&inform root path proc)
-  ;; returns the root with `proc` done to `ref path` and its associates.
-  ;; proc: mol -> mol | 'conflict
-  (let/ec escape
-    (for ([p  (ref-sync root path)])
-      (match (proc (ref root p))
-        ['conflict  (escape 'conflict)]
-        [new-mol    (set! root (replace root
-                                        p
-                                        new-mol))]))
-    root))
-
-(def (update root
-             path
-             [val  'no-dat])
-  ;; Used to update or expand
-  ;; if val is 'no-dat, do not overwrite existing data
-  (let loop ([rel  #|path so far|# null]
-             [path #|path left|#   path])
-    (match path
-      [(list)  (match* ((ref-data root rel) val)
-                 [(any any)    root]
-                 [('no-dat _)  (do&inform root
-                                          rel
-                                          (lam (m)  (struct-copy mol% m [data val])))]
-                 [(_ 'no-dat)  root]
-                 [(_ _)        'conflict])]
-
-      [(cons next-id rest-path)
-       (let ([kids  (ref-kids root rel)])
-         (when (< (last-index kids)
-                  next-id)
-           (set! root
-             (do&inform
-              root
-              rel
-              (lam (m)
-                (struct-copy mol% m
-                             [kids (let* ([missing-indices  (range (add1 (last-index kids))
-                                                                   (add1 next-id))]
-                                          [fillers  (for/list ([i missing-indices])
-                                                      (make-mol (for/list ([p (mol%-sync m)])
-                                                                  (pad p i))
-                                                                #|empty mole with inherited sync list|#))])
-                                     (append kids fillers))]))))))
-       (loop (pad rel next-id)
-             rest-path)])))
-
-(def (kids-paths root path)
-  ;; Very helpful utility.
-  (let ([kids-indices  (range (length (ref-kids root path)))])
-    (for/list ([i  kids-indices])
-      (pad path i))))
+  (let loop ([p  path])
+    (match path-left
+      ['[]             'okay]
+      [(cons nxt rst)
+       (match (ref mol (list nxt))
+         ['not-found (begin (expand mol nxt)
+                            (update (ref mol (list nxt))
+                                    rst))]
+         [kid        (update kid rst)])])))
 
 (def (height mol)
   ;; Used for synchronization
@@ -168,64 +61,59 @@
     [kids    (add1 (apply max (map height kids)))]))
 
 (def (sync root p1 p2)
-  ;; Establish a new synchronization, expand if needed.
+  ;; Merge two molecules, if fail, returns 'conflict,
+  ;; if successful, literally assign p2 to p1
   (begin
     #|Make sure the paths exist|#
-    (set! root (update root p1))
-    (set! root (update root p2)))
+    (update root p1)
+    (update root p2))
 
   (def max-height
     #|watch the height to detect cycle|#
     (max (height (ref root p1))
          (height (ref root p2))))
 
-  (let loop ([fp1  p1] [fp2  p2])
+  (let loop ([m1  (ref root p1)]  [m2  (ref root p2)])
     (let/ec escape
-      (when (member fp1 (ref-sync root fp2))
+      (when (eq? m1 m2)
         #|Save ourselves some time here|#
         (escape root))
 
-      (match* ((ref-data root fp1)
-               (ref-data root fp2))
+      (match* ((mol%-data m1)
+               (mol%-data m2))
         [(x x)                (void)]
-        [('no-dat other-dat)  (set! root  (update root fp1 other-dat))]
-        [(dat 'no-dat)        (set! root  (update root fp2 dat))]
+        [('no-dat other-dat)  (update m1 '[] other-dat)]
+        [(dat 'no-dat)        (void)  #|No need to worry about this|#]
         [(_ _)                (escape 'conflict)])
 
-      (let ([i1  (last-index (ref-kids root fp1))]
-            [i2  (last-index (ref-kids root fp2))])
+      (let ([i1  (last-index (mol%-kids m1))]
+            [i2  (last-index (mol%-kids m2))])
         ;; Add the missing kids
-        (cond [(< i1 i2)
-               (set! root (update root
-                                  (pad fp1 i2)))]
+        (when (< i1 i2)
+          (update m1 (list i2)))
 
-              [(> i1 i2)
-               (set! root (update root
-                                  (pad fp2 i1)))])
-
-        (when (> (max (height (ref root p1))
-                      (height (ref root p2)))
-                 max-height)
+        (when (> (height m1) max-height)
           (escape 'conflict)))
 
-      (let ([combined  (remove-duplicates
-                        (append (ref-sync root fp1)
-                                (ref-sync root fp2)))])
-        #|Establish the connections|#
-        (set! root
-          (do&inform root fp1 (lam (m)
-                                (struct-copy mol% m [sync combined]))))
-        (set! root
-          (do&inform root fp2 (lam (m)
-                                (struct-copy mol% m [sync combined])))))
-
-      (for ([new-fp1 (kids-paths root fp1)]
-            [new-fp2 (kids-paths root fp2)])
+      (for ([new-m1 (mol%-kids m1)]
+            [new-m2 (mol%-kids m2)]
+            #|m2 may be exhausted before m1|#)
         ;; Our job is over, let the kids sync
-        (match (loop new-fp1 new-fp2)
-          ['conflict  (escape 'conflict)]
-          [new-root   (set! root new-root)]))
-      root)))
+        (when (eq? (loop new-fp1 new-fp2)
+                   'conflict)
+          (escape 'conflict)))))
+
+  (let switch-id ([mol root])
+    (unless (memq? mol (list m1 m2))
+      (let replace ([accum  null]
+                    [kids   (mol%kids mol)])
+        (match kids
+          ['()             (reverse accum)]
+          [(cons nxt rst)  (match (eq? mol m2)
+                             [#t  (replace (cons m1 accum)  rst)]
+                             [#f  (replace (cons nxt accum) rst)])]))
+      (for ([kid  (mol%kids mol)])
+        (switch-id mol)))))
 
 (def (migrate root from to)
   ;; Migrate the molecule from root-`from` to ?-`to`

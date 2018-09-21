@@ -1,98 +1,103 @@
-;;; Macros
-(define-syntax update-macro
-  (syntax-rules ()
-    [(_ mol)  (void)]
+(def (mol-repr root [path null])
+  (def (blank? mol)
+    (match mol
+      [(mol% _ 'no-dat (list))  #t]
+      [_                        #f]))
 
-    [(_ mol (path ctor) rest ...)
-     (begin
-       (send mol update-path
-         'path ctor)
-       (update-macro mol rest ...))]))
+  (def (make-repr-env mol
+                      in-env
+                      get-next!)
+    ;; Sort out which variables are
+    ;; represented by which symbol.
+    (match (blank? mol)
+      [#t  (match (hash-ref in-env mol 'unbound)
+             ['unbound  (hash-set-many in-env
+                                       (map (lam (p)  (ref root p))
+                                            (mol%-sync mol))
+                                       (get-next!))]
+             [_         in-env])]
+      [#f  (let ([kids  (mol%-kids mol)]
+                 [env   in-env])
+             (for ([kid  kids])
+               (set! env (make-repr-env kid
+                                        env
+                                        get-next!)))
+             env)]))
 
-(define-syntax sync-macro
-  (syntax-rules ()
-    [(_m )  (void)]
-    [(_ m (path paths ...) rest ...)
-     (begin (sync-paths m 'path 'paths ...)
-            (sync-macro m rest ...))]))
+  (def (mol-repr-core mol env)
+    (match (blank? mol)
+      [#t  (hash-ref env mol)]
+      [#f  (cons (match (mol%-data mol)
+                   ['no-dat  '?]
+                   [any      any])
+                 (map (lam (kid)  (mol-repr-core kid env))
+                      (mol%-kids mol)))]))
 
+  (mol-repr-core (ref root path)
+                 (make-repr-env (ref root path)
+                                (hash)
+                                (let ([count 64])
+                                  ;; The counting closure
+                                  (thunk (set! count (add1 count))
+                                         (integer->char count))))))
 
+(def (update root
+             path
+             [val  'no-dat])
+  ;; Used to update or expand
+  ;; if val is 'no-dat, do not overwrite existing data
+  (let loop ([rel  #|path so far|# null]
+             [path #|path left|#   path])
+    (match path
+      [(list)  (match* ((ref-data root rel) val)
+                 [(any any)    root]
+                 [('no-dat _)  (do&inform root
+                                          rel
+                                          (lam (m)  (struct-copy mol% m [data val])))]
+                 [(_ 'no-dat)  root]
+                 [(_ _)        'conflict])]
 
-(def (complexity mol)
-  (add1 (sum-list (map complexity
-                       (send mol get-kids)))))
+      [(cons next-id rest-path)
+       (let ([kids  (ref-kids root rel)])
+         (when (< (last-index kids)
+                  next-id)
+           (set! root
+             (do&inform
+              root
+              rel
+              (lam (m)
+                (struct-copy mol% m
+                             [kids (let* ([missing-indices  (range (add1 (last-index kids))
+                                                                   (add1 next-id))]
+                                          [fillers  (for/list ([i missing-indices])
+                                                      (make-mol (for/list ([p (mol%-sync m)])
+                                                                  (pad p i))
+                                                                #|empty mole with inherited sync list|#))])
+                                     (append kids fillers))]))))))
+       (loop (pad rel next-id)
+             rest-path)])))
 
-(def (ref mol path)
-  ;; Reference a descendant.
-  (if (null? path)
-      mol
-      (match (send mol refr (car path))
-        ['NOT-FOUND 'NOT-FOUND]
-        [kid        (ref kid (cdr path))])))
+(def (replace mol path new)
+  ;; Crucial auxiliary function
+  (let loop ([path  path]
+             [m     mol])
+    (match path
+      [(list)               new]
+      [(cons next-id rest)
+       (struct-copy mol% m
+                    [kids  (list-set (mol%-kids m)
+                                     next-id
+                                     (loop rest (list-ref (mol%-kids m)
+                                                          next-id)))])])))
 
-(def (set-type-path mol path val)
-  (send mol expand path no-fail)
-  (send (ref mol path) set-type val))
-
-(def (ref-data mol path)
-  (match (ref mol path)
-    ['NOT-FOUND '?DATA]
-    [kid        (send kid get-data)]))
-
-(def (ref-type mol path)
-  (match (ref mol path)
-    ['NOT-FOUND '?TYPE]
-    [kid        (send kid get-type)]))
-
-(def (update-path mol path val
-                  [fail-con no-fail])
-  (match (let/ec escape
-           (match (ref mol path)
-             ['NOT-FOUND (send mol expand
-                           path
-                           (thunk (escape 'FAIL)))
-                         (send (ref mol path) update
-                           val no-fail)]
-             [kid        (send kid update
-                           val
-                           (thunk (escape 'FAIL)))]))
-    ['FAIL  (fail-con)]
-    [_      (void)]))
-
-(def (expand-and-get-paths mol paths)
-  (for      ([p paths]) (send mol expand p))
-  (for/list ([p paths]) (ref mol p)))
-
-(def (sync-paths mol
-                 paths
-                 [fail-con no-fail])
-  (check-false (null? paths)
-               "sync-paths must be given than one paths")
-
-  (match (let/ec escape
-           (let* ([mols    (expand-and-get-paths mol paths)]
-                  [master   (first mols)]
-                  [servants (list-tail mols 1)])
-             (for ([m servants])
-               (send m sync
-                 master
-                 (thunk (escape 'FAIL))))))
-    ['FAIL  (fail-con)]
-    [_      (void)]))
-
-(def (preserve mol paths)
-  (for ([m  (expand-and-get-paths mol paths)])
-    (send m mark-no-touch)))
-
-(def (distinguish mol paths)
-  ;; Do not let these molcules sync with each other.
-  ;; note: overwrites existing no-sync policies
-  ;; note: error checking is left to the user
-  (let ([mols (expand-and-get-paths mol paths)])
-    (for ([m mols])
-      (send m set-no-sync
-        (remq m mols)))))
-
-(def (mark-no-touch-paths mol paths)
-  (for ([m (expand-and-get-paths mol paths)])
-    (send m mark-no-touch)))
+(def (do&inform root path proc)
+  ;; returns the root with `proc` done to `ref path` and its associates.
+  ;; proc: mol -> mol | 'conflict
+  (let/ec escape
+    (for ([p  (ref-sync root path)])
+      (match (proc (ref root p))
+        ['conflict  (escape 'conflict)]
+        [new-mol    (set! root (replace root
+                                        p
+                                        new-mol))]))
+    root))
