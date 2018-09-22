@@ -101,3 +101,29 @@
                                         p
                                         new-mol))]))
     root))
+
+(def (migrate root from to)
+  ;; Migrate the molecule from root-`from` to ?-`to`
+  ;; Enables `attach` and `detach`
+  (def (swap-prefix ls pre new-pre)
+    (for/list ([li  (filter (lam (x) (list-prefix? pre x))
+                            ls   #|Weed out the non-descendants|#)])
+      (append new-pre
+              (list-tail li (length pre)))))
+
+  (let loop ([p  from])
+    (mol% (swap-prefix (ref-sync root p)  from  to)
+          (ref-data root p)
+          (for/list ([kid-path  (kids-paths root p)])
+            (loop kid-path)))))
+
+(def (pull host  guest  [to null])
+  ;; It's like synchronizing, but with different roots
+  (let* ([unifier (new-root)]
+         [unifier (attach unifier host  '[0])]
+         [unifier (attach unifier guest '[1])])
+    (match (sync unifier
+                 (append '[0] to)
+                 '[1])
+      ['conflict  'conflict]
+      [unified    (detach unified '[0])])))

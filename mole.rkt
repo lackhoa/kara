@@ -1,30 +1,23 @@
 #lang racket
 (require "lang/kara.rkt"
          racket/hash)
-(provide mol-repr update sync new-root
-         pull attach detach ref-data
-         ref-sync ref-kids kids-paths
-         dm height)
+(provide (all-defined-out))
 
 ;;; Molcules
-(struct mol% (sync [data #:mutable]
-                   [kids #:mutable]) #:prefab)
+(struct mol% ([data #:mutable  #|'no-dat | symbol|#]
+              [kids #:mutable  #|list[mol | valid path]|#])
+  #:prefab)
 
-(def (make-mol [data    'no-dat]
-               [kids    null])
-  ;; data     : 'no-dat | symbol
-  ;; kids     : [mol | valid path]
-  (mol% data kids))
-
-(def (new-root)
-  (make-mol))
+(def (new-mol)
+  (mol% 'no-dat null))
 
 (def (ref mol path)
   (match path
     ['[]             mol]
     [(cons nxt rst)  (let ([kids  (mol%-kids mol)])
                        (match (<= nxt (last-index kids))
-                         [#t  (loop kid rst)]
+                         [#t  (ref (list-ref kids nxt)
+                                   rst)]
                          [#f  'not-found]))]))
 
 (def (ref-data mol path)
@@ -37,118 +30,145 @@
     ['not-found     null]
     [(mol% _ kids)  kids]))
 
-(def (update mol path [val 'no-dat])
-  (def (expand mol next-id)
-    (set-mol%-kids! mol
-                    (let ([fillers (build-list (- nxt  (last-index (mol%-kids mol)))
-                                               (lam (_)  (make-mol)))])
-                      (append kids fillers))))
+(def (cascade mol proc)
+  (let loop ([focus  mol])
+    (proc focus)
+    (for ([kid  (mol%-kids focus)])
+      (loop kid))))
 
-  (let loop ([p  path])
-    (match path-left
-      ['[]             'okay]
-      [(cons nxt rst)
-       (match (ref mol (list nxt))
-         ['not-found (begin (expand mol nxt)
-                            (update (ref mol (list nxt))
-                                    rst))]
-         [kid        (update kid rst)])])))
+(def (update! mol path [val 'no-dat])
+  ;; Can be used to both update and expand (when val = 'no-dat).
+  (def (expand! mol next-id)
+    (let ([kids (mol%-kids mol)])
+      (set-mol%-kids! mol
+                      (let ([fillers (build-list (- next-id
+                                                    (last-index kids))
+                                                 (const (new-mol)))])
+                        (append kids fillers)))))
+
+  (let loop ([m mol]  [p path])
+    (match p
+      ['[]             (unless (eq? val 'no-dat)
+                         (match (mol%-data m)
+                           [(== val)  (void)]
+                           ['no-dat  (set-mol%-data! m val)]
+                           [_        'conflict]))]
+      [(cons nxt rst)  (match (ref mol (list nxt))
+                         ['not-found (begin (expand! mol nxt)
+                                            (update! (ref mol (list nxt))
+                                                     rst
+                                                     val))]
+                         [kid        (update! kid rst val)])])))
+
 
 (def (height mol)
-  ;; Used for synchronization
+  ;; Used for synchronization, useful for height limitation...
   (match (mol%-kids mol)
     [(list)  0]
     [kids    (add1 (apply max (map height kids)))]))
 
-(def (sync root p1 p2)
+(def (sync! root p1 p2)
+  (def (descendant? branch root)
+    (let ([kids  (mol%-kids root)])
+      (or (memq branch kids)
+         (exists (lam (kid)  (descendant? branch kid))
+            kids))))
+
   ;; Merge two molecules, if fail, returns 'conflict,
   ;; if successful, literally assign p2 to p1
   (begin
     #|Make sure the paths exist|#
-    (update root p1)
-    (update root p2))
+    (update! root p1)
+    (update! root p2))
 
-  (def max-height
-    #|watch the height to detect cycle|#
-    (max (height (ref root p1))
-         (height (ref root p2))))
+  (let/ec escape
+    (let ([mol1 (ref root p1)]
+          [mol2 (ref root p2)])
+      (when (or (descendant? mol1 mol2)
+               (descendant? mol2 mol1))
+        (escape 'conflict)  #|Cycle check|#)
 
-  (let loop ([m1  (ref root p1)]  [m2  (ref root p2)])
-    (let/ec escape
-      (when (eq? m1 m2)
-        #|Save ourselves some time here|#
-        (escape root))
+      (when (eq? mol1 mol2)
+        (escape (void))  #|Save some time|#)
 
-      (match* ((mol%-data m1)
-               (mol%-data m2))
-        [(x x)                (void)]
-        [('no-dat other-dat)  (update m1 '[] other-dat)]
-        [(dat 'no-dat)        (void)  #|No need to worry about this|#]
-        [(_ _)                (escape 'conflict)])
+      (let loop ([m1 mol1] [m2 mol2])
 
-      (let ([i1  (last-index (mol%-kids m1))]
-            [i2  (last-index (mol%-kids m2))])
-        ;; Add the missing kids
-        (when (< i1 i2)
-          (update m1 (list i2)))
 
-        (when (> (height m1) max-height)
-          (escape 'conflict)))
+        (let ([d1  (mol%-data m1)]
+              [d2  (mol%-data m2)])
+          (match d1
+            [(== d2)    (void)]
+            ['no-dat   (update! m1 '[] d2)]
+            [_         (escape 'conflict)]))
 
-      (for ([new-m1 (mol%-kids m1)]
-            [new-m2 (mol%-kids m2)]
-            #|m2 may be exhausted before m1|#)
-        ;; Our job is over, let the kids sync
-        (when (eq? (loop new-fp1 new-fp2)
-                   'conflict)
-          (escape 'conflict)))))
 
-  (let switch-id ([mol root])
-    (unless (memq? mol (list m1 m2))
-      (let replace ([accum  null]
-                    [kids   (mol%kids mol)])
-        (match kids
-          ['()             (reverse accum)]
-          [(cons nxt rst)  (match (eq? mol m2)
-                             [#t  (replace (cons m1 accum)  rst)]
-                             [#f  (replace (cons nxt accum) rst)])]))
-      (for ([kid  (mol%kids mol)])
-        (switch-id mol)))))
+        (let ([i1  (last-index (mol%-kids m1))]
+              [i2  (last-index (mol%-kids m2))])
+          ;; Add the missing kids
+          (when (< i1 i2)
+            (update! m1 (list i2))))
 
-(def (migrate root from to)
-  ;; Migrate the molecule from root-`from` to ?-`to`
-  ;; Enables `attach` and `detach`
-  (def (swap-prefix ls pre new-pre)
-    (for/list ([li  (filter (lam (x) (list-prefix? pre x))
-                            ls   #|Weed out the non-descendants|#)])
-      (append new-pre
-              (list-tail li (length pre)))))
+        (for ([new-m1 (mol%-kids m1)]
+              [new-m2 (mol%-kids m2)]
+              #|m2 may be exhausted before m1|#)
+          ;; Our job is over, let the kids sync
+          (when (eq? (loop new-m1 new-m2)
+                     'conflict)
+            (escape 'conflict))))
 
-  (let loop ([p  from])
-    (mol% (swap-prefix (ref-sync root p)  from  to)
-          (ref-data root p)
-          (for/list ([kid-path  (kids-paths root p)])
-            (loop kid-path)))))
+      (cascade root
+               (lam (mol)
+                 (unless (memq mol `(,mol1 ,mol2))
+                   (def new-kids
+                     (let build ([accum  null]
+                                 [ls     (mol%-kids mol)])
+                       (match ls
+                         ['()             (reverse accum)]
+                         [(cons nxt rst)  (match (eq? nxt mol2)
+                                            [#t  (build (cons mol1 accum) rst)]
+                                            [#f  (build (cons nxt accum)  rst)])])))
 
-(def (attach root branch to)
-  (replace (update root to)
-           to
-           (migrate branch '[] to)))
+                   (set-mol%-kids! mol new-kids)))  #|Identity exchange|#))))
 
-(def (detach root from)
-  ;; Convert root-path into a root
-  (migrate root from '[]))
+;;; Functional stuff
+(def (copy mol [path null])
+  ;; Utilize the print graph ability
+  ;; Can be used to detach
+  (let-values ([(in out) (make-pipe)])
+    (parameterize ([print-graph #t])
+      (write (ref mol path) out))
+    (read in)))
 
-(def (pull host  guest  [to null])
-  ;; It's like synchronizing, but with different roots
-  (let* ([unifier (new-root)]
-         [unifier (attach unifier host  '[0])]
-         [unifier (attach unifier guest '[1])])
-    (match (sync unifier
-                 (append '[0] to)
-                 '[1])
+(def (update mol path [val 'no-dat])
+  (let ([clone  (copy mol)])
+    (match (update! clone path val)
       ['conflict  'conflict]
-      [unified    (detach unified '[0])])))
+      [_          clone])))
 
-(def (dm mol [port (current-output-port)])
-  (pdisplay (mol-repr mol) 35 port))
+(def (sync root p1 p2)
+  (let ([clone  (copy root)])
+    (match (sync! (copy root) p1 p2)
+      ['conflict  'conflict]
+      [_          clone])))
+
+;;; Others
+(def (pull root branch path)
+  (let* ([unifier  (mol% 'no-dat `(,root ,branch))])
+    (sync! unifier
+           `[0 ,@path]
+           '[1])
+    (copy unifier '[0])))
+
+(define-syntax-rule (pull! root branch path)
+  (set! root (pull root branch path)))
+
+;;; Printing
+(def (dm mol [port  (current-output-port)])
+  ;; Make it pretty
+  (parameterize ([print-graph  #t])
+    (pdisplay mol 35 port)))
+
+(def (wm mol port)
+  ;; Make it efficient
+  (parameterize ([print-graph  #t])
+    (write mol port)))
