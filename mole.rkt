@@ -92,15 +92,13 @@
         (escape (void))  #|Save some time|#)
 
       (let loop ([m1 mol1] [m2 mol2])
-
-
         (let ([d1  (mol%-data m1)]
               [d2  (mol%-data m2)])
           (match d1
             [(== d2)    (void)]
             ['no-dat   (update! m1 '[] d2)]
-            [_         (escape 'conflict)]))
-
+            [_         (unless (eq? d2 'no-dat)
+                         (escape 'conflict))]))
 
         (let ([i1  (last-index (mol%-kids m1))]
               [i2  (last-index (mol%-kids m2))])
@@ -114,21 +112,21 @@
           ;; Our job is over, let the kids sync
           (when (eq? (loop new-m1 new-m2)
                      'conflict)
-            (escape 'conflict))))
+            (escape 'conflict)))
 
-      (cascade root
-               (lam (mol)
-                 (unless (memq mol `(,mol1 ,mol2))
-                   (def new-kids
-                     (let build ([accum  null]
-                                 [ls     (mol%-kids mol)])
-                       (match ls
-                         ['()             (reverse accum)]
-                         [(cons nxt rst)  (match (eq? nxt mol2)
-                                            [#t  (build (cons mol1 accum) rst)]
-                                            [#f  (build (cons nxt accum)  rst)])])))
+        (cascade root
+                 (lam (mol)
+                   (unless (memq mol `(,mol1 ,mol2))
+                     (def new-kids
+                       (let build ([accum  null]
+                                   [ls     (mol%-kids mol)])
+                         (match ls
+                           ['()             (reverse accum)]
+                           [(cons nxt rst)  (match (eq? nxt mol2)
+                                              [#t  (build (cons mol1 accum) rst)]
+                                              [#f  (build (cons nxt accum)  rst)])])))
 
-                   (set-mol%-kids! mol new-kids)))  #|Identity exchange|#))))
+                     (set-mol%-kids! mol new-kids)))  #|Identity exchange|#)))))
 
 ;;; Functional stuff
 (def (copy mol [path null])
@@ -147,16 +145,18 @@
 
 (def (sync root p1 p2)
   (let ([clone  (copy root)])
-    (match (sync! (copy root) p1 p2)
+    (match (sync! clone p1 p2)
       ['conflict  'conflict]
       [_          clone])))
 
 ;;; Others
 (def (pull root branch path)
-  (let* ([unifier  (mol% 'no-dat `(,root ,branch))])
+  (let ([unifier  (mol% 'no-dat `(,root ,branch))])
+    (displayln "Before")(dm unifier)
     (sync! unifier
            `[0 ,@path]
            '[1])
+    (displayln "After")(dm unifier)
     (copy unifier '[0])))
 
 (define-syntax-rule (pull! root branch path)
