@@ -36,6 +36,16 @@
     (for ([kid  (mol%-kids focus)])
       (loop kid))))
 
+(def (cascade-path mol proc)
+  ;; proc: mol -> path -> ?
+  (let loop ([mfocus  mol]
+             [path    null])
+    (proc mfocus path)
+    (let ([kids  (mol%-kids mfocus)])
+      (for ([i    (in-naturals)]
+            [kid  kids])
+        (loop kid (pad path i))))))
+
 (def (update! mol path [val 'no-dat])
   ;; Can be used to both update and expand (when val = 'no-dat).
   (def (expand! mol next-id)
@@ -43,7 +53,7 @@
       (set-mol%-kids! mol
                       (let ([fillers (build-list (- next-id
                                                     (last-index kids))
-                                                 (const (new-mol)))])
+                                                 (lam (x)  (mol% 'no-dat null)))])
                         (append kids fillers)))))
 
   (let loop ([m mol]  [p path])
@@ -74,6 +84,17 @@
          (exists (lam (kid)  (descendant? branch kid))
             kids))))
 
+  (def (replace! mol p1 p2)
+    ;; replace p1 by p2
+    (let*-values ([(pfocus plast)
+                   (split-at-right p1 1)]
+                  [(mfocus)  (ref mol pfocus)]
+                  [(last)    (car plast)])
+      (set-mol%-kids! mfocus
+                      (list-set (mol%-kids mfocus)
+                                last
+                                (ref mol p2)))))
+
   ;; Merge two molecules, if fail, returns 'conflict,
   ;; if successful, literally assign p2 to p1
   (begin
@@ -82,51 +103,73 @@
     (update! root p2))
 
   (let/ec escape
-    (let ([mol1 (ref root p1)]
-          [mol2 (ref root p2)])
-      (when (or (descendant? mol1 mol2)
-               (descendant? mol2 mol1))
-        (escape 'conflict)  #|Cycle check|#)
+    (def mol1  (ref root p1))
+    (def mol2  (ref root p2))
 
-      (when (eq? mol1 mol2)
-        (escape (void))  #|Save some time|#)
+    (when (or (descendant? mol1 mol2)
+             (descendant? mol2 mol1))
+      (escape 'conflict)  #|Cycle check|#)
 
-      (let loop ([m1 mol1] [m2 mol2])
-        (let ([d1  (mol%-data m1)]
-              [d2  (mol%-data m2)])
-          (match d1
-            [(== d2)    (void)]
-            ['no-dat   (update! m1 '[] d2)]
-            [_         (unless (eq? d2 'no-dat)
-                         (escape 'conflict))]))
+    (when (eq? mol1 mol2)
+      (escape (void))  #|Save some time|#)
 
-        (let ([i1  (last-index (mol%-kids m1))]
-              [i2  (last-index (mol%-kids m2))])
-          ;; Add the missing kids
-          (when (< i1 i2)
-            (update! m1 (list i2))))
+    (let loop ([m1 mol1] [m2 mol2])
+      #|Make both molecules similar|#
+      (let ([d1  (mol%-data m1)]
+            [d2  (mol%-data m2)])
+        (match* (d1 d2)
+          [(x x)        (void)]
+          [('no-dat _)  (update! m1 '[] d2)]
+          [(_ 'no-dat)  (update! m2 '[] d1)]
+          [(_ _)        (displayln "Conflict 2")(escape 'conflict)]))
 
-        (for ([new-m1 (mol%-kids m1)]
-              [new-m2 (mol%-kids m2)]
-              #|m2 may be exhausted before m1|#)
-          ;; Our job is over, let the kids sync
-          (when (eq? (loop new-m1 new-m2)
-                     'conflict)
-            (escape 'conflict)))
+      (let ([i1  (last-index (mol%-kids m1))]
+            [i2  (last-index (mol%-kids m2))])
+        ;; Add the missing kids
+        (when (< i1 i2)
+          (update! m1 (list i2)))
+        (when (< i2 i1)
+          (update! m2 (list i1))))
 
-        (cascade root
-                 (lam (mol)
-                   (unless (memq mol `(,mol1 ,mol2))
-                     (def new-kids
-                       (let build ([accum  null]
-                                   [ls     (mol%-kids mol)])
-                         (match ls
-                           ['()             (reverse accum)]
-                           [(cons nxt rst)  (match (eq? nxt mol2)
-                                              [#t  (build (cons mol1 accum) rst)]
-                                              [#f  (build (cons nxt accum)  rst)])])))
+      (for ([new-m1 (mol%-kids m1)]
+            [new-m2 (mol%-kids m2)])
+        ;; Our job is over, let the kids sync
+        (when (eq? (loop new-m1 new-m2)
+                   'conflict)
+          (escape 'conflict))))
 
-                     (set-mol%-kids! mol new-kids)))  #|Identity exchange|#)))))
+    (let ([sync-ls2  (make-hasheq)
+                     #|value->paths for m2|#])
+      (cascade-path mol2
+                    (lam (mol path)
+                      (hash-set! sync-ls2
+                                 mol
+                                 (cons path
+                                       (hash-ref! sync-ls2 mol null))))
+                    #|Build up sync-ls2|#)
+
+      (for ([chain  (hash-values sync-ls2)])
+        ;; Transform the topology of mol1
+        (let ([path-central  (car chain)])
+          (for ([path-to-replace  (cdr chain)])
+            (replace! mol1
+                      path-to-replace
+                      path-central)))))
+
+    (let ([translator (make-hasheq)])
+      #|Erase r2 and its descendants from the root|#
+      (cascade-path mol2
+                    (lam (mol path)
+                      (hash-ref! translator
+                                 mol
+                                 (ref mol1 path))))
+
+      (cascade root
+               (lam (mol)
+                 (set-mol%-kids! mol
+                                 (for/list ([kid  (mol%-kids mol)])
+                                   (hash-ref translator kid kid)))
+                 #|We can exclude mol1 here|#)))))
 
 ;;; Functional stuff
 (def (copy mol [path null])
@@ -152,11 +195,9 @@
 ;;; Others
 (def (pull root branch path)
   (let ([unifier  (mol% 'no-dat `(,root ,branch))])
-    (displayln "Before")(dm unifier)
     (sync! unifier
            `[0 ,@path]
            '[1])
-    (displayln "After")(dm unifier)
     (copy unifier '[0])))
 
 (define-syntax-rule (pull! root branch path)

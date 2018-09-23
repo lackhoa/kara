@@ -73,22 +73,24 @@
 
  (def r (update (new-mol) '[0] 'T))
  (pull! r model1 '[])
- ;; (pull! r model2 '[])
- ;; (pull! r model3 '[1])
- ;; (sync! r '[2] '[3])
- ;; (displayln "0, 1, 2 and 3 and are the same")
- ;; (dm r) (newline)
+ (pull! r model2 '[])
+ (pull! r model3 '[1])
+ (sync! r '[2] '[3])
+ (displayln "0, 1, 2 and 3 and are the same")
+ (dm r) (newline))
+
+(test-case
+ "Inter-root cycle"
+ (newline) (displayln "Let's begin motherfucker")
+ (def r1 (new-mol))
+ (sync! r1 '[0] '[1])
+
+ (def r2 (new-mol))
+ (sync! r2 '[1] '[0 0])
+ (dm r2)
+ ;; (check-eq? (pull r2 r1 '[])
+ ;;            'conflict)
  )
-
-;; (test-case
-;;  "Inter-root cycle"
-;;  (def r1 (new-mol))
-;;  (sync! r1 '[0] '[1])
-
-;;  (def r2 (new-mol))
-;;  (sync! r2 '[1] '[0 0])
-;;  (check-eq? (pull r2 r1 '[])
-;;             'conflict))
 
 ;; (test-case
 ;;  "Inter-root advanced"
