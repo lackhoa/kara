@@ -18,16 +18,16 @@
                        (match (<= nxt (last-index kids))
                          [#t  (ref (list-ref kids nxt)
                                    rst)]
-                         [#f  'not-found]))]))
+                         [#f  #f]))]))
 
 (def (ref-data mol path)
   (match (ref mol path)
-    ['not-found     'no-dat]
+    [#f             'no-dat]
     [(mol% data _)  data]))
 
 (def (ref-kids mol path)
   (match (ref mol path)
-    ['not-found     null]
+    [#f             null]
     [(mol% _ kids)  kids]))
 
 (def (cascade mol proc)
@@ -62,13 +62,13 @@
                          (match (mol%-data m)
                            [(== val)  (void)]
                            ['no-dat  (set-mol%-data! m val)]
-                           [_        'conflict]))]
+                           [_        #f]))]
       [(cons nxt rst)  (match (ref mol (list nxt))
-                         ['not-found (begin (expand! mol nxt)
-                                            (update! (ref mol (list nxt))
-                                                     rst
-                                                     val))]
-                         [kid        (update! kid rst val)])])))
+                         [#f   (begin (expand! mol nxt)
+                                      (update! (ref mol (list nxt))
+                                               rst
+                                               val))]
+                         [kid  (update! kid rst val)])])))
 
 
 (def (height mol)
@@ -77,99 +77,128 @@
     [(list)  0]
     [kids    (add1 (apply max (map height kids)))]))
 
-(def (sync! root p1 p2)
-  (def (descendant? branch root)
-    (let ([kids  (mol%-kids root)])
-      (or (memq branch kids)
-         (exists (lam (kid)  (descendant? branch kid))
-            kids))))
+(def (topology mol)
+  #|a list of paths that have the same value|#
+  (let ([result  (make-hasheq)])
+    (cascade-path mol
+                  (lam (m path)
+                    (hash-set! result
+                               m
+                               (cons path
+                                     (hash-ref! result m null)))))
+    (hash-values result)))
 
-  (def (replace! mol p1 p2)
-    ;; replace p1 by p2
-    (let*-values ([(pfocus plast)
-                   (split-at-right p1 1)]
-                  [(mfocus)  (ref mol pfocus)]
-                  [(last)    (car plast)])
-      (set-mol%-kids! mfocus
-                      (list-set (mol%-kids mfocus)
-                                last
-                                (ref mol p2)))))
+(def (replace! mol path rmol)
+  ;; replace path by rmol
+  (let*-values ([(pfocus plast)  (split-at-right path 1)]
+                [(mfocus)        (ref mol pfocus)])
+    (set-mol%-kids! mfocus
+                    (list-set (mol%-kids mfocus)
+                              (car plast)
+                              rmol))))
 
-  ;; Merge two molecules, if fail, returns 'conflict,
-  ;; if successful, literally assign p2 to p1
+(def (descendant? branch root)
+  (let ([kids  (mol%-kids root)])
+    (or (memq branch kids)
+       (exists (lam (kid)  (descendant? branch kid))
+          kids))))
+
+(def (cyclic-topo topo)
+  (for/or ([chain topo])
+    (let* ([sorted  (sort chain
+                          #:key length <)])
+      (let loop ([sorted sorted])
+        #|Looking out for prefix|#
+        (match sorted
+          ['()             #f]
+          [(cons fst rst)  (unless (findf (lam (p)  (list-prefix? fst p))
+                                          rst)
+                             (loop rst))])))))
+
+(def (merge-topo topo1 topo2)
+  (let ([result  topo1])
+    (for ([chain  topo2])
+      (match (index-where result
+                          (lam (c)  (not (set-empty? (set-intersect c chain)))))
+        [#f  (cons! chain result)]
+        [i   (set! result
+               (list-update result
+                            i
+                            (lam (c)  (set-union chain c))))]))
+    result))
+
+(def (sync! root path1 path2)
+  ;; Merge two molecules, if fail, returns #f,
+  ;; if successful, literally assign path2 to path1
   (begin
     #|Make sure the paths exist|#
-    (update! root p1)
-    (update! root p2))
+    (update! root path1)
+    (update! root path2))
 
   (let/ec escape
-    (def mol1  (ref root p1))
-    (def mol2  (ref root p2))
-
-    (when (or (descendant? mol1 mol2)
-             (descendant? mol2 mol1))
-      (escape 'conflict)  #|Cycle check|#)
+    (def mol1  (ref root path1))
+    (def mol2  (ref root path2))
 
     (when (eq? mol1 mol2)
-      (escape (void))  #|Save some time|#)
+      (escape 'vacuous)  #|Save some time|#)
 
     (let loop ([m1 mol1] [m2 mol2])
       #|Make both molecules similar|#
+      (when (or (descendant? m1 m2)
+               (descendant? m2 m1))
+        (escape #f)  #|Avoid infinite loop|#)
+
       (let ([d1  (mol%-data m1)]
             [d2  (mol%-data m2)])
         (match* (d1 d2)
           [(x x)        (void)]
           [('no-dat _)  (update! m1 '[] d2)]
           [(_ 'no-dat)  (update! m2 '[] d1)]
-          [(_ _)        (displayln "Conflict 2")(escape 'conflict)]))
+          [(_ _)        (escape #f)]))
 
       (let ([i1  (last-index (mol%-kids m1))]
             [i2  (last-index (mol%-kids m2))])
         ;; Add the missing kids
-        (when (< i1 i2)
-          (update! m1 (list i2)))
-        (when (< i2 i1)
-          (update! m2 (list i1))))
+        (cond [(< i1 i2)  (update! m1 `[,i2])]
+              [(< i2 i1)  (update! m2 `[,i1])]))
 
-      (for ([new-m1 (mol%-kids m1)]
-            [new-m2 (mol%-kids m2)])
+      (for ([kid1 (mol%-kids m1)]
+            [kid2 (mol%-kids m2)])
         ;; Our job is over, let the kids sync
-        (when (eq? (loop new-m1 new-m2)
-                   'conflict)
-          (escape 'conflict))))
+        (unless (loop kid1 kid2)
+          (escape #f))))
 
-    (let ([sync-ls2  (make-hasheq)
-                     #|value->paths for m2|#])
-      (cascade-path mol2
-                    (lam (mol path)
-                      (hash-set! sync-ls2
-                                 mol
-                                 (cons path
-                                       (hash-ref! sync-ls2 mol null))))
-                    #|Build up sync-ls2|#)
+    (let ([translator  (make-hasheq)]
+          [topo        (merge-topo (topology mol1)
+                                   (topology mol2))])
+      ;; Tricky part: transform the topology of mol1
+      (when (cyclic-topo topo)
+        (escape #f))
 
-      (for ([chain  (hash-values sync-ls2)])
-        ;; Transform the topology of mol1
-        (let ([path-central  (car chain)])
-          (for ([path-to-replace  (cdr chain)])
+      (for ([chain  topo])
+        (for ([p-replaced  (cdr chain)])
+          (let ([mcentral  (ref mol1 (car chain))])
+            (hash-set! translator
+                       (ref mol1 p-replaced)
+                       mcentral)
+
             (replace! mol1
-                      path-to-replace
-                      path-central)))))
+                      p-replaced
+                      mcentral))))
 
-    (let ([translator (make-hasheq)])
-      #|Erase r2 and its descendants from the root|#
       (cascade-path mol2
                     (lam (mol path)
                       (hash-ref! translator
                                  mol
-                                 (ref mol1 path))))
+                                 (ref mol1 path)))
+                    #|Translate mol2's pointers|#)
 
       (cascade root
                (lam (mol)
                  (set-mol%-kids! mol
                                  (for/list ([kid  (mol%-kids mol)])
                                    (hash-ref translator kid kid)))
-                 #|We can exclude mol1 here|#)))))
+                 #|Erase r2 and r1's extra pointers|#)))))
 
 ;;; Functional stuff
 (def (copy mol [path null])
@@ -183,22 +212,24 @@
 (def (update mol path [val 'no-dat])
   (let ([clone  (copy mol)])
     (match (update! clone path val)
-      ['conflict  'conflict]
-      [_          clone])))
+      [#f  #f]
+      [_   clone])))
 
-(def (sync root p1 p2)
+(def (sync root path1 path2)
   (let ([clone  (copy root)])
-    (match (sync! clone p1 p2)
-      ['conflict  'conflict]
-      [_          clone])))
+    (match (sync! clone  path1  path2)
+      [#f  #f]
+      [_   clone])))
 
 ;;; Others
 (def (pull root branch path)
-  (let ([unifier  (mol% 'no-dat `(,root ,branch))])
-    (sync! unifier
-           `[0 ,@path]
-           '[1])
-    (copy unifier '[0])))
+  (let ([unifier  (mol% 'no-dat
+                        `(,(copy root) ,(copy branch)))])
+    (match (sync! unifier
+                  `[0 ,@path]
+                  '[1])
+      [#f  #f]
+      [_   (copy unifier '[0])])))
 
 (define-syntax-rule (pull! root branch path)
   (set! root (pull root branch path)))
