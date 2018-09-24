@@ -51,4 +51,6 @@
      (sy (sy (up (up (up (up (new-mol) '[] '->) '[0] '->) '[1] '->) '[1 1] '->) '[0 0] '[1 1 0]) '[0 1] '[1 1 1])))
 
  (check-not-false (instance r2 r1))
- (check-false (instance r1 r2)))
+ (check-not-false (instance r1 r2))
+ (check-true (< (complexity r1)
+                (complexity r2))))

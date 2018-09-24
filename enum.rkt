@@ -12,6 +12,7 @@
       [(->)  2]))
 
   (def (same m1 m2)
+    ;; the meaning of the saying "m1 is synced with m2"
     (or (eq? m1 m2)
        (let ([ctor  (mol%-data m1)])
          (match (mol%-data m2)
@@ -26,6 +27,9 @@
                             (same kid1 kid2))))]
            [_        #f]))))
 
+  (begin (set! ins   (copy ins))
+         (set! model (copy model)))
+
   (let/ec escape
     (cascade-path model
                   (lam (mol path)
@@ -34,18 +38,23 @@
                       [md       (match (ref-data ins path)
                                   [md  (void)]
                                   [_   (escape #f)])]))
-                  #|Data check|#)
+                  #|Data requirement|#)
 
     (let ([topo  (topology model)])
-      ;; topology mapping
+      ;; topology requirement
       (for/and ([chain  topo])
-        (match (ref ins (car chain))
-          [#f        (escape #f)]
-          [mcentral  (for/and ([path  (cdr chain)])
-                       (match (ref ins path)
-                         [#f  #f]
-                         [m   (same m mcentral)]))])))))
+        (for ([path  chain])
+          (update! ins path)
+          #|Equip ins in case it is simpler|#)
 
+        (let ([mcentral  (ref ins (car chain))])
+          (for/and ([path  (cdr chain)])
+            (same (ref ins path)
+                  mcentral)))))))
+
+(def (complexity m)
+  (add1 (sum-list (map complexity
+                       (mol%-kids m)))))
 
 (def (main database)
   (def (make-mp fun arg)
@@ -94,7 +103,12 @@
            [#f  (match (instance (conclusion m1)
                                  (conclusion m2))
                   [#t  ;; (log-discard m1 m2)
-                   (loop new-db  m2  mrst)]
+                   (match (< (complexity m1)
+                             (complexity m2))
+                     [#t  (match (instance m2 m1)
+                            [#t  (loop new-db  m1  mrst)]
+                            [#f  (loop new-db  m2  mrst)])]
+                     [#f  (loop new-db  m2  mrst)])]
                   [#f  (match (instance m2 m1)
                          [#t  ;; (log-discard m2 m1)
                           (loop new-db  m1  mrst)]
