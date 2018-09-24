@@ -140,7 +140,7 @@
     (for ([chain  topo2])
       (match (index-where result (lam (c)
                                    (not (set-empty? (set-intersect c chain)))))
-        [#f  (cons! chain result)]
+        [#f  (error "Input to `merge-topo` is erroneous")]
         [i   (set! result
                (list-update result
                             i
@@ -162,12 +162,12 @@
     (when (eq? mol1 mol2)
       (escape 'vacuous)  #|Save some time|#)
 
+    (when (or (descendant? mol1 mol2)
+             (descendant? mol2 mol1))
+      (escape #f)  #|Avoid infinite loop|#)
+
     (let loop ([m1 mol1] [m2 mol2])
       #|Make both molecules similar|#
-      (when (or (descendant? m1 m2)
-               (descendant? m2 m1))
-        (escape #f)  #|Avoid infinite loop|#)
-
       (let ([d1  (mol%-data m1)]
             [d2  (mol%-data m2)])
         (match* (d1 d2)
@@ -191,6 +191,13 @@
     (let ([translator  (make-hasheq)]
           [topo        (merge-topo (topology mol1)
                                    (topology mol2))])
+      (displayln "topology1")
+      (displayln (topology mol1))
+      (displayln "topology2")
+      (displayln (topology mol2))
+      (displayln "merged")
+      (displayln topo)
+
       ;; Tricky part: transform the topology of mol1
       (when (cyclic-topo topo)
         (escape #f))

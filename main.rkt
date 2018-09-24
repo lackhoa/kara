@@ -9,27 +9,28 @@
 (def (seed file-name)
   (call-with-output-file file-name
     #:exists 'truncate
-    (lam (out) (write axioms out))))
+    (lam (out) (wm axioms out))))
 
 (def (mix&react times)
-  (let ([db  (call-with-input-file "db/data"
+  (let ([db  (call-with-input-file "db/data.rkt"
                (lam (in) (read in)))])
     (repeat times
             (thunk (set! db (main db))))
-    (call-with-output-file "db/data"
+    (call-with-output-file "db/data.rkt"
       #:exists 'truncate
       (lam (out)
-        (write db out)))))
+        (wm db out)))))
 
-(def (view-data)
-  (call-with-input-file "db/data"
+(def (view)
+  (call-with-input-file "db/data.rkt"
     (lam (in)
-      (call-with-output-file "db/view"
+      (call-with-output-file "db/view.rkt"
         #:exists 'truncate
         (lam (out)
           (for ([m  (read in)])
-            (dm (detach m '[0]) out)
+            (dm (copy m '[0]) out)
             (newline out)))))))
 
-(mix&react 1000)
-(view-data)
+;; (seed "db/data.rkt")
+(mix&react 1)
+(view)
