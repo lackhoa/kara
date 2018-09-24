@@ -41,7 +41,6 @@
                   #|Data requirement|#)
 
     (let ([topo  (topology model)])
-      ;; topology requirement
       (for/and ([chain  topo])
         (for ([path  chain])
           (update! ins path)
@@ -50,7 +49,8 @@
         (let ([mcentral  (ref ins (car chain))])
           (for/and ([path  (cdr chain)])
             (same (ref ins path)
-                  mcentral)))))))
+                  mcentral))))
+      #|topology requirement|#)))
 
 (def (complexity m)
   (add1 (sum-list (map complexity

@@ -136,15 +136,23 @@
                              (loop rst))])))))
 
 (def (merge-topo topo1 topo2)
-  (let ([result  topo1])
-    (for ([chain  topo2])
-      (match (index-where result (lam (c)
-                                   (not (set-empty? (set-intersect c chain)))))
-        [#f  (error "Input to `merge-topo` is erroneous")]
-        [i   (set! result
-               (list-update result
-                            i
-                            (lam (c)  (set-union chain c))))]))
+  (let ([topo    (append topo1 topo2)]
+        [result  null])
+    (let loop ()
+      (unless (null? topo)
+        (let ([new-chain  (car topo)])
+          (let gather ()
+            (match (index-where topo
+                                (lam (c)
+                                  ((negate set-empty?)
+                                   (set-intersect new-chain c))))
+              [#f  (void)]
+              [i   (set! new-chain (set-union new-chain
+                                              (list-ref topo i)))
+                   (set! topo (drop-pos topo i))
+                   (gather)]))
+          (cons! new-chain result))
+        (loop)))
     result))
 
 (def (sync! root path1 path2)
@@ -197,6 +205,11 @@
       (displayln (topology mol2))
       (displayln "merged")
       (displayln topo)
+
+      (def (process topo)
+        (foldr append null topo))
+      (check-true (= (length (process (topology mol1)))
+                     (length (process (topology mol2)))))
 
       ;; Tricky part: transform the topology of mol1
       (when (cyclic-topo topo)
