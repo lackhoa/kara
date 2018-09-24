@@ -47,7 +47,8 @@
         (loop kid (pad path i))))))
 
 (def (update! mol path [val 'no-dat])
-  ;; Can be used to both update and expand (when val = 'no-dat).
+  ;; Can be used to update (val != 'no-dat)
+  ;; or expand (when val = 'no-dat).
   (def (expand! mol next-id)
     (let ([kids (mol%-kids mol)])
       (set-mol%-kids! mol
@@ -56,7 +57,7 @@
                                                  (lam (x)  (mol% 'no-dat null)))])
                         (append kids fillers)))))
 
-  (let loop ([m mol]  [p path])
+  (let loop ([m mol] [p path])
     (match p
       ['[]             (unless (eq? val 'no-dat)
                          (match (mol%-data m)
@@ -72,13 +73,13 @@
 
 
 (def (height mol)
-  ;; Used for synchronization, useful for height limitation...
+  ;; Useful to have
   (match (mol%-kids mol)
     [(list)  0]
     [kids    (add1 (apply max (map height kids)))]))
 
 (def (topology mol)
-  #|a list of paths that have the same value|#
+  #|a partition of paths based on value|#
   (let ([result  (make-hasheq)])
     (cascade-path mol
                   (lam (m path)
@@ -87,6 +88,25 @@
                                (cons path
                                      (hash-ref! result m null)))))
     (hash-values result)))
+
+(def (get-chain topo path)
+  (for/or ([chain  topo])
+    (match (member path chain)
+      [#f  #f]
+      [_   chain])))
+
+(def (synced? topo path1 path2)
+  (match (member path2
+                 (get-chain topo path1))
+    [#f  #f]
+    [_   #t]))
+
+(def (mol-paths mol)
+  (let ([result  null])
+    (cascade-path mol (lam (mol path)
+                        (cons! path result)))
+
+    result))
 
 (def (replace! mol path rmol)
   ;; replace path by rmol
@@ -118,8 +138,8 @@
 (def (merge-topo topo1 topo2)
   (let ([result  topo1])
     (for ([chain  topo2])
-      (match (index-where result
-                          (lam (c)  (not (set-empty? (set-intersect c chain)))))
+      (match (index-where result (lam (c)
+                                   (not (set-empty? (set-intersect c chain)))))
         [#f  (cons! chain result)]
         [i   (set! result
                (list-update result
@@ -176,8 +196,8 @@
         (escape #f))
 
       (for ([chain  topo])
-        (for ([p-replaced  (cdr chain)])
-          (let ([mcentral  (ref mol1 (car chain))])
+        (let ([mcentral  (ref mol1 (car chain))])
+          (for ([p-replaced  (cdr chain)])
             (hash-set! translator
                        (ref mol1 p-replaced)
                        mcentral)
@@ -191,14 +211,15 @@
                       (hash-ref! translator
                                  mol
                                  (ref mol1 path)))
-                    #|Translate mol2's pointers|#)
+                    #|Translate mol2's pointers to mol1's|#)
 
       (cascade root
                (lam (mol)
-                 (set-mol%-kids! mol
-                                 (for/list ([kid  (mol%-kids mol)])
-                                   (hash-ref translator kid kid)))
-                 #|Erase r2 and r1's extra pointers|#)))))
+                 (unless (eq? mol mol1)
+                   (set-mol%-kids! mol
+                                   (for/list ([kid  (mol%-kids mol)])
+                                     (hash-ref translator kid kid))))
+                 #|Erase mol2 entirely, with mol1's extra pointers|#)))))
 
 ;;; Functional stuff
 (def (copy mol [path null])
