@@ -1,7 +1,8 @@
 #! /usr/bin/racket
 #lang racket
 (require "lang/kara.rkt"
-         "mole.rkt")
+         "mole.rkt"
+         rackunit)
 
 (test-case
  "Introduction"

@@ -2,7 +2,8 @@
 (require "lang/kara.rkt"
          "mole.rkt"
          "types.rkt"
-         "enum.rkt")
+         "enum.rkt"
+         rackunit)
 
 (test-case
  "Generality"
