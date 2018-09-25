@@ -171,7 +171,7 @@
       (escape 'vacuous)  #|Save some time|#)
 
     (when (or (descendant? mol1 mol2)
-              (descendant? mol2 mol1))
+             (descendant? mol2 mol1))
       (escape #f)  #|Avoid infinite loop|#)
 
     (let loop ([m1 mol1] [m2 mol2])
@@ -199,18 +199,9 @@
     (let ([translator  (make-hasheq)]
           [topo        (merge-topo (topology mol1)
                                    (topology mol2))])
-      (displayln "topology1")
-      (displayln (topology mol1))
-      (displayln "topology2")
-      (displayln (topology mol2))
-      (displayln "merged")
-      (displayln topo)
 
       (def (process topo)
         (foldr append null topo))
-      (assert (= (length (process (topology mol1)))
-                 (length (process (topology mol2))))
-              "Oh my god how?" (topology mol1) (topology mol2))
 
       ;; Tricky part: transform the topology of mol1
       (when (cyclic-topo topo)

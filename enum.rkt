@@ -102,16 +102,16 @@
 
            [#f  (match (instance (conclusion m1)
                                  (conclusion m2))
-                  [#t  ;; (log-discard m1 m2)
-                   (match (< (complexity m1)
-                             (complexity m2))
-                     [#t  (match (instance m2 m1)
-                            [#t  (loop new-db  m1  mrst)]
-                            [#f  (loop new-db  m2  mrst)])]
-                     [#f  (loop new-db  m2  mrst)])]
+                  [#t  (log-discard m1 m2)
+                       (match (< (complexity m1)
+                                 (complexity m2))
+                         [#t  (match (instance m2 m1)
+                                [#t  (loop new-db  m1  mrst)]
+                                [#f  (loop new-db  m2  mrst)])]
+                         [#f  (loop new-db  m2  mrst)])]
                   [#f  (match (instance m2 m1)
-                         [#t  ;; (log-discard m2 m1)
-                          (loop new-db  m1  mrst)]
+                         [#t  (log-discard m2 m1)
+                              (loop new-db  m1  mrst)]
                          [#f  (loop (cons m1 new-db)
                                     m2
                                     mrst)])])])]))))
