@@ -79,3 +79,6 @@
                          [#f  (loop (cons m1 new-db)
                                     m2
                                     mrst)])])])]))))
+(pull (update (new-mol) '[] 'mp=>)
+      (conclusion m3)
+      '[0] #|We cannot store the entire proof |#)

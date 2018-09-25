@@ -58,19 +58,18 @@
 
 (def (main database)
   (def (make-mp fun arg)
-    (pull (pull mp fun '[1])
-          arg '[2]))
+    (match (pull mp fun '[1])
+      [#f  #f]
+      [_   (pull mp arg '[2])]))
 
   (def (conclusion root)
     (copy root '[0]))
 
-  (def (log-discard m1 m2)
-    (let ([c1 (conclusion m1)]
-          [c2 (conclusion m2)])
-      (unless (equal? c1 c2)
-        (newline) (dm c1)
-        (displayln "Replaced by")
-        (dm c2) (newline)))
+  (def (log-discard c1 c2)
+    (unless (equal? c1 c2)
+      (newline) (dm c1)
+      (displayln "Replaced by")
+      (dm c2) (newline))
 
     (display "x"))
 
@@ -89,29 +88,29 @@
                              m2
                              mrst)  #|conflict|#]
                   [m3  (match (> (height (conclusion m3))
-                                 20)
+                                 10)
                          [#t  (loop (cons m1 new-db)
                                     m2
                                     mrst)  #|Gotta do w/o this one|#]
-                         [#f  (loop (cons (pull (update (new-mol) '[] 'mp=>)
-                                                (conclusion m3)
-                                                '[0] #|We cannot store the entire proof |#)
+                         [#f  (loop (cons m3
                                           (cons m1 new-db))
                                     m2
                                     mrst)])])]
 
-           [#f  (match (instance (conclusion m1)
-                                 (conclusion m2))
-                  [#t  (log-discard m1 m2)
-                       (match (< (complexity m1)
-                                 (complexity m2))
-                         [#t  (match (instance m2 m1)
-                                [#t  (loop new-db  m1  mrst)]
-                                [#f  (loop new-db  m2  mrst)])]
-                         [#f  (loop new-db  m2  mrst)])]
-                  [#f  (match (instance m2 m1)
-                         [#t  (log-discard m2 m1)
-                              (loop new-db  m1  mrst)]
-                         [#f  (loop (cons m1 new-db)
-                                    m2
-                                    mrst)])])])]))))
+           [#f  (let ([c1  (conclusion m1)]
+                      [c2  (conclusion m2)])
+                  (match (instance c1 c2)
+                    [#t  (match (< (complexity c1)
+                                   (complexity c2))
+                           [#t  (match (instance c2 c1)
+                                  [#t  (log-discard c2 c1)
+                                       (loop new-db  m1  mrst)]
+                                  [#f  (log-discard c1 c2)
+                                       (loop new-db  m2  mrst)])]
+                           [#f  (loop new-db  m2  mrst)])]
+                    [#f  (match (instance c2 c1)
+                           [#t  (log-discard c2 c1)
+                                (loop new-db  m1  mrst)]
+                           [#f  (loop (cons m1 new-db)
+                                      m2
+                                      mrst)])]))])]))))

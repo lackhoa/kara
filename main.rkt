@@ -28,9 +28,10 @@
         #:exists 'truncate
         (lam (out)
           (for ([m  (read in)])
-            (dm (copy m '[0]) out)
+            (dm m ;; (copy m '[0])
+                out)
             (newline out)))))))
 
 ;; (seed "db/data.rkt")
-(mix&react 1)
-(view)
+(mix&react 10)
+;; (view)

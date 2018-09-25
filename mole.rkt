@@ -155,6 +155,18 @@
         (loop)))
     result))
 
+(def (compare m1 m2)
+  (match* ((mol%-data m1)
+           (mol%-data m2))
+    [(x x)  (let ([kids1  (mol%-kids m1)]
+                  [kids2  (mol%-kids m2)])
+              (match (length kids1)
+                [(== (length kids2))  (for/and ([kid1  kids1]
+                                               [kid2  kids2])
+                                       (compare kid1 kid2))]
+                [_                   #f]))]
+    [(a b)  #f]))
+
 (def (sync! root path1 path2)
   ;; Merge two molecules, if fail, returns #f,
   ;; if successful, literally assign path2 to path1
@@ -170,68 +182,68 @@
     (when (eq? mol1 mol2)
       (escape 'vacuous)  #|Save some time|#)
 
-    (when (or (descendant? mol1 mol2)
-             (descendant? mol2 mol1))
-      (escape #f)  #|Avoid infinite loop|#)
+    (let* ([max-height  (max (height mol1)
+                             (height mol2))]
+           [topo1       (topology mol1)]
+           [topo2       (topology mol2)]
+           [topo        (merge-topo topo1 topo2)])
+      (let super-loop ()
+        (let loop ([m1 mol1]
+                   [m2 mol2])
+          #|Make both molecules similar|#
+          (let ([d1  (mol%-data m1)]
+                [d2  (mol%-data m2)])
+            (match* (d1 d2)
+              [(x x)        (void)]
+              [('no-dat _)  (update! m1 '[] d2)]
+              [(_ 'no-dat)  (update! m2 '[] d1)]
+              [(_ _)        (escape #f)]))
 
-    (let loop ([m1 mol1] [m2 mol2])
-      #|Make both molecules similar|#
-      (let ([d1  (mol%-data m1)]
-            [d2  (mol%-data m2)])
-        (match* (d1 d2)
-          [(x x)        (void)]
-          [('no-dat _)  (update! m1 '[] d2)]
-          [(_ 'no-dat)  (update! m2 '[] d1)]
-          [(_ _)        (escape #f)]))
+          (let ([i1  (last-index (mol%-kids m1))]
+                [i2  (last-index (mol%-kids m2))])
+            ;; Add the missing kids
+            (cond [(< i1 i2)  (update! m1 `[,i2])]
+                  [(< i2 i1)  (update! m2 `[,i1])]))
 
-      (let ([i1  (last-index (mol%-kids m1))]
-            [i2  (last-index (mol%-kids m2))])
-        ;; Add the missing kids
-        (cond [(< i1 i2)  (update! m1 `[,i2])]
-              [(< i2 i1)  (update! m2 `[,i1])]))
+          (when (> (max (height mol1)
+                        (height mol2))
+                   max-height  #|Infinite cycle|#)
+            (escape #f))
 
-      (for ([kid1 (mol%-kids m1)]
-            [kid2 (mol%-kids m2)])
-        ;; Our job is over, let the kids sync
-        (unless (loop kid1 kid2)
-          (escape #f))))
+          (for ([kid1 (mol%-kids m1)]
+                [kid2 (mol%-kids m2)])
+            ;; Our job is over, let the kids sync
+            (loop kid1 kid2)))
 
-    (let ([translator  (make-hasheq)]
-          [topo        (merge-topo (topology mol1)
-                                   (topology mol2))])
+        (unless (compare mol1 mol2)
+          (super-loop)))
 
-      (def (process topo)
-        (foldr append null topo))
+      (let ([translator  (make-hasheq)])
+        ;; Tricky part: transform the topology of mol1
+        (for ([chain  topo])
+          (let ([mcentral  (ref mol1 (car chain))])
+            (for ([p-replaced  (cdr chain)])
+              (hash-set! translator
+                         (ref mol1 p-replaced)
+                         mcentral)
 
-      ;; Tricky part: transform the topology of mol1
-      (when (cyclic-topo topo)
-        (escape #f))
+              (replace! mol1
+                        p-replaced
+                        mcentral))))
 
-      (for ([chain  topo])
-        (let ([mcentral  (ref mol1 (car chain))])
-          (for ([p-replaced  (cdr chain)])
-            (hash-set! translator
-                       (ref mol1 p-replaced)
-                       mcentral)
+        (cascade-path mol2
+                      (lam (mol path)
+                        (hash-ref! translator
+                                   mol
+                                   (ref mol1 path)))
+                      #|Translate mol2's pointers to mol1's|#)
 
-            (replace! mol1
-                      p-replaced
-                      mcentral))))
-
-      (cascade-path mol2
-                    (lam (mol path)
-                      (hash-ref! translator
-                                 mol
-                                 (ref mol1 path)))
-                    #|Translate mol2's pointers to mol1's|#)
-
-      (cascade root
-               (lam (mol)
-                 (unless (eq? mol mol1)
-                   (set-mol%-kids! mol
-                                   (for/list ([kid  (mol%-kids mol)])
-                                     (hash-ref translator kid kid))))
-                 #|Erase mol2 entirely, with mol1's extra pointers|#)))))
+        (cascade root
+                 (lam (mol) (unless (eq? mol mol1)
+                            (set-mol%-kids! mol
+                                            (for/list ([kid  (mol%-kids mol)])
+                                              (hash-ref translator kid kid))))
+                   #|Erase mol2 entirely, with mol1's extra pointers|#))))))
 
 ;;; Functional stuff
 (def (copy mol [path null])
