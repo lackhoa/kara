@@ -9,23 +9,24 @@
   ;; Check if `ins` is an instance of `model`
   (def (ctor-arity s)
     (case s
-      [(->)  2]))
+      [(->)  2]
+      [(?x ?y ?z ?w ?t ?u ?v ?A ?B ?C ?D)  0]))
 
   (def (same m1 m2)
     ;; the meaning of the saying "m1 is synced with m2"
     (or (eq? m1 m2)
        (let ([ctor  (mol%-data m1)])
          (match (mol%-data m2)
-           ['no-dat  #f]
-           [ctor     (let ([kids1  (mol%-kids m1)]
-                           [kids2  (mol%-kids m2)])
-                       (and (eq*? (ctor-arity ctor)
-                                (length kids1)
-                                (length kids2))
-                          (for/and ([kid1  kids1]
-                                    [kid2  kids2])
-                            (same kid1 kid2))))]
-           [_        #f]))))
+           ['no-dat   #f]
+           [(== ctor)  (let ([kids1  (mol%-kids m1)]
+                            [kids2  (mol%-kids m2)])
+                        (and (eq*? (ctor-arity ctor)
+                                 (length kids1)
+                                 (length kids2))
+                           (for/and ([kid1  kids1]
+                                     [kid2  kids2])
+                             (same kid1 kid2))))]
+           [_         #f]))))
 
   (begin (set! ins   (copy ins))
          (set! model (copy model)))
@@ -59,8 +60,8 @@
 (def (main database)
   (def (make-mp fun arg)
     (match (pull mp fun '[1])
-      [#f  #f]
-      [_   (pull mp arg '[2])]))
+      [#f   #f]
+      [mol  (pull mol arg '[2])]))
 
   (def (conclusion root)
     (copy root '[0]))
@@ -69,48 +70,53 @@
     (unless (equal? c1 c2)
       (newline) (dm c1)
       (displayln "Replaced by")
-      (dm c2) (newline))
+      (dm c2))
 
     (display "x"))
 
-  (let ([mixed  (shuffle database)]
-        [i      -1])
-    (let loop ([new-db null]
-               [m1     (car mixed)]
-               [mixed  (cdr mixed)])
-      (set! i (add1 i))
-      (match mixed
-        [(list)          (cons m1 new-db)]
-        [(cons m2 mrst)
-         (match (< i 2)
-           [#t  (match (make-mp m1 m2)
-                  [#f  (loop (cons m1 new-db)
-                             m2
-                             mrst)  #|conflict|#]
-                  [m3  (match (> (height (conclusion m3))
-                                 10)
-                         [#t  (loop (cons m1 new-db)
-                                    m2
-                                    mrst)  #|Gotta do w/o this one|#]
-                         [#f  (loop (cons m3
-                                          (cons m1 new-db))
-                                    m2
-                                    mrst)])])]
+  (let* ([pool   (shuffle database)]
+         [fpool  (car  pool)]
+         [spool  (cadr pool)])
+    (match (make-mp fpool fpool)
+      [#f   (void)  #|conflict|#]
+      [new  (let ([cn  (conclusion new)])
+              (match (> (height cn) 30)
+                [#t  (void)  #|Gotta do w/o this one|#]
+                [#f  (cons! (pull (update (new-mol) '[] 'mp=>)
+                                  cn '[0])
+                            pool)]))]
+      #|Combining something with itself|#)
 
-           [#f  (let ([c1  (conclusion m1)]
-                      [c2  (conclusion m2)])
-                  (match (instance c1 c2)
-                    [#t  (match (< (complexity c1)
-                                   (complexity c2))
-                           [#t  (match (instance c2 c1)
-                                  [#t  (log-discard c2 c1)
-                                       (loop new-db  m1  mrst)]
-                                  [#f  (log-discard c1 c2)
-                                       (loop new-db  m2  mrst)])]
-                           [#f  (loop new-db  m2  mrst)])]
-                    [#f  (match (instance c2 c1)
-                           [#t  (log-discard c2 c1)
-                                (loop new-db  m1  mrst)]
-                           [#f  (loop (cons m1 new-db)
-                                      m2
-                                      mrst)])]))])]))))
+    (match (make-mp fpool spool)
+      [#f   (void)  #|conflict|#]
+      [new  (let ([cn  (conclusion new)])
+              (match (> (height cn) 30)
+                [#t  (void)  #|Gotta do w/o this one|#]
+                [#f  (cons! (pull (update (new-mol) '[] 'mp=>)
+                                  cn '[0])
+                            pool)]))]
+      #|Combining something with another thing|#)
+
+    (let loop ([new-db null]
+               [m1     (car pool)]
+               [pool   (cdr pool)])
+      (match pool
+        [(list)          (cons m1 new-db)]
+        [(cons m2 mrst)  (let ([c1  (conclusion m1)]
+                               [c2  (conclusion m2)])
+                           (match (instance c1 c2)
+                             [#t  (match (< (complexity c1)
+                                            (complexity c2))
+                                    [#t  (match (instance c2 c1)
+                                           [#t  ;; (log-discard c2 c1)
+                                            (loop new-db  m1  mrst)]
+                                           [#f  (log-discard c1 c2)
+                                                (loop new-db  m2  mrst)])]
+                                    [#f  ;; (log-discard c1 c2)
+                                     (loop new-db  m2  mrst)])]
+                             [#f  (match (instance c2 c1)
+                                    [#t   ;; (log-discard c2 c1)
+                                     (loop new-db  m1  mrst)]
+                                    [#f  (loop (cons m1 new-db)
+                                               m2
+                                               mrst)])]))]))))

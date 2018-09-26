@@ -62,7 +62,7 @@
                   [m3         (match (> (height (conclusion m3))
                                         10)
                                 [#t  (loop (cons m1 new-db)  m2  mrst)  #|Gotta do w/o this one|#]
-                                [#f  (loop (cons (pull (update (new-root) '[] 'mp=>)
+                                [#f  (loop (cons (pull (update (new-mol) '[] 'mp=>)
                                                        (conclusion m3)
                                                        '[0] #|We cannot store the entire proof|#)
                                                  (cons m1 new-db))

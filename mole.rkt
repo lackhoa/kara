@@ -108,15 +108,6 @@
 
     result))
 
-(def (replace! mol path rmol)
-  ;; replace path by rmol
-  (let*-values ([(pfocus plast)  (split-at-right path 1)]
-                [(mfocus)        (ref mol pfocus)])
-    (set-mol%-kids! mfocus
-                    (list-set (mol%-kids mfocus)
-                              (car plast)
-                              rmol))))
-
 (def (descendant? branch root)
   (let ([kids  (mol%-kids root)])
     (or (memq branch kids)
@@ -174,15 +165,18 @@
       (let ([translator  (make-hasheq)])
         (cascade-path m
                       (lam (mol path)
-                        (assert (ref mr path) "The input paths are not equal")
+                        (assert (ref mr path)
+                                "Trying to exchange two paths that are not equal"
+                                root p pr)
                         (hash-set! translator
                                    mol
                                    (ref mr path)))
                       #|Building the translator|#)
         (cascade root
-                 (lam (mol) (set-mol%-kids! mol
-                                          (for/list ([kid  (mol%-kids mol)])
-                                            (hash-ref translator kid kid)))
+                 (lam (mol)
+                   (set-mol%-kids! mol
+                                   (for/list ([kid  (mol%-kids mol)])
+                                     (hash-ref translator kid kid)))
                    #|Erase|#))))))
 
 (def (sync! root path1 path2)
@@ -245,7 +239,8 @@
                        p-central)))
         #|Tricky part: transform mol1's topology|#)
 
-      (exchange! root path2 path1  #|Erase path2 from root|#))))
+      (exchange! root path2 path1
+                 #|Erase path2 from root|#))))
 
 ;;; Functional stuff
 (def (copy mol [path null])
