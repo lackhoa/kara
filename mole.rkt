@@ -167,6 +167,24 @@
                 [_                   #f]))]
     [(a b)  #f]))
 
+(def (exchange! root p pr)
+  (let ([m   (ref root p)]
+        [mr  (ref root pr)])
+    (unless (eq? m mr)
+      (let ([translator  (make-hasheq)])
+        (cascade-path m
+                      (lam (mol path)
+                        (assert (ref mr path) "The input paths are not equal")
+                        (hash-set! translator
+                                   mol
+                                   (ref mr path)))
+                      #|Building the translator|#)
+        (cascade root
+                 (lam (mol) (set-mol%-kids! mol
+                                          (for/list ([kid  (mol%-kids mol)])
+                                            (hash-ref translator kid kid)))
+                   #|Erase|#))))))
+
 (def (sync! root path1 path2)
   ;; Merge two molecules, if fail, returns #f,
   ;; if successful, literally assign path2 to path1
@@ -218,32 +236,16 @@
         (unless (compare mol1 mol2)
           (super-loop)))
 
-      (let ([translator  (make-hasheq)])
-        ;; Tricky part: transform the topology of mol1
-        (for ([chain  topo])
-          (let ([mcentral  (ref mol1 (car chain))])
-            (for ([p-replaced  (cdr chain)])
-              (hash-set! translator
-                         (ref mol1 p-replaced)
-                         mcentral)
+      (for ([chain  topo])
+        (let ([p-central  (append path1 (car chain))])
+          (for ([p-replaced  (map (lam (p)  (append path1 p))
+                                  (cdr chain))])
+            (exchange! root
+                       p-replaced
+                       p-central)))
+        #|Tricky part: transform mol1's topology|#)
 
-              (replace! mol1
-                        p-replaced
-                        mcentral))))
-
-        (cascade-path mol2
-                      (lam (mol path)
-                        (hash-ref! translator
-                                   mol
-                                   (ref mol1 path)))
-                      #|Translate mol2's pointers to mol1's|#)
-
-        (cascade root
-                 (lam (mol) (unless (eq? mol mol1)
-                            (set-mol%-kids! mol
-                                            (for/list ([kid  (mol%-kids mol)])
-                                              (hash-ref translator kid kid))))
-                   #|Erase mol2 entirely, with mol1's extra pointers|#))))))
+      (exchange! root path2 path1  #|Erase path2 from root|#))))
 
 ;;; Functional stuff
 (def (copy mol [path null])

@@ -132,3 +132,16 @@
  (newline) (displayln "Conclusion says (-> A (-> B B))")
  (dm (copy (pull rt2 ai '[2]) '[0]))
  )
+
+(test-case
+ "More edge case"
+ (def m (new-mol))
+ (sync! m '[0 0 0] '[2])
+ (check-eq? (ref m '[0 0 0])
+            (ref m '[2]))
+
+ (sync! m '[1 0] '[1 1])
+ (sync! m '[0] '[1])
+ (check-eq? (ref m '[0 0 0])
+            (ref m '[2]))
+ )
