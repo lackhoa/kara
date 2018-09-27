@@ -57,46 +57,19 @@
   (add1 (sum-list (map complexity
                        (mol%-kids m)))))
 
-(def (main database)
-  (def (make-mp fun arg)
-    (match (pull mp fun '[1])
-      [#f   #f]
-      [mol  (pull mol arg '[2])]))
+(def (conclusion root)
+  (copy root '[0]))
 
-  (def (conclusion root)
-    (copy root '[0]))
-
+(def (collide database)
   (def (log-discard c1 c2)
-    (unless (equal? c1 c2)
-      (newline) (dm c1)
-      (displayln "Replaced by")
-      (dm c2))
+    ;; (unless (equal? c1 c2)
+    ;;   (newline) (dm c1)
+    ;;   (displayln "Replaced by")
+    ;;   (dm c2))
 
-    (display "x"))
+    (display "-"))
 
-  (let* ([pool   (shuffle database)]
-         [fpool  (car  pool)]
-         [spool  (cadr pool)])
-    (match (make-mp fpool fpool)
-      [#f   (void)  #|conflict|#]
-      [new  (let ([cn  (conclusion new)])
-              (match (> (height cn) 30)
-                [#t  (void)  #|Gotta do w/o this one|#]
-                [#f  (cons! (pull (update (new-mol) '[] 'mp=>)
-                                  cn '[0])
-                            pool)]))]
-      #|Combining something with itself|#)
-
-    (match (make-mp fpool spool)
-      [#f   (void)  #|conflict|#]
-      [new  (let ([cn  (conclusion new)])
-              (match (> (height cn) 30)
-                [#t  (void)  #|Gotta do w/o this one|#]
-                [#f  (cons! (pull (update (new-mol) '[] 'mp=>)
-                                  cn '[0])
-                            pool)]))]
-      #|Combining something with another thing|#)
-
+  (let ([pool  (shuffle database)])
     (let loop ([new-db null]
                [m1     (car pool)]
                [pool   (cdr pool)])
@@ -108,15 +81,36 @@
                              [#t  (match (< (complexity c1)
                                             (complexity c2))
                                     [#t  (match (instance c2 c1)
-                                           [#t  ;; (log-discard c2 c1)
-                                            (loop new-db  m1  mrst)]
+                                           [#t  (log-discard c2 c1)
+                                                (loop new-db  m1  mrst)]
                                            [#f  (log-discard c1 c2)
                                                 (loop new-db  m2  mrst)])]
-                                    [#f  ;; (log-discard c1 c2)
-                                     (loop new-db  m2  mrst)])]
+                                    [#f  (log-discard c1 c2)
+                                         (loop new-db  m2  mrst)])]
                              [#f  (match (instance c2 c1)
-                                    [#t   ;; (log-discard c2 c1)
-                                     (loop new-db  m1  mrst)]
+                                    [#t   (log-discard c2 c1)
+                                          (loop new-db  m1  mrst)]
                                     [#f  (loop (cons m1 new-db)
                                                m2
                                                mrst)])]))]))))
+
+(def (combine database)
+  (def (make-mp fun arg)
+    (match (pull mp fun '[1])
+      [#f   #f]
+      [mol  (pull mol arg '[2])]))
+
+  (let* ([len  (length database)]
+         [fst  (list-ref database
+                         (random len))]
+         [snd  (list-ref database
+                         (random len))])
+    (match (make-mp fst snd)
+      [#f   database  #|conflict|#]
+      [new  (let ([cn  (conclusion new)])
+              (match (> (height cn) 30)
+                [#t  database  #|Gotta do w/o this one|#]
+                [#f  (display "+")
+                     (cons (pull (update (new-mol) '[] 'mp=>)
+                                 cn '[0])
+                           database)]))])))

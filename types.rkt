@@ -6,6 +6,7 @@
 (def up update)
 (def sy sync)
 
+;;; Axioms
 (def ai
   ;; A -> A
   (sy (up (up (new-mol)
@@ -55,3 +56,34 @@
       '[1 0 0]  '[2 0]    #|B|#))
 
 (def axioms (list ai ak as))
+
+;;; Some theorems to prove
+(def w
+  ;; (A -> (A -> B)) -> (A -> B)
+  (let ([m  (new-mol)])
+    (update! m '[]      '->)
+    (update! m '[0]     '->)
+    (update! m '[0 0]   '?A)
+    (update! m '[0 1]   '->)
+    (update! m '[0 1 0] '?A)
+    (update! m '[0 1 1] '?B)
+    (update! m '[1]     '->)
+    (update! m '[1 0]   '?A)
+    (update! m '[1 1]   '?B)
+    m)  #|Proven|#)
+
+(def c
+  ;; (A -> (B -> C)) -> (B -> (A -> C))
+  (let ([m  (new-mol)])
+    (update! m '[]      '->)
+    (update! m '[0]     '->)
+    (update! m '[0 0]   '?A)
+    (update! m '[0 1]   '->)
+    (update! m '[0 1 0] '?B)
+    (update! m '[0 1 1] '?C)
+    (update! m '[1]     '->)
+    (update! m '[1 0]   '?B)
+    (update! m '[1 1]   '->)
+    (update! m '[1 1 0] '?A)
+    (update! m '[1 1 1] '?C)
+    m))

@@ -82,3 +82,54 @@
 (pull (update (new-mol) '[] 'mp=>)
       (conclusion m3)
       '[0] #|We cannot store the entire proof |#)
+
+(def (parse mol)
+  (match (mol%-data mol)
+    ['mp=>  (list (parse (list-ref (mol%-kids mol) 1))
+                  (parse (list-ref (mol%-kids mol) 2)))]
+    ['ai=>  'i]
+    ['ak=>  'k]
+    ['as=>  's]))
+
+(def (mol-repr root [path null])
+  (def (blank? mol)
+    (match mol
+      [(mol% _ 'no-dat (list))  #t]
+      [_                        #f]))
+
+  (def (make-repr-env mol
+                      in-env
+                      get-next!)
+    ;; Sort out which variables are
+    ;; represented by which symbol.
+    (match (blank? mol)
+      [#t  (match (hash-ref in-env mol 'unbound)
+             ['unbound  (hash-set-many in-env
+                                       (map (lam (p)  (ref root p))
+                                            (mol%-sync mol))
+                                       (get-next!))]
+             [_         in-env])]
+      [#f  (let ([kids  (mol%-kids mol)]
+                 [env   in-env])
+             (for ([kid  kids])
+               (set! env (make-repr-env kid
+                                        env
+                                        get-next!)))
+             env)]))
+
+  (def (mol-repr-core mol env)
+    (match (blank? mol)
+      [#t  (hash-ref env mol)]
+      [#f  (cons (match (mol%-data mol)
+                   ['no-dat  '?]
+                   [any      any])
+                 (map (lam (kid)  (mol-repr-core kid env))
+                      (mol%-kids mol)))]))
+
+  (mol-repr-core (ref root path)
+                 (make-repr-env (ref root path)
+                                (hash)
+                                (let ([count 64])
+                                  ;; The counting closure
+                                  (thunk (set! count (add1 count))
+                                         (integer->char count))))))
