@@ -64,9 +64,9 @@
                            [(== val)  (void)]
                            ['no-dat  (set-mol%-data! m val)]
                            [_        #f]))]
-      [(cons nxt rst)  (match (ref mol (list nxt))
+      [(cons nxt rst)  (match (ref mol `[,nxt])
                          [#f   (begin (expand! mol nxt)
-                                      (update! (ref mol (list nxt))
+                                      (update! (ref mol `[,nxt])
                                                rst
                                                val))]
                          [kid  (update! kid rst val)])])))
@@ -75,8 +75,8 @@
 (def (height mol)
   ;; Useful to have
   (match (mol%-kids mol)
-    [(list)  0]
-    [kids    (add1 (apply max (map height kids)))]))
+    ['()   0]
+    [kids  (add1 (apply max (map height kids)))]))
 
 (def (topology mol)
   #|a partition of paths based on value|#
@@ -111,8 +111,8 @@
 (def (descendant? branch root)
   (let ([kids  (mol%-kids root)])
     (or (memq branch kids)
-       (exists (lam (kid)  (descendant? branch kid))
-          kids))))
+        (exists (lam (kid)  (descendant? branch kid))
+                kids))))
 
 (def (cyclic-topo topo)
   (for/or ([chain topo])
@@ -153,8 +153,8 @@
                   [kids2  (mol%-kids m2)])
               (match (length kids1)
                 [(== (length kids2))  (for/and ([kid1  kids1]
-                                               [kid2  kids2])
-                                       (compare kid1 kid2))]
+                                                [kid2  kids2])
+                                        (compare kid1 kid2))]
                 [_                   #f]))]
     [(a b)  #f]))
 

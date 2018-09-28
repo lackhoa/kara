@@ -145,37 +145,3 @@
  (check-eq? (ref m '[0 0 0])
             (ref m '[2]))
  )
-
-(test-case
- "More advance shit"
- (define sy sync)
- (define up update)
- (def ai (sy (up (up (new-mol) '[] 'ai=>) '[0] '->) '[0 0] '[0 1]))
-
- (def ak (sy (up (up (up (new-mol) '[] 'ak=>) '[0] '->) '[0 1] '->) '[0 0] '[0 1 1]))
-
- (def mp (sy (sy (up (up (new-mol) '[]  'mp=>) '[1 0]  '->) '[0]  '[1 0 1]) '[1 0 0]  '[2 0]))
-
- (def as
-   ;; (=> (-> (-> A
-   ;;             (-> B C))
-   ;;         (-> (-> A B)
-   ;;             (-> A C))))
-   (let* ([r  (new-mol)]
-          [r  (up r '[]      'as=>)]
-          [r  (up r '[0]     '->)]
-          [r  (up r '[0 0]   '->)]
-          [r  (up r '[0 0 1] '->)]
-          [r  (up r '[0 1]   '->)]
-          [r  (up r '[0 1 0] '->)]
-          [r  (up r '[0 1 1] '->)]
-
-          [r  (sy r '[0 0 0]   '[0 1 0 0])]
-          [r  (sy r '[0 0 0]   '[0 1 1 0])]
-          [r  (sy r '[0 0 1 0] '[0 1 0 1])]
-          [r  (sy r '[0 0 1 1] '[0 1 1 1])])
-     r))
-
- (newline)
- (dm (copy (pull (pull mp as '[2]) ak '[1]) '[0]))
- )
