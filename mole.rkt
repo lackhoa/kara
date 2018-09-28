@@ -4,25 +4,23 @@
 (provide (all-defined-out))
 
 ;;; Molcules
-(struct mol% ([data #:mutable  #|'no-dat | symbol|#]
-              [kids #:mutable  #|list[mol | valid path]|#])
+(struct mol% ([data #:mutable  #| #f | symbol |#]
+              [kids #:mutable  #| mols |#])
   #:prefab)
 
 (def (new-mol)
-  (mol% 'no-dat null))
+  (mol% #f null))
 
 (def (ref mol path)
   (match path
     ['[]             mol]
     [(cons nxt rst)  (let ([kids  (mol%-kids mol)])
-                       (match (<= nxt (last-index kids))
-                         [#t  (ref (list-ref kids nxt)
-                                   rst)]
-                         [#f  #f]))]))
+                       (and (<= nxt (last-index kids))
+                          (ref (list-ref kids nxt) rst)))]))
 
 (def (ref-data mol path)
   (match (ref mol path)
-    [#f             'no-dat]
+    [#f             #f]
     [(mol% data _)  data]))
 
 (def (ref-kids mol path)
@@ -46,23 +44,23 @@
             [kid  kids])
         (loop kid (pad path i))))))
 
-(def (update! mol path [val 'no-dat])
-  ;; Can be used to update (val != 'no-dat)
-  ;; or expand (when val = 'no-dat).
+(def (update! mol path [val #f])
+  ;; Can be used to update (val != #f)
+  ;; or expand (when val = #f).
   (def (expand! mol next-id)
     (let ([kids (mol%-kids mol)])
       (set-mol%-kids! mol
                       (let ([fillers (build-list (- next-id
                                                     (last-index kids))
-                                                 (lam (x)  (mol% 'no-dat null)))])
+                                                 (lam (x)  (mol% #f null)))])
                         (append kids fillers)))))
 
   (let loop ([m mol] [p path])
     (match p
-      ['[]             (unless (eq? val 'no-dat)
+      ['[]             (unless (eq? val #f)
                          (match (mol%-data m)
                            [(== val)  (void)]
-                           ['no-dat  (set-mol%-data! m val)]
+                           [#f  (set-mol%-data! m val)]
                            [_        #f]))]
       [(cons nxt rst)  (match (ref mol `[,nxt])
                          [#f   (begin (expand! mol nxt)
@@ -70,7 +68,6 @@
                                                rst
                                                val))]
                          [kid  (update! kid rst val)])])))
-
 
 (def (height mol)
   ;; Useful to have
@@ -110,8 +107,8 @@
 
 (def (descendant? branch root)
   (let ([kids  (mol%-kids root)])
-    (or (memq branch kids)
-        (exists (lam (kid)  (descendant? branch kid))
+    (orb (memq branch kids)
+         (findf (lam (kid)  (descendant? branch kid))
                 kids))))
 
 (def (cyclic-topo topo)
@@ -207,8 +204,8 @@
                 [d2  (mol%-data m2)])
             (match* (d1 d2)
               [(x x)        (void)]
-              [('no-dat _)  (update! m1 '[] d2)]
-              [(_ 'no-dat)  (update! m2 '[] d1)]
+              [(#f _)  (update! m1 '[] d2)]
+              [(_ #f)  (update! m2 '[] d1)]
               [(_ _)        (escape #f)]))
 
           (let ([i1  (last-index (mol%-kids m1))]
@@ -251,7 +248,7 @@
       (write (ref mol path) out))
     (read in)))
 
-(def (update mol path [val 'no-dat])
+(def (update mol path [val #f])
   (let ([clone  (copy mol)])
     (match (update! clone path val)
       [#f  #f]
@@ -265,7 +262,7 @@
 
 ;;; Others
 (def (pull root branch path)
-  (let ([unifier  (mol% 'no-dat
+  (let ([unifier  (mol% #f
                         `(,(copy root) ,(copy branch)))])
     (match (sync! unifier
                   `[0 ,@path]

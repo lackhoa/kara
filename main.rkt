@@ -16,14 +16,14 @@
          (call-with-input-file "db/data.rkt"
            (lam (in) (read in)))))
 
-(def (total)
+(def (num)
   (length db))
 
-(def (combine-n [times 100])
+(def (com [times 100])
   (repeat times
           (thunk (set! db (combine db)))))
 
-(def (collide-n [times 5])
+(def (col [times 5])
   (repeat times
           (thunk (set! db (collide db)))))
 
@@ -44,6 +44,6 @@
 
 (def (query thm)
   (for/or ([m  db])
-    (match (instance thm (conclusion m))
+    (match (instance? thm (conclusion m))
       [#t  (dm m)]
       [#f  #f])))

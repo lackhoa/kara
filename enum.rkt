@@ -5,52 +5,52 @@
 
 (provide (all-defined-out))
 
-(def (instance ins model)
-  ;; Check if `ins` is an instance of `model`
+(def (instance? ins model)
+  ;; Check if `ins` is an instance? of `model`
   (def (ctor-arity s)
     (case s
-      [(->)  2]
-      [(?x ?y ?z ?w ?t ?u ?v ?A ?B ?C ?D)  0]))
+      [(->)   2]
+      [else  0]))
 
-  (def (same m1 m2)
+  (def (same? m1 m2)
     ;; the meaning of the saying "m1 is synced with m2"
-    (or (eq? m1 m2)
-       (let ([ctor  (mol%-data m1)])
-         (match (mol%-data m2)
-           ['no-dat   #f]
-           [(== ctor)  (let ([kids1  (mol%-kids m1)]
-                            [kids2  (mol%-kids m2)])
-                        (and (eq*? (ctor-arity ctor)
-                                 (length kids1)
-                                 (length kids2))
-                           (for/and ([kid1  kids1]
-                                     [kid2  kids2])
-                             (same kid1 kid2))))]
-           [_         #f]))))
+    (orb (eq? m1 m2)
+         (let ([ctor  (mol%-data m1)])
+           (match (mol%-data m2)
+             [#f        #f]
+             [(== ctor)  (let ([kids1  (mol%-kids m1)]
+                              [kids2  (mol%-kids m2)])
+                          (andb (eq*? (ctor-arity ctor)
+                                      (length kids1)
+                                      (length kids2))
+                                (for/andb ([kid1  kids1]
+                                           [kid2  kids2])
+                                  (same? kid1 kid2))))]
+             [_         #f]))))
 
   (begin (set! ins   (copy ins))
-         (set! model (copy model)))
+         (set! model (copy model))  #|This process involves modification|#)
 
   (let/ec escape
     (cascade-path model
                   (lam (mol path)
                     (match (mol%-data mol)
-                      ['no-dat  (void)]
-                      [md       (match (ref-data ins path)
-                                  [md  (void)]
-                                  [_   (escape #f)])]))
+                      [#f  (void)]
+                      [md  (match (ref-data ins path)
+                             [md  (void)]
+                             [_   (escape #f)])]))
                   #|Data requirement|#)
 
     (let ([topo  (topology model)])
-      (for/and ([chain  topo])
+      (for/andb ([chain  topo])
         (for ([path  chain])
           (update! ins path)
-          #|Equip ins in case it is simpler|#)
+          #|Equip `ins` since it might be simpler|#)
 
         (let ([mcentral  (ref ins (car chain))])
-          (for/and ([path  (cdr chain)])
-            (same (ref ins path)
-                  mcentral))))
+          (for/andb ([path  (cdr chain)])
+            (same? (ref ins path)
+                   mcentral))))
       #|topology requirement|#)))
 
 (def (complexity m)
@@ -77,17 +77,17 @@
         [(list)          (cons m1 new-db)]
         [(cons m2 mrst)  (let ([c1  (conclusion m1)]
                                [c2  (conclusion m2)])
-                           (match (instance c1 c2)
+                           (match (instance? c1 c2)
                              [#t  (match (< (complexity c1)
                                             (complexity c2))
-                                    [#t  (match (instance c2 c1)
+                                    [#t  (match (instance? c2 c1)
                                            [#t  (log-discard c2 c1)
                                                 (loop new-db  m1  mrst)]
                                            [#f  (log-discard c1 c2)
                                                 (loop new-db  m2  mrst)])]
                                     [#f  (log-discard c1 c2)
                                          (loop new-db  m2  mrst)])]
-                             [#f  (match (instance c2 c1)
+                             [#f  (match (instance? c2 c1)
                                     [#t   (log-discard c2 c1)
                                           (loop new-db  m1  mrst)]
                                     [#f  (loop (cons m1 new-db)
