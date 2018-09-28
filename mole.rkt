@@ -244,8 +244,8 @@
 
 ;;; Functional stuff
 (def (copy mol [path null])
-  ;; Utilize the print graph ability
-  ;; Can be used to detach
+  ;; Utilize the print graph
+  ;; Can be used to detach molecules from the root.
   (let-values ([(in out) (make-pipe)])
     (parameterize ([print-graph #t])
       (write (ref mol path) out))
@@ -271,7 +271,7 @@
                   `[0 ,@path]
                   '[1])
       [#f  #f]
-      [_   (copy unifier '[0])])))
+      [_   (ref unifier '[0])])))
 
 (define-syntax-rule (pull! root branch path)
   (set! root (pull root branch path)))

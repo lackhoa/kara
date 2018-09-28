@@ -5,17 +5,19 @@
          "enum.rkt"
          "types.rkt")
 
-(def db
-  (call-with-input-file "db/data.rkt"
-    (lam (in) (read in))))
-
-(def (total)
-  (length db))
-
 (def (seed [file-name "db/data.rkt"])
   (call-with-output-file file-name
     #:exists 'truncate
     (lam (out) (wm axioms out))))
+
+(def db
+  (begin (unless (file-exists? "db/data.rkt")
+           (seed))
+         (call-with-input-file "db/data.rkt"
+           (lam (in) (read in)))))
+
+(def (total)
+  (length db))
 
 (def (combine-n [times 100])
   (repeat times

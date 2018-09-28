@@ -111,6 +111,5 @@
               (match (> (height cn) 30)
                 [#t  database  #|Gotta do w/o this one|#]
                 [#f  (display "+")
-                     (cons (pull (update (new-mol) '[] 'mp=>)
-                                 cn '[0])
+                     (cons (mol% 'mp=> `(,cn)  #|the conclusion and the indicator that it was derived|#)
                            database)]))])))
