@@ -83,13 +83,7 @@
       (conclusion m3)
       '[0] #|We cannot store the entire proof |#)
 
-(def (parse mol)
-  (match (mol%-data mol)
-    ['mp=>  (list (parse (list-ref (mol%-kids mol) 1))
-                  (parse (list-ref (mol%-kids mol) 2)))]
-    ['ai=>  'i]
-    ['ak=>  'k]
-    ['as=>  's]))
+
 
 (def (mol-repr root [path null])
   (def (blank? mol)

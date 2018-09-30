@@ -1,6 +1,7 @@
 #lang racket
 (require "lang/kara.rkt"
-         racket/hash)
+         racket/hash
+         racket/struct)
 (provide (all-defined-out))
 
 ;;; Molcules
@@ -60,7 +61,7 @@
       ['[]             (unless (eq? val #f)
                          (match (mol%-data m)
                            [(== val)  (void)]
-                           [#f  (set-mol%-data! m val)]
+                           [#f       (set-mol%-data! m val)]
                            [_        #f]))]
       [(cons nxt rst)  (match (ref mol `[,nxt])
                          [#f   (begin (expand! mol nxt)
@@ -222,7 +223,8 @@
           (for ([kid1 (mol%-kids m1)]
                 [kid2 (mol%-kids m2)])
             ;; Our job is over, let the kids sync
-            (loop kid1 kid2)))
+            (unless (eq? kid1 kid2)
+              (loop kid1 kid2))))
 
         (unless (compare mol1 mol2)
           (super-loop)))
@@ -261,7 +263,7 @@
       [_   clone])))
 
 ;;; Others
-(def (pull root branch path)
+(def (pull root path branch)
   (let ([unifier  (mol% #f
                         `(,(copy root) ,(copy branch)))])
     (match (sync! unifier
@@ -270,16 +272,32 @@
       [#f  #f]
       [_   (ref unifier '[0])])))
 
-(define-syntax-rule (pull! root branch path)
-  (set! root (pull root branch path)))
+(define-syntax-rule (pull! root path branch)
+  (set! root (pull root path branch)))
 
 ;;; Printing
 (def (dm mol [port  (current-output-port)])
   ;; Make it pretty
   (parameterize ([print-graph  #t])
-    (pdisplay mol 35 port)))
+    (pprint (mol%->vmol% mol) 35 port)))
 
 (def (wm mol port)
   ;; Make it efficient
   (parameterize ([print-graph  #t])
     (write mol port)))
+
+(def (mol%->vmol% mol)
+  (let ([dic  (make-hasheq)])
+    (let loop ([m  mol])
+      (hash-ref! dic
+                 m
+                 (thunk (vmol% (mol%-data m)
+                               (map loop (mol%-kids m))))))))
+
+(struct vmol% (data kids)
+  #:methods gen:custom-write
+  [(define write-proc
+     (make-constructor-style-printer (lam (obj) (match (vmol%-data obj)
+                                                [#f   '?]
+                                                [any  any]))
+                                     (lam (obj) (vmol%-kids obj))))])

@@ -1,4 +1,3 @@
-#! /usr/bin/racket
 #lang racket
 (require "lang/kara.rkt"
          "mole.rkt"
@@ -71,8 +70,8 @@
  (def model2 (sync (new-mol) '[1] '[2]))
 
  (def r (update (new-mol) '[0] 'T))
- (pull! r model1 '[])
- (pull! r model2 '[])
+ (pull! r '[] model1)
+ (pull! r '[] model2)
  (sync! r '[2] '[3])
  (displayln "0, 1, 2, 3 are the same")
  (dm r) (newline)
@@ -85,8 +84,8 @@
 
  (def r2 (new-mol))
  (sync! r2 '[1] '[0 0])
- (check-false (pull r2 r1 '[]))
- (check-false (pull r1 r2 '[]))
+ (check-false (pull r2 '[] r1))
+ (check-false (pull r1 '[] r2))
  )
 
 (test-case
@@ -97,7 +96,7 @@
  (def r2 (new-mol))
  (sync! r2 '[1] '[2 0])
  (newline) (displayln "0 = 1 = 2-0")
- (dm (pull r2 r1 '[]))
+ (dm (pull r2 '[] r1))
  )
 
 (test-case
@@ -107,7 +106,7 @@
 
  (def r (new-mol))
  (update! r '[0] 'N)
- (pull! r model '[])
+ (pull! r '[] model)
  (check-eq? (ref-data r '[1 0])
             'N))
 
@@ -123,14 +122,14 @@
 
  (newline) (displayln "Let's begin MOTHERFUCKER!")
  (def rt mp)
- (set! rt (pull rt ai '[1]))
+ (set! rt (pull rt '[1] ai))
  (displayln "Conclusion says (-> A (-> B A))")
- (dm (copy (pull rt ak '[2]) '[0]))
+ (dm (copy (pull rt '[2] ak) '[0]))
 
  (def rt2 mp)
- (set! rt2 (pull rt2 ak '[1]))
+ (set! rt2 (pull rt2 '[1] ak))
  (newline) (displayln "Conclusion says (-> A (-> B B))")
- (dm (copy (pull rt2 ai '[2]) '[0]))
+ (dm (copy (pull rt2 '[2] ai) '[0]))
  )
 
 (test-case

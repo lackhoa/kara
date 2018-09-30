@@ -96,9 +96,9 @@
 
 (def (combine database)
   (def (make-mp fun arg)
-    (match (pull mp fun '[1])
+    (match (pull mp '[1] fun)
       [#f   #f]
-      [mol  (pull mol arg '[2])]))
+      [mol  (pull mol '[2] arg)]))
 
   (let* ([len  (length database)]
          [fst  (list-ref database
