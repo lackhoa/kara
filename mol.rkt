@@ -4,7 +4,7 @@
          racket/struct)
 (provide (all-defined-out))
 
-;;; mol% <<decompress--compress>> cmol% --visualize>>
+;;; mol% <<decompress--compress>> cmol% --visualize>> vmol%
 
 ;;; Molcules
 (struct mol% (sync  #|at least one path|#
@@ -123,6 +123,7 @@
     #|watch the height to detect cycle|#
     (max (height (ref root p1))
          (height (ref root p2))))
+  (displayln max-height)
 
   (let loop ([fp1  p1] [fp2  p2])
     (let/ec escape
@@ -215,7 +216,7 @@
 (def (compress root)
   (let ([dic null  #|Map of sync list to cmol|#])
     (let loop ([mol  root])
-      (match (for/or ([pair dic])
+      (match (for/or ([pair  dic])
                (if (member (car (mol%-sync mol))
                            (car pair))
                    pair
@@ -236,8 +237,8 @@
                (if (member path sync-ls)
                    sync-ls
                    #f))
-             (cmol%-data cmol)
-             (for/list ([kid  (cmol%-kids cmol)]
+             (cmol%-data cm)
+             (for/list ([kid  (cmol%-kids cm)]
                         [i    (in-naturals)])
                (loop kid (pad path i)))))))
 
@@ -269,31 +270,35 @@
 ;;; Printing
 (def (dm c/mol [port  (current-output-port)])
   ;; Write cmol prettily
-  (struct vmol% (data kids)
-    #:methods gen:custom-write
-    [(define write-proc
-       (make-constructor-style-printer (lam (vmol) (match (vmol%-data vmol)
-                                                   [#f   '?]
-                                                   [any  any]))
-                                       (lam (vmol) (vmol%-kids vmol))))])
-
-  (def (visualize cmol)
+  (def (listify cmol)
     (let ([dic  (make-hasheq)])
       (let loop ([cm  cmol])
         (hash-ref! dic
                    cm
-                   (thunk (vmol% (cmol%-data cm)
-                                 (map loop (cmol%-kids cm))))))))
+                   (thunk (cons (cmol%-data cm)
+                                (map loop (cmol%-kids cm))))))))
 
   (parameterize ([print-graph  #t])
-    (pprint (visualize (match c/mol
+    (pdisplay (listify (match c/mol
                          [(mol% _ _ _)  (compress c/mol)]
                          [(cmol% _ _)   c/mol]  #|Compress is necessary|#))
-            35
-            port))
-  )
+              35
+              port)))
 
-(def (wm cmol port)
+(def (wm cmol? port)
   ;; Write cmol efficiently
   (parameterize ([print-graph  #t])
-    (write cmol port)))
+    (write (match cmol?
+             [(mol% _ _ _)  (compress cmol?)]
+             [(cmol% _ _)   cmol?]  #|Compress if necessary|#)
+           port)))
+
+;;; Assignment (NOT mutation)
+(define-syntax-rule (update! iden more ...)
+  (set! iden (update iden more ...)))
+
+(define-syntax-rule (sync! iden more ...)
+  (set! iden (sync iden more ...)))
+
+(define-syntax-rule (pull! iden more ...)
+  (set! iden (pull iden more ...)))

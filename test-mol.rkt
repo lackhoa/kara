@@ -3,21 +3,15 @@
          "mol.rkt"
          rackunit)
 
-(define-syntax-rule (update! iden more ...)
-  (set! iden (update iden more ...)))
-
-(define-syntax-rule (sync! iden more ...)
-  (set! iden (sync iden more ...)))
-
-(define-syntax-rule (pull! iden more ...)
-  (set! iden (pull iden more ...)))
+(def dc
+  (compose decompress compress))
 
 (test-case
  "Introduction"
  (def root (new-root))
  (update! root '[] 'I)
  (update! root '[0] 'A)
- (check-false (update root '[0] 'NOT-A))
+ (check-false (update (dc root) '[0] 'NOT-A))
  )
 
 (test-case
@@ -25,15 +19,15 @@
  (def root (new-root))
  (sync! root '[0] '[1])
  (update! root '[0] 'A)
- (check-eq? (ref-data root '[1])
+ (check-eq? (ref-data (dc root) '[1])
             'A)
  (update! root '[0 0] 'B)
- (check-eq? (ref-data root '[1 0])
+ (check-eq? (ref-data (dc root) '[1 0])
             'B)
  (update! root '[1 2] 'C)
- (check-eq? (ref-data root '[0 2])
+ (check-eq? (ref-data (dc root) '[0 2])
             'C)
- (check-false (update root '[1 2] 'D))
+ (check-false (update (dc root) '[1 2] 'D))
  )
 
 (test-case
@@ -47,8 +41,8 @@
  (update! root '[4])
  (sync! root '[3] '[4])
  (update! root '[5])
- (displayln "0, 1-0 and 3, 4 are the same")
- (dm root) (newline)
+ (displayln "0 = 1-0; 3 = 4")
+ (dm (dc root)) (newline)
  )
 
 (test-case
@@ -56,10 +50,10 @@
  (def root (new-root))
  (update! root '[0] 'A)
  (sync! root '[0] '[1])
- (check-eq? (ref-data root '[1])
+ (check-eq? (ref-data (dc root) '[1])
             'A)
  (update! root '[2] 'B)
- (check-false (sync root '[0] '[2]))
+ (check-false (sync (dc root) '[0] '[2]))
  )
 
 (test-case
@@ -67,8 +61,8 @@
  (def root (new-root))
  (update! root '[0 0])
  (sync! root '[0 0] '[1])
- (check-false (sync root '[0] '[1]))
- (check-false (sync root '[2] '[2 3 4]))
+ (check-false (sync (dc root) '[0] '[1]))
+ (check-false (sync (dc root) '[2] '[2 3 4]))
  )
 
 (test-case
@@ -80,8 +74,8 @@
  (pull! r '[] model1)
  (pull! r '[] model2)
  (sync! r '[2] '[3])
- (displayln "0, 1, 2, 3 are the same")
- (dm r) (newline)
+ (displayln "0 = 1 = 2 = 3")
+ (dm (dc r)) (newline)
  )
 
 (test-case
@@ -91,63 +85,63 @@
 
  (def r2 (new-root))
  (sync! r2 '[1] '[0 0])
- (check-false (pull r2 '[] r1))
- (check-false (pull r1 '[] r2))
+ (check-false (pull (dc r2) '[] r1))
+ (check-false (pull (dc r1) '[] r2))
  )
 
-;; (test-case
-;;  "Inter-root without cycle"
-;;  (def r1 (new-root))
-;;  (sync! r1 '[0] '[1])
+(test-case
+ "Inter-root without cycle"
+ (def r1 (new-root))
+ (sync! r1 '[0] '[1])
 
-;;  (def r2 (new-root))
-;;  (sync! r2 '[1] '[2 0])
-;;  (newline) (displayln "0 = 1 = 2-0")
-;;  (dm (pull r2 '[] r1))
-;;  )
+ (def r2 (new-root))
+ (sync! r2 '[1] '[2 0])
+ (newline) (displayln "0 = 1 = 2-0")
+ (dm (pull r2 '[] r1))
+ )
 
-;; (test-case
-;;  "Inter-root advanced"
-;;  (def model (new-root))
-;;  (sync! model '[0] '[1 0])
+(test-case
+ "Inter-root advanced"
+ (def model (new-root))
+ (sync! model '[0] '[1 0])
 
-;;  (def r (new-root))
-;;  (update! r '[0] 'N)
-;;  (pull! r '[] model)
-;;  (check-eq? (ref-data r '[1 0])
-;;             'N))
+ (def r (new-root))
+ (update! r '[0] 'N)
+ (pull! r '[] model)
+ (check-eq? (ref-data (dc r) '[1 0])
+            'N))
 
-;; (test-case
-;;  "Advanced shit"
-;;  (def sy sync)
-;;  (def up update)
-;;  (def ai (sy (up (up (new-root) '[] 'ai=>) '[0] '->) '[0 0] '[0 1]))
+(test-case
+ "Advanced shit"
+ (def sy sync)
+ (def up update)
+ (def ai (sy (up (up (new-root) '[] 'ai=>) '[0] '->) '[0 0] '[0 1]))
 
-;;  (def ak (sy (up (up (up (new-root) '[] 'ak=>) '[0] '->) '[0 1] '->) '[0 0] '[0 1 1]))
+ (def ak (sy (up (up (up (new-root) '[] 'ak=>) '[0] '->) '[0 1] '->) '[0 0] '[0 1 1]))
 
-;;  (def mp (sy (sy (up (up (new-root) '[]  'mp=>) '[1 0]  '->) '[0]  '[1 0 1]) '[1 0 0]  '[2 0]))
+ (def mp (sy (sy (up (up (new-root) '[]  'mp=>) '[1 0]  '->) '[0]  '[1 0 1]) '[1 0 0]  '[2 0]))
 
-;;  (newline) (displayln "Let's begin MOTHERFUCKER!")
-;;  (def rt mp)
-;;  (set! rt (pull rt '[1] ai))
-;;  (displayln "Conclusion says (-> A (-> B A))")
-;;  (dm (copy (pull rt '[2] ak) '[0]))
+ (newline) (displayln "Let's begin MOTHERFUCKER!")
+ (def rt mp)
+ (set! rt (pull rt '[1] ai))
+ (displayln "Conclusion says (-> A (-> B A))")
+ (dm (detach (pull (dc rt) '[2] ak) '[0]))
 
-;;  (def rt2 mp)
-;;  (set! rt2 (pull rt2 '[1] ak))
-;;  (newline) (displayln "Conclusion says (-> A (-> B B))")
-;;  (dm (copy (pull rt2 '[2] ai) '[0]))
-;;  )
+ (def rt2 mp)
+ (set! rt2 (pull (dc rt2) '[1] ak))
+ (newline) (displayln "Conclusion says (-> A (-> B B))")
+ (dm (detach (pull (dc rt2) '[2] ai) '[0]))
+ )
 
-;; (test-case
-;;  "Tricky topology"
-;;  (def m (new-root))
-;;  (sync! m '[0 0 0] '[2])
-;;  (check-eq? (ref m '[0 0 0])
-;;             (ref m '[2]))
+(test-case
+ "Tricky topology"
+ (def m (new-root))
+ (sync! m '[0 0 0] '[2])
+ (check-not-false (member '[2]
+                          (ref-sync (dc m) '[0 0 0])))
 
-;;  (sync! m '[1 0] '[1 1])
-;;  (sync! m '[0] '[1])
-;;  (check-eq? (ref m '[0 0 0])
-;;             (ref m '[2]))
-;;  )
+ (sync! m '[1 0] '[1 1])
+ (sync! m '[0] '[1])
+ (check-not-false (member '[2]
+                          (ref-sync (dc m) '[0 0 0])))
+ )

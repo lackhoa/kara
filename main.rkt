@@ -1,19 +1,18 @@
 #lang racket
 (require "lang/kara.rkt"
-         "mole.rkt"
+         "mol.rkt"
          "enum.rkt"
          "types.rkt")
 
-(def (seed [file-name "db/data.rkt"])
-  (call-with-output-file file-name
-    #:exists 'truncate
-    (lam (out) (wm axioms out))))
+(print-graph #t)
 
 (def db
-  (begin (unless (file-exists? "db/data.rkt")
-           (seed))
-         (call-with-input-file "db/data.rkt"
-           (lam (in) (read in)))))
+  (match (file-exists? "db/data.rkt")
+    [#t  (file->list "db/data.rkt")]
+    [#f  (map compress axioms)]))
+
+(def (seed)
+  (set! db (map compress axioms)))
 
 (def (num)
   (length db))
@@ -30,19 +29,19 @@
   (call-with-output-file filename
     #:exists 'truncate
     (lam (out)
-      (wm db out))))
+      (for ([m  db])
+        (wm m out)))))
 
 (def (view)
   (call-with-output-file "db/view.rkt"
     #:exists 'truncate
     (lam (out)
       (for ([m  db])
-        (dm (copy m '[0])
-            out)
+        (dm m out)
         (newline out)))))
 
 (def (query thm)
-  (for/or ([m  db])
+  (for/or ([m  (map decompress db)])
     (match (instance? thm (conclusion m))
       [#t  (dm m)]
       [#f  #f])))
