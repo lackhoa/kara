@@ -2,14 +2,18 @@
 (require "lang/kara.rkt"
          racket/struct)
 
-(struct point (x y)
-  #:methods gen:custom-write
-  [(define write-proc
-     (make-constructor-style-printer
-      (lambda (obj) 'fuckyou)
-      (lambda (obj) (list (point-x obj)
-                     (point-y obj)))))])
+(struct point (x y))
 
-(def l (list 1))
+(define write-proc
+  (make-constructor-style-printer
+   (lambda (obj) 'done)
+   (lambda (obj) (list (point-x obj)
+                  (point-y obj)))))
+
 (parameterize ([print-graph #t])
-  (print (point #f #f)))
+  (println (point #f #f)))
+
+(parameterize ([print-graph #t])
+  (write-proc (point #f #f)
+              (current-output-port)
+              #t))
