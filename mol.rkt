@@ -53,6 +53,7 @@
 (def (do&inform root path proc)
   ;; returns the root with `proc` done to `ref path` and its associates.
   ;; proc: mol -> mol | #f
+  ;; !! Can be replaced with 'while', but we must extract the path every time.
   (let/ec escape
     (for ([p  (ref-sync root path)])
       (match (proc (ref root p))
@@ -116,6 +117,7 @@
   ;; Establish a new synchronization, expand if needed.
   (begin
     #|Make sure the paths exist|#
+    #|Can be replaced by let, but even better, compose|#
     (set! root (update root p1))
     (set! root (update root p2)))
 
