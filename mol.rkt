@@ -7,20 +7,23 @@
 ;;; mol% <<decompress--compress>> cmol% --visualize>> vmol%
 
 ;;; Molcules
-(struct mol% (sync  #|at least one path|#
-              data  #|#f | symbol|#
-              kids  #|mols|#))
+;; sync:  at least one path
+;; data:  #f | symbol
+;; kids:  mols
 
-(def (new-root)
-  (mol% '([]) #f null))
+(def new-root '(([]) #f ()))
 
-(def (ref root path)
-  (match path
-    [(list)            root]
-    [(cons next rest)  (let ([kids  (mol%-kids root)])
-                         (and (<= next (last-index kids))
-                            (ref (list-ref kids next)
-                                 rest)))]))
+(def mol%-sync first)
+(def mol%-data second)
+(def mol%-kids third)
+
+(def ref
+  (compose first
+     (while (compose notnull? 2nd)
+       (pam (compose list-ref (pam (compose mol%-kids 1st)
+                             (compose car 2nd)))
+            (compose cdr 2nd)))
+     #|(mol path)|#))
 
 (def (ref-data root path)
   (match (ref root path)
