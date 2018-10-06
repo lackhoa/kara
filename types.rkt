@@ -9,7 +9,7 @@
 ;;; Axioms
 (def ai
   ;; A -> A
-  (sy (up (up (new-root)
+  (sy (up (up new-root
               '[] 'ai=>)
           '[0]    '->)
 
@@ -17,7 +17,7 @@
 
 (def ak
   ;; (-> A (-> B A))
-  (sy (up (up (up (new-root)
+  (sy (up (up (up new-root
                   '[] 'ak=>)
               '[0]    '->)
           '[0 1]      '->)
@@ -29,7 +29,7 @@
   ;;             (-> B C))
   ;;         (-> (-> A B)
   ;;             (-> A C))))
-  (let* ([r  (new-root)]
+  (let* ([r  new-root]
          [r  (up r '[]      'as=>)]
          [r  (up r '[0]     '->)]
          [r  (up r '[0 0]   '->)]
@@ -48,7 +48,7 @@
   ;; (=> A
   ;;     (=> (-> B A))
   ;;     (=> B))
-  (sy (sy (up (up (new-root)
+  (sy (sy (up (up new-root
                   '[]  'mp=>)
               '[1 0]  '->)
 
@@ -60,7 +60,7 @@
 ;;; Some theorems to prove
 (def w
   ;; (A -> (A -> B)) -> (A -> B)
-  (let ([m  (new-root)])
+  (let ([m  new-root])
     (update! m '[]      '->)
     (update! m '[0]     '->)
     (update! m '[0 0]   '?A)
@@ -74,7 +74,7 @@
 
 (def c
   ;; (A -> (B -> C)) -> (B -> (A -> C))
-  (let ([m  (new-root)])
+  (let ([m  new-root])
     (update! m '[]      '->)
     (update! m '[0]     '->)
     (update! m '[0 0]   '?A)

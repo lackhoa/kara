@@ -8,7 +8,7 @@
 
 (test-case
  "Introduction"
- (def root (new-root))
+ (def root new-root)
  (update! root '[] 'I)
  (update! root '[0] 'A)
  (check-false (update (dc root) '[0] 'NOT-A))
@@ -16,7 +16,7 @@
 
 (test-case
  "Update working with sync"
- (def root (new-root))
+ (def root new-root)
  (sync! root '[0] '[1])
  (update! root '[0] 'A)
  (check-eq? (ref-data (dc root) '[1])
@@ -32,7 +32,7 @@
 
 (test-case
  "Representation"
- (def root (new-root))
+ (def root new-root)
  (update! root '[0])
  (update! root '[1 0])
  (sync! root '[0] '[1 0])
@@ -42,12 +42,12 @@
  (sync! root '[3] '[4])
  (update! root '[5])
  (displayln "0 = 1-0; 3 = 4")
- (dm (dc root)) (newline)
+ (dm (dc root))
  )
 
 (test-case
  "Synchronization"
- (def root (new-root))
+ (def root new-root)
  (update! root '[0] 'A)
  (sync! root '[0] '[1])
  (check-eq? (ref-data (dc root) '[1])
@@ -58,7 +58,7 @@
 
 (test-case
  "Cyclical synchronization"
- (def root (new-root))
+ (def root new-root)
  (update! root '[0 0])
  (sync! root '[0 0] '[1])
  (check-false (sync (dc root) '[0] '[1]))
@@ -67,23 +67,23 @@
 
 (test-case
  "Inter-root synchronization"
- (def model1 (sync (new-root) '[0] '[1]))
- (def model2 (sync (new-root) '[1] '[2]))
+ (def model1 (sync new-root '[0] '[1]))
+ (def model2 (sync new-root '[1] '[2]))
 
- (def r (update (new-root) '[0] 'T))
+ (def r (update new-root '[0] 'T))
  (pull! r '[] model1)
  (pull! r '[] model2)
  (sync! r '[2] '[3])
  (displayln "0 = 1 = 2 = 3")
- (dm (dc r)) (newline)
+ (dm (dc r))
  )
 
 (test-case
  "Inter-root cycle"
- (def r1 (new-root))
+ (def r1 new-root)
  (sync! r1 '[0] '[1])
 
- (def r2 (new-root))
+ (def r2 new-root)
  (sync! r2 '[1] '[0 0])
  (check-false (pull (dc r2) '[] r1))
  (check-false (pull (dc r1) '[] r2))
@@ -91,10 +91,10 @@
 
 (test-case
  "Inter-root without cycle"
- (def r1 (new-root))
+ (def r1 new-root)
  (sync! r1 '[0] '[1])
 
- (def r2 (new-root))
+ (def r2 new-root)
  (sync! r2 '[1] '[2 0])
  (newline) (displayln "0 = 1 = 2-0")
  (dm (pull r2 '[] r1))
@@ -102,10 +102,10 @@
 
 (test-case
  "Inter-root advanced"
- (def model (new-root))
+ (def model new-root)
  (sync! model '[0] '[1 0])
 
- (def r (new-root))
+ (def r new-root)
  (update! r '[0] 'N)
  (pull! r '[] model)
  (check-eq? (ref-data (dc r) '[1 0])
@@ -115,11 +115,11 @@
  "Advanced shit"
  (def sy sync)
  (def up update)
- (def ai (sy (up (up (new-root) '[] 'ai=>) '[0] '->) '[0 0] '[0 1]))
+ (def ai (sy (up (up new-root '[] 'ai=>) '[0] '->) '[0 0] '[0 1]))
 
- (def ak (sy (up (up (up (new-root) '[] 'ak=>) '[0] '->) '[0 1] '->) '[0 0] '[0 1 1]))
+ (def ak (sy (up (up (up new-root '[] 'ak=>) '[0] '->) '[0 1] '->) '[0 0] '[0 1 1]))
 
- (def mp (sy (sy (up (up (new-root) '[]  'mp=>) '[1 0]  '->) '[0]  '[1 0 1]) '[1 0 0]  '[2 0]))
+ (def mp (sy (sy (up (up new-root '[]  'mp=>) '[1 0]  '->) '[0]  '[1 0 1]) '[1 0 0]  '[2 0]))
 
  (newline) (displayln "Let's begin MOTHERFUCKER!")
  (def rt mp)
@@ -135,7 +135,7 @@
 
 (test-case
  "Tricky topology"
- (def m (new-root))
+ (def m new-root)
  (sync! m '[0 0 0] '[2])
  (check-not-false (member '[2]
                           (ref-sync (dc m) '[0 0 0])))
