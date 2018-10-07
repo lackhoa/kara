@@ -82,10 +82,22 @@
 (def (update root
              path
              [val  #f])
-  ;; Used to update or expand
-  ;; if val is #f, do not overwrite existing data
+  ;; Update (val != #f) or Expand (val = #f)
+  (def (pad-kids mol kids last-id)
+    (mol%-set-kids mol
+                   (let* ([missing  (range (add1 (last-index kids))
+                                           (add1 last-id))]
+                          [fillers  (for/list ([i  missing])
+                                      (mol% (for/list ([p  (mol%-sync mol)])
+                                              (rcons p i))
+                                            #f
+                                            null
+                                            #|new mole inheriting sync list|#))])
+                     (append kids fillers))))
+
   (let loop ([rel  #|path so far|# null]
-             [path #|path left|#   path])
+             [path #|path left|#   path]
+             [root #|root state|#  root])
     (match path
       [(list)  (match* ((ref-data root rel) val)
                  [(x x)   root]
@@ -97,24 +109,15 @@
 
       [(cons next-id rest-path)
        (let ([kids  (ref-kids root rel)])
-         (when (< (last-index kids)
-                  next-id)
-           (set! root
-             (do&inform
-              root
-              rel
-              (lam (m)
-                (mol%-set-kids m (let* ([missing-indices  (range (add1 (last-index kids))
-                                                                 (add1 next-id))]
-                                        [fillers  (for/list ([i missing-indices])
-                                                    (mol% (for/list ([p (mol%-sync m)])
-                                                            (rcons p i))
-                                                          #f
-                                                          null
-                                                          #|empty mole with inherited sync list|#))])
-                                   (append kids fillers))))))))
-       (loop (rcons rel next-id)
-             rest-path)])))
+         (loop (rcons rel next-id)
+               rest-path
+               (match (< (last-index kids)
+                         next-id  #|Need to expand?|#)
+                 [#f  root]
+                 [#t  (do&inform root
+                                 rel
+                                 (lam (m)
+                                   (pad-kids m kids next-id)))])))])))
 
 (def (kids-paths root path)
   ;; Very helpful utility.
