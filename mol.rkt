@@ -131,68 +131,60 @@
     [(list)  0]
     [kids    (add1 (apply max (map height kids)))]))
 
-(def (sync root p1 p2)
-  ;; Establish a new synchronization, expand if needed.
-  (begin
-    #|Make sure the paths exist|#
-    (set! root (update root p1))
-    (set! root (update root p2)))
-
+(def (sync root path1 path2)
+  ;; Establish a new synchronization, update if needed.
   (def max-height
     #|watch the height to detect cycle|#
-    (max (height (ref root p1))
-         (height (ref root p2))))
+    (max (height (ref root path1))
+         (height (ref root path2))))
 
-  (let loop ([fp1  p1] [fp2  p2])
-    (let/ec escape
-      (when (member fp1 (ref-sync root fp2))
-        #|Save ourselves some time here|#
-        (escape root))
+  (def (sync-data root p1 p2 m1 m2)
+    (match* ((mol%-data m1)
+             (mol%-data m2))
+      [(x x)    root]
+      [(#f d2)  (update root p1 d2)]
+      [(d1 #f)  (update root p2 d1)]
+      [(_ _)    #f]))
 
-      (match* ((ref-data root fp1)
-               (ref-data root fp2))
-        [(x x)    (void)]
-        [(#f d2)  (set! root  (update root fp1 d2))]
-        [(d1 #f)  (set! root  (update root fp2 d1))]
-        [(_ _)    (escape #f)])
+  (def (level-kids root p1 p2 m1 m2)
+    (let ([i1  (last-index (mol%-kids m1))]
+          [i2  (last-index (mol%-kids m1))])
+      ;; Add the missing kids
+      (cond [(< i1 i2)  (update root (rcons p1 i2))]
+            [(> i1 i2)  (update root (rcons p2 i1))]
+            [else       root])))
 
-      (let ([i1  (last-index (ref-kids root fp1))]
-            [i2  (last-index (ref-kids root fp2))])
-        ;; Add the missing kids
-        (cond [(< i1 i2)
-               (set! root (update root
-                                  (rcons fp1 i2)))]
+  (def (sync-sync root p1 p2 m1 m2)
+    (let* ([combined  (set-union (mol%-sync m1)
+                                 (mol%-sync m2))]
+           [proc      (lam (m)
+                        (mol%-set-sync m combined))])
+      #|Establish the connections|#
+      (do&inform (do&inform root p1 proc) p2 proc)))
 
-              [(> i1 i2)
-               (set! root (update root
-                                  (rcons fp2 i1)))])
-
-        (when (> (max (height (ref root p1))
-                      (height (ref root p2)))
-                 max-height)
-          (escape #f)))
-
-      (let ([combined  (set-union (ref-sync root fp1)
-                                  (ref-sync root fp2))])
-        #|Establish the connections|#
-        (set! root
-          (do&inform root
-                     fp1
-                     (lam (m)
-                       (mol%-set-sync m combined))))
-        (set! root
-          (do&inform root
-                     fp2
-                     (lam (m)
-                       (mol%-set-sync m combined)))))
-
-      (for ([new-fp1 (kids-paths root fp1)]
-            [new-fp2 (kids-paths root fp2)])
-        ;; Our job is over, let the kids sync
-        (match (loop new-fp1 new-fp2)
-          [#f        (escape #f)]
-          [new-root  (set! root new-root)]))
-      root)))
+  (let loop ([root (update (update root p1) p2)]
+             [p1   path1]
+             [p2   path2]
+             [m1   (ref root p1)]
+             [m2   (ref root p2)])
+    (match (bool (member fp1 (ref-sync root fp2)))
+      [#t  root]
+      [#f  (>> root
+               (lam (r) (sync-data r p1 p2 m1 m2))
+               (lam (r) (level-kids r p1 p2 m1 m2))
+               (lam (r) (> (max (height (ref r path1))
+                              (height (ref r path2)))
+                         max-height))
+               (lam (r) (sync-sync r p1 p2 m1 m2))
+               (lam (r)
+                 (for/fold ([r  r]) ([new-p1  (kids-paths r p1)]
+                                     [new-p2  (kids-paths r p2)]
+                                     [new-m1  (mol%-kids m1)]
+                                     [new-m2  (mol%-kids m2)])
+                   #:break (not r)
+                   (loop r
+                         new-p1 new-p2
+                         new-m1 new-m2))))])))
 
 (def (migrate root from to)
   ;; Migrate the molecule from root-`from` to ?-`to`
