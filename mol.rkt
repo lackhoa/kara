@@ -51,30 +51,33 @@
     [#f                (list path)]
     [(list sync _ _ )  sync]))
 
-(def (replace mol path new)
+(def (replace mol paths new)
   ;; Crucial auxiliary function
-  (let loop ([path  path]
-             [m     mol])
-    (match path
-      [(list)               new]
-      [(cons next-id rest)
-       (mol%-set-kids m (list-set (mol%-kids m)
-                                  next-id
-                                  (loop rest
-                                        (list-ref (mol%-kids m)
-                                                  next-id))))])))
+  ;; No path can contain another
+  (match paths
+    ['([])  new  #|Directed to root|#]
+    [_
+     (let loop ([paths  paths  #|Will be shortened every cycle|#]
+                [m      mol])
+       (mol%-set-kids m
+                      (for/list ([kid  (mol%-kids m)]
+                                 [i    (in-naturals)])
+                        (match (map cdr
+                                    (filter (lam (p)  (eq? (car p) i))
+                                            paths  #|No path can be empty|#))
+                          ['()        kid]
+                          ['([])      new]
+                          [new-paths  (loop new-paths kid)]))))]))
 
 (def (do&inform root path proc)
   ;; returns the root with `proc` done to `ref path` and its associates.
   ;; proc: mol -> mol | #f
-  (let/ec escape
-    (for ([p  (ref-sync root path)])
-      (match (proc (ref root p))
-        [#f       (escape #f)]
-        [new-mol  (set! root (replace root
-                                      p
-                                      new-mol))]))
-    root))
+  (let ([sl  (ref-sync root path)])
+    (match (proc (ref root (car sl)))
+      [#f       #f]
+      [new-mol  (replace root
+                         sl
+                         new-mol)])))
 
 (def (update root
              path
@@ -207,7 +210,7 @@
 
 (def (attach root branch to)
   (replace (update root to)
-           to
+           `(,to)
            (migrate branch '[] to)))
 
 (def (detach root path)
