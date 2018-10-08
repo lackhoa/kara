@@ -148,31 +148,33 @@
             [else       root])))
 
   (def (sync-sync root p1 p2)
-    (let* ([combined  (append (ref-sync root p1)
-                              (ref-sync root p2))]
-           [proc      (lam (m)
-                        (mol%-set-sync m combined))])
-      #|Establish the connections|#
-      (do&inform (do&inform root p1 proc) p2 proc)))
+    (def (incest? p1 p2  #|Naming much?|#)
+      (let-values ([(tl1 tl2)
+                    (drop-common-prefix p1 p2)])
+        (or (null? tl1) (null? tl2))))
+
+    (let ([sy1  (ref-sync root p1)]
+          [sy2  (ref-sync root p2)])
+      (and (not (for*/or ([p1  sy1]
+                      [p2  sy2])
+              (incest? p1 p2)))
+
+         (let ([proc  (lam (m)
+                        (mol%-set-sync m (append sy1 sy2)))])
+           #|Establish the connections|#
+           (do&inform (do&inform root p1 proc) p2 proc)))))
 
   (let* ([root        (update root path1)]
-         [root        (update root path2)]
-         [cap-height  (max (height (ref root path1))
-                           (height (ref root path2)))
-                      #|watch the height to detect cycle|#])
+         [root        (update root path2)])
     (let loop ([root  root]
                [p1    path1]
                [p2    path2])
       (match (bool (member p1 (ref-sync root p2)))
         [#t  root]
         [#f  (>> root
-                 (lam (r) (sync-data r p1 p2))
+                 (lam (r) (sync-data  r p1 p2))
                  (lam (r) (level-kids r p1 p2))
-                 (lam (r) (and (<= (max (height (ref r path1))
-                                   (height (ref r path2)))
-                              cap-height)
-                           r))
-                 (lam (r) (sync-sync r p1 p2))
+                 (lam (r) (sync-sync  r p1 p2))
                  (lam (r)
                    (for/fold ([r  r]) ([new-p1  (kids-paths r p1)]
                                        [new-p2  (kids-paths r p2)])
@@ -215,7 +217,6 @@
               '[1])
         (lam (unified)
           (detach unified '[0])))))
-(trace pull)
 
 (def (compress root)
   (let ([dic null  #|Map of sync list to cmol|#])
