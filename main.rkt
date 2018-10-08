@@ -3,6 +3,7 @@
          "mol.rkt"
          "enum.rkt"
          "types.rkt")
+(provide (all-defined-out))
 
 (print-graph #t)
 
