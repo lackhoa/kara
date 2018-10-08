@@ -22,7 +22,7 @@
   (repeat times
           (thunk (set! db (combine db)))))
 
-(def (col [times 5])
+(def (col [times 10])
   (repeat times
           (thunk (set! db (collide db)))))
 
