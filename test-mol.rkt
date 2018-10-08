@@ -3,9 +3,22 @@
          "mol.rkt"
          rackunit)
 
+;;; Preparation
 (def dc
   (compose decompress compress))
 
+;;; Assignment (NOT mutation)
+(define-syntax-rule (update! iden more ...)
+  (set! iden (update iden more ...)))
+
+(define-syntax-rule (sync! iden more ...)
+  (set! iden (sync iden more ...)))
+
+(define-syntax-rule (pull! iden more ...)
+  (set! iden (pull iden more ...)))
+
+
+;;; Test zone
 (test-case
  "Introduction"
  (def root new-root)
@@ -67,9 +80,9 @@
 
 (test-case
  "Inter-root synchronization"
+ (newline)
  (def model1 (sync new-root '[0] '[1]))
  (def model2 (sync new-root '[1] '[2]))
-
  (def r (update new-root '[0] 'T))
  (pull! r '[] model1)
  (pull! r '[] model2)
