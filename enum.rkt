@@ -92,9 +92,9 @@
 
 (def (combine database)
   (def (make-mp fun arg)
-    (match (pull mp '[1] fun)
-      [#f   #f]
-      [mol  (pull mol '[2] arg)]))
+    (>> (pull mp '[1] fun)
+        (lam (mol)
+          (pull mol '[2] arg))))
 
   (let* ([len  (length database)]
          [fst  (decompress (list-ref database
@@ -102,7 +102,7 @@
          [snd  (decompress (list-ref database
                                      (random len)))])
     (match (make-mp fst snd)
-      [#f   database  #|conflict|#]
+      [#f   database]
       [new  (let ([cn  (conclusion new)])
               (match (> (height cn) 30)
                 [#t  database  #|Gotta do w/o this one|#]
