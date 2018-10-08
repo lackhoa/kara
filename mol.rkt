@@ -75,9 +75,7 @@
   (let ([sl  (ref-sync root path)])
     (match (proc (ref root (car sl)))
       [#f       #f]
-      [new-mol  (replace root
-                         sl
-                         new-mol)])))
+      [new-mol  (replace root sl new-mol)])))
 
 (def (update root
              path
@@ -157,12 +155,8 @@
       #|Establish the connections|#
       (do&inform (do&inform root p1 proc) p2 proc)))
 
-  (let* ([root        (match (ref root path1)
-                        [#f  (update root path1)]
-                        [_   root])]
-         [root        (match (ref root path2)
-                        [#f  (update root path2)]
-                        [_   root])]
+  (let* ([root        (update root path1)]
+         [root        (update root path2)]
          [cap-height  (max (height (ref root path1))
                            (height (ref root path2)))
                       #|watch the height to detect cycle|#])
@@ -221,31 +215,30 @@
               '[1])
         (lam (unified)
           (detach unified '[0])))))
+(trace pull)
 
 (def (compress root)
   (let ([dic null  #|Map of sync list to cmol|#])
     (let loop ([mol  root])
-      (match (for/or ([pair  dic])
-               (if (member (car (mol%-sync mol))
-                           (car pair))
-                   pair
-                   #f))
-        [#f            (let ([res  (cmol% (mol%-data mol)
-                                          (map loop (mol%-kids mol)))])
-                         (cons! (cons (mol%-sync mol)
-                                      res)
-                                dic)
-                         res)]
-        [(cons _ any)  any]))))
+      (match (findf (lam (pair)
+                      (member (car (mol%-sync mol))
+                              (car pair)))
+                    dic)
+        [#f             (let ([res  (cmol% (mol%-data mol)
+                                           (map loop (mol%-kids mol)))])
+                          (cons! (cons (mol%-sync mol)
+                                       res)
+                                 dic)
+                          res)]
+        [(cons _ cmol)  cmol]))))
 
 (def (decompress cmol)
   (let ([topo  (topology cmol)])
     (let loop ([cm    cmol]
                [path  null])
-      (mol% (for/or ([sync-ls topo])
-              (if (member path sync-ls)
-                  sync-ls
-                  #f))
+      (mol% (findf (lam (sync-ls)
+                     (member path sync-ls))
+                   topo)
             (cmol%-data cm)
             (for/list ([kid  (cmol%-kids cm)]
                        [i    (in-naturals)])

@@ -6,6 +6,17 @@
 (def up update)
 (def sy sync)
 
+;;; Assignment (NOT mutation)
+(define-syntax-rule (update! iden more ...)
+  (set! iden (update iden more ...)))
+
+(define-syntax-rule (sync! iden more ...)
+  (set! iden (sync iden more ...)))
+
+(define-syntax-rule (pull! iden more ...)
+  (set! iden (pull iden more ...)))
+
+
 ;;; Axioms
 (def ai
   ;; A -> A

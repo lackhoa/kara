@@ -6,31 +6,27 @@
 (provide (all-defined-out))
 
 (def (instance? ins model)
-  (displayln (max (height ins)
-                  (height model)))
-
   ;; Check if `ins` is an instance? of `model`
   (def (ctor-arity s)
     (case s
       [(->)   2]
-      [else  0]))
+      [else  0  #|Enable the use of arbitrary variables|#]))
 
   (def (same? root path1 path2)
     ;; the meaning of uttering "path1 is synced with path2"
-    (begin (update! root path1)
-           (update! root path2))
-
-    (let ([mol1  (ref root path1)]
-          [mol2  (ref root path2)])
+    (let* ([root  (update root path1)]
+           [root  (update root path2)]
+           [mol1  (ref root path1)]
+           [mol2  (ref root path2)])
       (orb (member path1 (mol%-sync mol2))
            (let ([ctor  (mol%-data mol1)])
              (match (mol%-data mol2)
                [#f        #f]
                [(== ctor)  (let ([kpaths1  (kids-paths root path1)]
                                 [kpaths2  (kids-paths root path2)])
-                            (andb (eq*? (ctor-arity ctor)
-                                        (length kpaths1)
-                                        (length kpaths2))
+                            (andb (eq? (ctor-arity ctor)
+                                       (length kpaths1)
+                                       (length kpaths2))
                                   (for/andb ([kp1  kpaths1]
                                              [kp2  kpaths2])
                                     (same? root kp1 kp2))))]
@@ -71,8 +67,6 @@
                [cm1    (car pool)]
                [m1     (decompress (car pool))]
                [pool   (cdr pool)])
-      (assert (cmol%? cm1) "Type is correct")
-      (assert (mol%?  m1)  "Type is correct")
       (match pool
         [(list)           (cons cm1 new-db)]
         [(cons cm2 mrst)  (let* ([m2  (decompress cm2)]
