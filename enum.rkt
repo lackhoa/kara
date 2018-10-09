@@ -1,7 +1,8 @@
 #lang racket
 (require "lang/kara.rkt"
          "mol.rkt"
-         "types.rkt")
+         "types.rkt"
+         future-visualizer)
 
 (provide (all-defined-out))
 
@@ -59,36 +60,46 @@
   (detach root '[0]))
 
 (def (collide database)
-  (def (log-discard c1 c2)
-    (display "-"))
+  (def (core-collide database)
+    ;; Work on a single core
+    (def (log-discard c1 c2)
+      (display "-"))
 
-  (let ([pool  (shuffle database)])
-    (let loop ([new-db null]
-               [cm1    (car pool)]
-               [m1     (decompress (car pool))]
-               [pool   (cdr pool)])
-      (match pool
-        [(list)           (cons cm1 new-db)]
-        [(cons cm2 mrst)  (let* ([m2  (decompress cm2)]
-                                 [c1  (conclusion m1)]
-                                 [c2  (conclusion m2)])
-                            (match (instance? c1 c2)
-                              [#t  (match (< (complexity c1)
-                                             (complexity c2))
-                                     [#t  (match (instance? c2 c1)
-                                            [#t  (log-discard c2 c1)
-                                                 (loop new-db  cm1  m1  mrst)]
-                                            [#f  (log-discard c1 c2)
-                                                 (loop new-db  cm2  m2  mrst)])]
-                                     [#f  (log-discard c1 c2)
-                                          (loop new-db  cm2  m2  mrst)])]
-                              [#f  (match (instance? c2 c1)
-                                     [#t   (log-discard c2 c1)
-                                           (loop new-db  cm1  m1  mrst)]
-                                     [#f  (loop (cons cm1 new-db)
-                                                cm2
-                                                m2
-                                                mrst)])]))]))))
+    (let ([pool  database])
+      (let loop ([new-db null]
+                 [cm1    (car pool)]
+                 [m1     (decompress (car pool))]
+                 [pool   (cdr pool)])
+        (match pool
+          [(list)           (cons cm1 new-db)]
+          [(cons cm2 mrst)  (let* ([m2  (decompress cm2)]
+                                   [c1  (conclusion m1)]
+                                   [c2  (conclusion m2)])
+                              (match (instance? c1 c2)
+                                [#t  (match (< (complexity c1)
+                                               (complexity c2))
+                                       [#t  (match (instance? c2 c1)
+                                              [#t  (log-discard c2 c1)
+                                                   (loop new-db  cm1  m1  mrst)]
+                                              [#f  (log-discard c1 c2)
+                                                   (loop new-db  cm2  m2  mrst)])]
+                                       [#f  (log-discard c1 c2)
+                                            (loop new-db  cm2  m2  mrst)])]
+                                [#f  (match (instance? c2 c1)
+                                       [#t   (log-discard c2 c1)
+                                             (loop new-db  cm1  m1  mrst)]
+                                       [#f  (loop (cons cm1 new-db)
+                                                  cm2
+                                                  m2
+                                                  mrst)])]))]))))
+
+  (let-values ([(db1 db2)  (split-at (shuffle database)
+                                     (floor (/ (length database)
+                                               2)))])
+    (visualize-futures
+     (let ([f  (future (thunk (core-collide db2)))])
+       (let ([now  (core-collide db1)])
+         (append now (touch f)))))))
 
 (def (combine database)
   (def (make-mp fun arg)

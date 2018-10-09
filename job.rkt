@@ -5,8 +5,9 @@
          "types.rkt"
          "main.rkt")
 
-(for ([i  (in-range 100)])
+(for ([i  (in-range 1)])
   (pydisplay "Cycle number:" i)
-  (com)
-  (col)
+  (time (com 1))
+  (time (col 1))
+  (displayln (num))
   (save))
