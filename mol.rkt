@@ -32,30 +32,25 @@
   (match path
     [(list)            root]
     [(cons next rest)  (let ([kids  (mol%-kids root)])
-                         (and (<= next (last-index kids))
-                            (ref (list-ref kids next)
-                                 rest)))]))
+                         (with-handlers ([exn:fail:contract?  (const  #f)])
+                           (ref (list-ref kids next)
+                                rest)))]))
 
 (def (ref-data root path)
-  (match (ref root path)
-    [#f               #f]
-    [(list _ dat _)   dat]))
+  (mol%-data (ref root path)))
 
 (def (ref-kids root path)
-  (match (ref root path)
-    [#f               null]
-    [(list _ _ kids)  kids]))
+  (mol%-kids (ref root path)))
 
 (def (ref-sync root path)
-  (match (ref root path)
-    [#f                (list path)]
-    [(list sync _ _ )  sync]))
+  (mol%-sync (ref root path)))
 
 (def (replace mol paths new)
   ;; Crucial auxiliary function
-  ;; No path can contain another
+  ;; No path can be a prefix of another
   (match paths
-    ['([])  new  #|Directed to root|#]
+    ['([])
+     new  #|Directed to root|#]
     [_
      (let loop ([paths  paths  #|Will be shortened every cycle|#]
                 [m      mol])
