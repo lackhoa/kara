@@ -11,7 +11,7 @@
   (def (ctor-arity s)
     (case s
       [(->)   2]
-      [else  0  #|Enable the use of arbitrary variables|#]))
+      [else  0  #|This enables the use of arbitrary variables|#]))
 
   (def (same? root path1 path2)
     ;; the meaning of uttering "path1 is synced with path2"
@@ -33,24 +33,18 @@
                                     (same? root kp1 kp2))))]
                [_         #f])))))
 
-  (let/ec escape
-    (let loop ([path  '[]])
-      (let ([recur  (thunk
-                     (for ([kid-path  (kids-paths model path)])
-                       (loop kid-path)))])
-        (match (ref-data model path)
-          [#f  (recur)]
-          [md  (match (ref-data ins path)
-                 [md  (recur)]
-                 [_   (escape #f)])]))  #|Data requirement|#)
+  (let loop ([path  '[]])
+    (andb (match (ref-data model path)
+            [#f  #t]
+            [md  (eq? md (ref-data ins path))])
 
-    (let loop ([path  '[]])
-      (let* ([sync-ls   (ref-sync model path)]
-             [pcentral  (car sync-ls)])
-        (andb (for/andb ([p  (cdr sync-ls)])
-                (same? ins pcentral p))
-              (for/andb ([kid-path  (kids-paths model path)])
-                (loop kid-path))))  #|Topology requirement|#)))
+          (let* ([sync-ls  (ref-sync model path)]
+                 [pct      (car sync-ls)])
+            (for/andb ([p  (cdr sync-ls)])
+              (same? ins pct p)) #|topology|#)
+
+          (for/andb ([kid-path  (kids-paths model path)])
+            (loop kid-path)))))
 
 (def (complexity m)
   (add1 (sum-list (map complexity

@@ -37,13 +37,16 @@
                                 rest)))]))
 
 (def (ref-data root path)
-  (mol%-data (ref root path)))
+  (with-handlers ([exn:fail:contract?  (const  #f)])
+    (mol%-data (ref root path))))
 
 (def (ref-kids root path)
-  (mol%-kids (ref root path)))
+  (with-handlers ([exn:fail:contract?  (const  #f)])
+    (mol%-kids (ref root path))))
 
 (def (ref-sync root path)
-  (mol%-sync (ref root path)))
+  (with-handlers ([exn:fail:contract?  (const  #f)])
+    (mol%-sync (ref root path))))
 
 (def (replace mol paths new)
   ;; Crucial auxiliary function
