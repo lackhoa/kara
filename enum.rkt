@@ -14,7 +14,7 @@
       [else  0  #|Enable the use of arbitrary variables|#]))
 
   (def (same? root path1 path2)
-    ;; the meaning of uttering "path1 is synced with path2"
+    ;; the meaning of "path1 is synced with path2"
     (let* ([root  (update root path1)]
            [root  (update root path2)]
            [mol1  (ref root path1)]
