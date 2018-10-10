@@ -11,46 +11,44 @@
   (def (ctor-arity s)
     (case s
       [(->)   2]
-      [else  0  #|Enable the use of arbitrary variables|#]))
+      [else  0  #|This enables the use of arbitrary variables|#]))
 
   (def (same? root path1 path2)
-    ;; the meaning of "path1 is synced with path2"
-    (let* ([root  (update root path1)]
-           [root  (update root path2)]
-           [mol1  (ref root path1)]
-           [mol2  (ref root path2)])
-      (orb (member path1 (mol%-sync mol2))
-           (let ([ctor  (mol%-data mol1)])
-             (match (mol%-data mol2)
-               [#f        #f]
-               [(== ctor)  (let ([kpaths1  (kids-paths root path1)]
-                                [kpaths2  (kids-paths root path2)])
-                            (andb (eq? (ctor-arity ctor)
-                                       (length kpaths1)
-                                       (length kpaths2))
-                                  (for/andb ([kp1  kpaths1]
-                                             [kp2  kpaths2])
-                                    (same? root kp1 kp2))))]
-               [_         #f])))))
+    ;; the meaning of uttering "path1 is synced with path2"
+    (let ([mol1  (ref root path1)]
+          [mol2  (ref root path2)])
+      (match (andb mol1 mol2)
+        [#t  (orb (member path1 (mol%-sync mol2))
+                  (let ([ctor  (mol%-data mol1)])
+                    (match (mol%-data mol2)
+                      [#f        #f]
+                      [(== ctor)  (let ([kpaths1  (kids-paths root path1)]
+                                       [kpaths2  (kids-paths root path2)])
+                                   (andb (eq? (ctor-arity ctor)
+                                              (length kpaths1)
+                                              (length kpaths2))
+                                         (for/andb ([kp1  kpaths1]
+                                                    [kp2  kpaths2])
+                                           (same? root kp1 kp2))))]
+                      [_         #f])))]
+        [#f  (andb (not (orb mol1 mol2)
+                      #|If they were synced, both would exist|#)
+                   (same? root
+                          (rcdr path1)
+                          (rcdr path2)))])))
 
-  (let/ec escape
-    (let loop ([path  '[]])
-      (let ([recur  (thunk
-                     (for ([kid-path  (kids-paths model path)])
-                       (loop kid-path)))])
-        (match (ref-data model path)
-          [#f  (recur)]
-          [md  (match (ref-data ins path)
-                 [md  (recur)]
-                 [_   (escape #f)])]))  #|Data requirement|#)
+  (let loop ([path  '[]])
+    (andb (match (ref-data model path)
+            [#f  #t]
+            [md  (eq? md (ref-data ins path))]  #|Data|#)
 
-    (let loop ([path  '[]])
-      (let* ([sync-ls   (ref-sync model path)]
-             [pcentral  (car sync-ls)])
-        (andb (for/andb ([p  (cdr sync-ls)])
-                (same? ins pcentral p))
-              (for/andb ([kid-path  (kids-paths model path)])
-                (loop kid-path))))  #|Topology requirement|#)))
+          (let* ([sync-ls  (ref-sync model path)]
+                 [pct      (car sync-ls)])
+            (for/andb ([p  (cdr sync-ls)])
+              (same? ins pct p)) #|Topology|#)
+
+          (for/andb ([kid-path  (kids-paths model path)])
+            (loop kid-path)  #|Recursion|#))))
 
 (def (complexity m)
   (add1 (sum-list (map complexity

@@ -18,21 +18,21 @@
 
 (test-case
  "Generality"
- (check-not-false (instance? new-root
-                             new-root))
- (check-not-false (instance? new-root
-                             (update new-root '[] '->)))
- (check-not-false (instance? (update new-root '[] '->)
-                             (update new-root '[] '->)))
- (check-not-false (instance? (sync (update (update new-root '[0] '->)
-                                           '[1] '->)
-                                   '[0] '[1])
-                             (sync new-root '[0] '[1])))
+ (check-true (instance? new-root
+                        new-root))
+ (check-false (instance? new-root
+                         (update new-root '[] '->)))
+ (check-true (instance? (update new-root '[] '->)
+                        (update new-root '[] '->)))
+ (check-true (instance? (sync (update (update new-root '[0] '->)
+                                      '[1] '->)
+                              '[0] '[1])
+                        (sync new-root '[0] '[1])))
  (let ([base (sync (sync new-root '[0] '[1]) '[2] '[3])])
    (check-false (instance? base
                            (sync base '[1] '[2])))
-   (check-not-false (instance? (sync base '[1] '[2])
-                               base))))
+   (check-true (instance? (sync base '[1] '[2])
+                          base))))
 
 (test-case
  "Multi-leveled"
@@ -47,7 +47,7 @@
      (sync! m '[0 0 1] '[0 1 1]) (sync! m '[0 1 1] '[1 0 1]) (sync! m '[1 0 1] '[1 1 1])
      m))
 
- (check-not-false (instance? r a->a))
+ (check-true (instance? r a->a))
  (check-false     (instance? a->a r)))
 
 (test-case
@@ -61,7 +61,7 @@
    (let ([update! update] [sync! sync])
      (sync! (sync! (update! (update! (update! (update! new-root '[] '->) '[0] '->) '[1] '->) '[1 1] '->) '[0 0] '[1 1 0]) '[0 1] '[1 1 1])))
 
- (check-not-false (instance? r2 r1))
- (check-not-false (instance? r1 r2))
+ (check-true (instance? r2 r1))
+ (check-false (instance? r1 r2))
  (check-true (< (complexity r1)
                 (complexity r2))))
