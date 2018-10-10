@@ -40,15 +40,15 @@
   (let loop ([path  '[]])
     (andb (match (ref-data model path)
             [#f  #t]
-            [md  (eq? md (ref-data ins path))])
+            [md  (eq? md (ref-data ins path))]  #|Data|#)
 
           (let* ([sync-ls  (ref-sync model path)]
                  [pct      (car sync-ls)])
             (for/andb ([p  (cdr sync-ls)])
-              (same? ins pct p)) #|topology|#)
+              (same? ins pct p)) #|Topology|#)
 
           (for/andb ([kid-path  (kids-paths model path)])
-            (loop kid-path)))))
+            (loop kid-path)  #|Recursion|#))))
 
 (def (complexity m)
   (add1 (sum-list (map complexity
