@@ -15,23 +15,27 @@
 
   (def (same? root path1 path2)
     ;; the meaning of uttering "path1 is synced with path2"
-    (let* ([root  (update root path1)]
-           [root  (update root path2)]
-           [mol1  (ref root path1)]
-           [mol2  (ref root path2)])
-      (orb (member path1 (mol%-sync mol2))
-           (let ([ctor  (mol%-data mol1)])
-             (match (mol%-data mol2)
-               [#f        #f]
-               [(== ctor)  (let ([kpaths1  (kids-paths root path1)]
-                                [kpaths2  (kids-paths root path2)])
-                            (andb (eq? (ctor-arity ctor)
-                                       (length kpaths1)
-                                       (length kpaths2))
-                                  (for/andb ([kp1  kpaths1]
-                                             [kp2  kpaths2])
-                                    (same? root kp1 kp2))))]
-               [_         #f])))))
+    (let ([mol1  (ref root path1)]
+          [mol2  (ref root path2)])
+      (match (andb mol1 mol2)
+        [#t  (orb (member path1 (mol%-sync mol2))
+                  (let ([ctor  (mol%-data mol1)])
+                    (match (mol%-data mol2)
+                      [#f        #f]
+                      [(== ctor)  (let ([kpaths1  (kids-paths root path1)]
+                                       [kpaths2  (kids-paths root path2)])
+                                   (andb (eq? (ctor-arity ctor)
+                                              (length kpaths1)
+                                              (length kpaths2))
+                                         (for/andb ([kp1  kpaths1]
+                                                    [kp2  kpaths2])
+                                           (same? root kp1 kp2))))]
+                      [_         #f])))]
+        [#f  (andb (not (orb mol1 mol2)
+                      #|If they were synced, both would exist|#)
+                   (same? root
+                          (rcdr path1)
+                          (rcdr path2)))])))
 
   (let loop ([path  '[]])
     (andb (match (ref-data model path)
