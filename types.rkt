@@ -99,6 +99,21 @@
     (update! m '[1 1 1] '?C)
     m))
 
+(def b
+  ;; (B -> C) -> ((A -> B) -> (A -> C))
+  (>> new-root
+      (lam (m)  (update m '[]      '->))
+      (lam (m)  (update m '[0]     '->))
+      (lam (m)  (update m '[1]     '->))
+      (lam (m)  (update m '[1 0]   '->))
+      (lam (m)  (update m '[1 1]   '->))
+      (lam (m)  (update m '[1 0 0] 'A))
+      (lam (m)  (update m '[1 1 0] 'A))
+      (lam (m)  (update m '[0 0]   'B))
+      (lam (m)  (update m '[1 0 1] 'B))
+      (lam (m)  (update m '[0 1]   'C))
+      (lam (m)  (update m '[1 1 1] 'C))))
+
 (def i (detach ai '[0]))
 
 (def k (detach ak '[0]))

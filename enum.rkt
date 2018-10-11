@@ -64,8 +64,7 @@
       #:exists 'append
       (lam (out)
         (dm ccs1 out) (displayln "<<<<<<<" out)
-        (dm ccs2 out) (newline out)))
-    (display "-"))
+        (dm ccs2 out) (newline out))))
 
   (let ([pool  (shuffle database)])
     (let loop ([new-db null]
@@ -84,14 +83,18 @@
                                      [#t  (match (< (complexity ccs1)
                                                     (complexity ccs2))
                                             [#t  (match (instance? ccs2 ccs1)
-                                                   [#t  (log-discard ccs2 ccs1)
+                                                   [#t  (display "-")
+                                                        ;; (log-discard ccs2 ccs1)
                                                         (loop new-db  cm1  m1  mrst)  #|Ultimate comeback!|#]
-                                                   [#f  (log-discard ccs1 ccs2)
+                                                   [#f  (display "-")
+                                                        ;; (log-discard ccs1 ccs2)
                                                         (loop new-db  cm2  m2  mrst)])]
-                                            [#f  (log-discard ccs1 ccs2)
+                                            [#f  (display "-")
+                                                 ;; (log-discard ccs1 ccs2)
                                                  (loop new-db  cm2  m2  mrst)])]
                                      [#f  (match (instance? ccs2 ccs1)
-                                            [#t   (log-discard ccs2 ccs1)
+                                            [#t   (display "-")
+                                                  ;; (log-discard ccs2 ccs1)
                                                   (loop new-db  cm1  m1  mrst)]
                                             [#f  (loop (cons cm1 new-db)
                                                        cm2
@@ -112,7 +115,7 @@
     (match (make-mp fst snd)
       [#f   database]
       [new  (let ([cn  (conclusion new)])
-              (match (> (height cn) 5)
+              (match (> (height cn) 10)
                 [#t  database  #|Gotta do w/o this one|#]
                 [#f  (display "+")
                      (cons (cmol% 'mp=> `(,(compress cn))  #|Keep only the conclusion|#)

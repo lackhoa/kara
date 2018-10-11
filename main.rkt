@@ -7,13 +7,10 @@
 
 (print-graph #t)
 
-(def db
-  (match (file-exists? "db/data.rkt")
-    [#t  (file->list "db/data.rkt")]
-    [#f  (map compress axioms)]))
+(def db (map compress axioms))
 
-(def (seed)
-  (set! db (map compress axioms)))
+(def (load filename)
+  (set! db (file->list filename)))
 
 (def (num)
   (length db))
@@ -26,7 +23,7 @@
   (repeat times
           (thunk (set! db (collide db)))))
 
-(def (save [filename "db/data.rkt"])
+(def (save filename)
   (call-with-output-file filename
     #:exists 'truncate
     (lam (out)
