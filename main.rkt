@@ -53,9 +53,9 @@
                                     ["1"  "db/data1"]
                                     ["2"  "db/data2"])])
                   (load FILE-NAME)
-                  (for ([i  (in-range 10)])
+                  (for ([i  (in-naturals)])
                     (pydisplay "Cycle number:" i)
-                    (time (com 100))
+                    (time (com 10))
                     (time (col 1))
                     (displayln (num))
                     (save FILE-NAME)))]
