@@ -59,12 +59,11 @@
 
 (def (collide database)
   ;; Work on a single core
-  (def (log-discard c1 c2)
+  (def (log-discard ccs1 ccs2)
     (call-with-output-file "db/discard.rkt"
       #:exists 'append
       (lam (out)
-        (dm c1 out)
-        (dm c2 out)
+        (dm ccs1 out) (displayln "<<<<<<<") (dm ccs2 out)
         (newline out)))
     (display "-"))
 
@@ -75,26 +74,29 @@
                [pool   (cdr pool)])
       (match pool
         [(list)           (cons cm1 new-db)]
-        [(cons cm2 mrst)  (let* ([m2  (decompress cm2)]
-                                 [c1  (conclusion m1)]
-                                 [c2  (conclusion m2)])
-                            (match (instance? c1 c2)
-                              [#t  (match (< (complexity c1)
-                                             (complexity c2))
-                                     [#t  (match (instance? c2 c1)
-                                            [#t  (log-discard c2 c1)
-                                                 (loop new-db  cm1  m1  mrst)]
-                                            [#f  (log-discard c1 c2)
+        [(cons cm2 mrst)  (let* ([m2    (decompress cm2)]
+                                 [ccs1  (conclusion m1)]
+                                 [ccs2  (conclusion m2)])
+                            (match (equal? ccs1 ccs2)
+                              [#t  (display "-")
+                                   (loop new-db  cm1  m1  mrst)]
+                              [#f  (match (instance? ccs1 ccs2)
+                                     [#t  (match (< (complexity ccs1)
+                                                    (complexity ccs2))
+                                            [#t  (match (instance? ccs2 ccs1)
+                                                   [#t  (log-discard ccs2 ccs1)
+                                                        (loop new-db  cm1  m1  mrst)  #|Ultimate comeback!|#]
+                                                   [#f  (log-discard ccs1 ccs2)
+                                                        (loop new-db  cm2  m2  mrst)])]
+                                            [#f  (log-discard ccs1 ccs2)
                                                  (loop new-db  cm2  m2  mrst)])]
-                                     [#f  (log-discard c1 c2)
-                                          (loop new-db  cm2  m2  mrst)])]
-                              [#f  (match (instance? c2 c1)
-                                     [#t   (log-discard c2 c1)
-                                           (loop new-db  cm1  m1  mrst)]
-                                     [#f  (loop (cons cm1 new-db)
-                                                cm2
-                                                m2
-                                                mrst)])]))]))))
+                                     [#f  (match (instance? ccs2 ccs1)
+                                            [#t   (log-discard ccs2 ccs1)
+                                                  (loop new-db  cm1  m1  mrst)]
+                                            [#f  (loop (cons cm1 new-db)
+                                                       cm2
+                                                       m2
+                                                       mrst)])])]))]))))
 
 (def (combine database)
   (def (make-mp fun arg)

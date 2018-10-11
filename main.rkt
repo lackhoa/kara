@@ -38,7 +38,7 @@
     #:exists 'truncate
     (lam (out)
       (for ([m  db])
-        (dm m out)
+        (dm (first (cmol%-kids m)) out)
         (newline out)))))
 
 (def (query thm)

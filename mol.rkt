@@ -245,15 +245,15 @@
 
 ;;; Compressed molecule using pointers
 (def (cmol% data kids)
-  `(,data ,@kids))
+  `(,data ,kids))
 
 (def cmol%-data first)
 (def (cmol%-set-data mol val)
   (list-set mol 0 val))
 
-(def cmol%-kids cdr)
+(def cmol%-kids second)
 (def (cmol%-set-kids mol val)
-  `(,(cmol%-data mol) ,@val))
+  (list-set mol 1 val))
 
 (def (topology cmol)
   #|a partition of paths based on value|#
