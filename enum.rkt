@@ -63,11 +63,11 @@
     (call-with-output-file "db/discard.rkt"
       #:exists 'append
       (lam (out)
-        (dm ccs1 out) (displayln "<<<<<<<") (dm ccs2 out)
-        (newline out)))
+        (dm ccs1 out) (displayln "<<<<<<<" out)
+        (dm ccs2 out) (newline out)))
     (display "-"))
 
-  (let ([pool  database])
+  (let ([pool  (shuffle database)])
     (let loop ([new-db null]
                [cm1    (car pool)]
                [m1     (decompress (car pool))]
