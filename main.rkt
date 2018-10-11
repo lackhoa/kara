@@ -50,8 +50,8 @@
     [("0")      (void)]
 
     [("1" "2")  (let ([FILE-NAME  (match flag
-                                    ["1"  "db/data1.rkt"]
-                                    ["2"  "db/data2.rkt"])])
+                                    ["1"  "db/data1"]
+                                    ["2"  "db/data2"])])
                   (load FILE-NAME)
                   (for ([i  (in-range 10)])
                     (pydisplay "Cycle number:" i)
@@ -60,20 +60,20 @@
                     (displayln (num))
                     (save FILE-NAME)))]
 
-    [("3")      (let* ([db1        (file->list "db/data1.rkt")]
-                       [db2        (file->list "db/data2.rkt")]
+    [("3")      (let* ([db1        (file->list "db/data1")]
+                       [db2        (file->list "db/data2")]
                        [merge      (append db1 db2)]
                        [avg-len    (round (/ (length merge) 2))]
                        [new-merge  (shuffle merge)])
                   (let-values ([(new-db1 new-db2)
                                 (split-at new-merge avg-len)])
-                    (call-with-output-file "db/data1.rkt"
+                    (call-with-output-file "db/data1"
                       #:exists 'truncate
                       (lam (out)
                         (for ([m  new-db1])
                           (wm m out))))
 
-                    (call-with-output-file "db/data2.rkt"
+                    (call-with-output-file "db/data2"
                       #:exists 'truncate
                       (lam (out)
                         (for ([m  new-db2])
