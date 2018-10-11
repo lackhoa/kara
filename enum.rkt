@@ -58,46 +58,43 @@
   (detach root '[0]))
 
 (def (collide database)
-  (def (core-collide database)
-    ;; Work on a single core
-    (def (log-discard c1 c2)
-      (display "-"))
+  ;; Work on a single core
+  (def (log-discard c1 c2)
+    (call-with-output-file "db/discard.rkt"
+      #:exists 'append
+      (lam (out)
+        (dm c1 out)
+        (dm c2 out)
+        (newline out)))
+    (display "-"))
 
-    (let ([pool  database])
-      (let loop ([new-db null]
-                 [cm1    (car pool)]
-                 [m1     (decompress (car pool))]
-                 [pool   (cdr pool)])
-        (match pool
-          [(list)           (cons cm1 new-db)]
-          [(cons cm2 mrst)  (let* ([m2  (decompress cm2)]
-                                   [c1  (conclusion m1)]
-                                   [c2  (conclusion m2)])
-                              (match (instance? c1 c2)
-                                [#t  (match (< (complexity c1)
-                                               (complexity c2))
-                                       [#t  (match (instance? c2 c1)
-                                              [#t  (log-discard c2 c1)
-                                                   (loop new-db  cm1  m1  mrst)]
-                                              [#f  (log-discard c1 c2)
-                                                   (loop new-db  cm2  m2  mrst)])]
-                                       [#f  (log-discard c1 c2)
-                                            (loop new-db  cm2  m2  mrst)])]
-                                [#f  (match (instance? c2 c1)
-                                       [#t   (log-discard c2 c1)
-                                             (loop new-db  cm1  m1  mrst)]
-                                       [#f  (loop (cons cm1 new-db)
-                                                  cm2
-                                                  m2
-                                                  mrst)])]))]))))
-
-  (let-values ([(db1 db2)  (split-at (shuffle database)
-                                     (floor (/ (length database)
-                                               2)))])
-    (visualize-futures
-     (let ([f  (future (thunk (core-collide db2)))])
-       (let ([now  (core-collide db1)])
-         (append now (touch f)))))))
+  (let ([pool  database])
+    (let loop ([new-db null]
+               [cm1    (car pool)]
+               [m1     (decompress (car pool))]
+               [pool   (cdr pool)])
+      (match pool
+        [(list)           (cons cm1 new-db)]
+        [(cons cm2 mrst)  (let* ([m2  (decompress cm2)]
+                                 [c1  (conclusion m1)]
+                                 [c2  (conclusion m2)])
+                            (match (instance? c1 c2)
+                              [#t  (match (< (complexity c1)
+                                             (complexity c2))
+                                     [#t  (match (instance? c2 c1)
+                                            [#t  (log-discard c2 c1)
+                                                 (loop new-db  cm1  m1  mrst)]
+                                            [#f  (log-discard c1 c2)
+                                                 (loop new-db  cm2  m2  mrst)])]
+                                     [#f  (log-discard c1 c2)
+                                          (loop new-db  cm2  m2  mrst)])]
+                              [#f  (match (instance? c2 c1)
+                                     [#t   (log-discard c2 c1)
+                                           (loop new-db  cm1  m1  mrst)]
+                                     [#f  (loop (cons cm1 new-db)
+                                                cm2
+                                                m2
+                                                mrst)])]))]))))
 
 (def (combine database)
   (def (make-mp fun arg)
@@ -113,7 +110,7 @@
     (match (make-mp fst snd)
       [#f   database]
       [new  (let ([cn  (conclusion new)])
-              (match (> (height cn) 30)
+              (match (> (height cn) 5)
                 [#t  database  #|Gotta do w/o this one|#]
                 [#f  (display "+")
                      (cons (cmol% 'mp=> `(,(compress cn))  #|Keep only the conclusion|#)
