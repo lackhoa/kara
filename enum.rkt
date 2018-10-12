@@ -37,28 +37,33 @@
                           (rcdr path1)
                           (rcdr path2)))])))
 
-  (let loop ([path  '[]])
-    (andb (match (ref-data model path)
-            [#f  #t]
-            [md  (eq? md (ref-data ins path))]  #|Data|#)
+  (orb (equal? ins model  #|Quick elimination|#)
+       (let loop ([path  '[]])
+         (andb (match (ref-data model path)
+                 [#f  #t]
+                 [md  (eq? md (ref-data ins path))]  #|Data|#)
 
-          (let* ([sync-ls  (ref-sync model path)]
-                 [pct      (car sync-ls)])
-            (for/andb ([p  (cdr sync-ls)])
-              (same? ins pct p)) #|Topology|#)
+               (let* ([sync-ls  (ref-sync model path)]
+                      [pct      (car sync-ls)])
+                 (for/andb ([p  (cdr sync-ls)])
+                   (same? ins pct p)) #|Topology|#)
 
-          (for/andb ([kid-path  (kids-paths model path)])
-            (loop kid-path)  #|Recursion|#))))
+               (for/andb ([kid-path  (kids-paths model path)])
+                 (loop kid-path)  #|Recursion|#)))))
 
 (def (complexity m)
   (add1 (sum-list (map complexity
                        (mol%-kids m)))))
 
-(def (conclusion root)
-  (detach root '[0]))
+(def (conclusion cmol)
+  ;; Just rips it out since it's the only node
+  (decompress (first (cmol%-kids cmol))))
 
-(def (collide database)
-  ;; Work on a single core
+(def (collide reactor ort)
+  ;; reactor: mol% (a conclusion)
+  ;; ort    : [cmol%]
+  ;; out    : [cmol%] (discarded, if reactor is original)
+  ;;        | #f      (if reactor is unoriginal)
   (def (log-discard ccs1 ccs2)
     (call-with-output-file "db/discard.rkt"
       #:exists 'append
@@ -66,57 +71,32 @@
         (dm ccs1 out) (displayln "<<<<<<<" out)
         (dm ccs2 out) (newline out))))
 
-  (let ([pool  (shuffle database)])
-    (let loop ([new-db null]
-               [cm1    (car pool)]
-               [m1     (decompress (car pool))]
-               [pool   (cdr pool)])
-      (match pool
-        [(list)           (cons cm1 new-db)]
-        [(cons cm2 mrst)  (let* ([m2    (decompress cm2)]
-                                 [ccs1  (conclusion m1)]
-                                 [ccs2  (conclusion m2)])
-                            (match (equal? ccs1 ccs2)
-                              [#t  (display "-")
-                                   (loop new-db  cm1  m1  mrst)]
-                              [#f  (match (instance? ccs1 ccs2)
-                                     [#t  (match (< (complexity ccs1)
-                                                    (complexity ccs2))
-                                            [#t  (match (instance? ccs2 ccs1)
-                                                   [#t  (display "-")
-                                                        ;; (log-discard ccs2 ccs1)
-                                                        (loop new-db  cm1  m1  mrst)  #|Ultimate comeback!|#]
-                                                   [#f  (display "-")
-                                                        ;; (log-discard ccs1 ccs2)
-                                                        (loop new-db  cm2  m2  mrst)])]
-                                            [#f  (display "-")
-                                                 ;; (log-discard ccs1 ccs2)
-                                                 (loop new-db  cm2  m2  mrst)])]
-                                     [#f  (match (instance? ccs2 ccs1)
-                                            [#t   (display "-")
-                                                  ;; (log-discard ccs2 ccs1)
-                                                  (loop new-db  cm1  m1  mrst)]
-                                            [#f  (loop (cons cm1 new-db)
-                                                       cm2
-                                                       m2
-                                                       mrst)])])]))]))))
+  (>> (for/orb ([orti  ort])
+        (instance? reactor
+                   (conclusion orti))  #|Preliminary phase|#)
 
-(def (combine database)
+      (lam (_)
+        (for/fold ([discarded  '()]) ([orti  ort])
+          (match (instance? (conclusion orti)
+                            reactor)
+            [#f  discarded]
+            [#t  (cons orti discarded)]))  #|Destruction phase|#)))
+
+(def (combine reactor ort)
+  ;; reactor: mol% (a conclusion)
+  ;; ort    : [cmol%]
+  ;; out    : [cmol%]
   (def (make-mp fun arg)
     (>> (pull mp '[1] fun)
         (lam (mol)
-          (pull mol '[2] arg))))
+          (pull mol '[2] arg))
+        (lam (mol)
+          (let ([cm  (detach mol '[0]  #|Retain conclusion|#)])
+            (cmol% 'mp=> `(,(compress cm))
+                   #|compress|#)))))
 
-  (let* ([len  (length database)]
-         [fst  (decompress (list-ref database
-                                     (random len)))]
-         [snd  (decompress (list-ref database
-                                     (random len)))])
-    (match (make-mp fst snd)
-      [#f   database]
-      [new  (let ([cn  (conclusion new)])
-              (match (> (height cn) 10)
-                [#t  database  #|Gotta do w/o this one|#]
-                [#f  (display "+")
-                     (cons (cmol% 'mp=> `(,(compress cn))  #|Keep only the conclusion|#)
-                           database)]))])))
+  (for/fold ([accu  '()]) ([orti  ort])
+    (let ([orti  (conclusion orti)])
+      (append (exclude-false `(,(make-mp orti reactor)
+                               ,(make-mp reactor orti)))
+              accu))))

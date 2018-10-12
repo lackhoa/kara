@@ -170,3 +170,9 @@
                               ;; The counting closure
                               (thunk (set! count (add1 count))
                                      (integer->char count))))))
+
+(def (conclusion cmol)
+  (let-values ([(in out) (make-pipe)])
+    (parameterize ([print-graph #t])
+      (write (first (cmol%-kids cmol)) out))
+    (decompress (read in))))
