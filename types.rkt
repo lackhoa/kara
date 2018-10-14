@@ -6,116 +6,83 @@
 (def up update)
 (def sy sync)
 
-;;; Assignment (NOT mutation)
-(define-syntax-rule (update! iden more ...)
-  (set! iden (update iden more ...)))
-
-(define-syntax-rule (sync! iden more ...)
-  (set! iden (sync iden more ...)))
-
-(define-syntax-rule (pull! iden more ...)
-  (set! iden (pull iden more ...)))
-
-
 ;;; Axioms
-(def ai
+(def i
   ;; A -> A
-  (sy (up (up new-root
-              '[] 'ai=>)
-          '[0]    '->)
+  (sy (up new-root '[] '->)
+      '[0] '[1]))
 
-      '[0 0] '[0 1]))
-
-(def ak
+(def k
   ;; (-> A (-> B A))
-  (sy (up (up (up new-root
-                  '[] 'ak=>)
-              '[0]    '->)
-          '[0 1]      '->)
+  (sy (up (up new-root '[] '->)
+          '[1] '->)
+      '[0] '[1 1]))
 
-      '[0 0] '[0 1 1]))
+(def s
+  ;; (-> (-> A
+  ;;         (-> B C))
+  ;;     (-> (-> A B)
+  ;;         (-> A C)))
+  (>> new-root
+      (lam (r)  (up r '[]    '->))
+      (lam (r)  (up r '[0]   '->))
+      (lam (r)  (up r '[0 1] '->))
+      (lam (r)  (up r '[1]   '->))
+      (lam (r)  (up r '[1 0] '->))
+      (lam (r)  (up r '[1 1] '->))
+      (lam (r)  (sy r '[0 0]   '[1 0 0]))
+      (lam (r)  (sy r '[0 0]   '[1 1 0]))
+      (lam (r)  (sy r '[0 1 0] '[1 0 1]))
+      (lam (r)  (sy r '[0 1 1] '[1 1 1]))))
 
-(def as
-  ;; (=> (-> (-> A
-  ;;             (-> B C))
-  ;;         (-> (-> A B)
-  ;;             (-> A C))))
-  (let* ([r  new-root]
-         [r  (up r '[]      'as=>)]
-         [r  (up r '[0]     '->)]
-         [r  (up r '[0 0]   '->)]
-         [r  (up r '[0 0 1] '->)]
-         [r  (up r '[0 1]   '->)]
-         [r  (up r '[0 1 0] '->)]
-         [r  (up r '[0 1 1] '->)]
-
-         [r  (sy r '[0 0 0]   '[0 1 0 0])]
-         [r  (sy r '[0 0 0]   '[0 1 1 0])]
-         [r  (sy r '[0 0 1 0] '[0 1 0 1])]
-         [r  (sy r '[0 0 1 1] '[0 1 1 1])])
-    r))
+(def axioms `(,k ,s))
 
 (def mp
-  ;; (=> A
-  ;;     (=> (-> B A))
-  ;;     (=> B))
-  (sy (sy (up (up new-root
-                  '[]  'mp=>)
-              '[1 0]  '->)
-
-          '[0]  '[1 0 1]  #|A|#)
-      '[1 0 0]  '[2 0]    #|B|#))
-
-(def axioms (list ai ak as))
+  ;; (B (-> A B) A)
+  (sy (sy (up new-root '[1] '->)
+          '[0]  '[1 1]  #|B|#)
+      '[1 0]  '[2]      #|A|#))
 
 ;;; Some theorems to prove
 (def w
   ;; (A -> (A -> B)) -> (A -> B)
-  (let ([m  new-root])
-    (update! m '[]      '->)
-    (update! m '[0]     '->)
-    (update! m '[0 0]   '?A)
-    (update! m '[0 1]   '->)
-    (update! m '[0 1 0] '?A)
-    (update! m '[0 1 1] '?B)
-    (update! m '[1]     '->)
-    (update! m '[1 0]   '?A)
-    (update! m '[1 1]   '?B)
-    m)  #|Proven|#)
+  (>> new-root
+      (lam (m) (up m '[]      '->))
+      (lam (m) (up m '[0]     '->))
+      (lam (m) (up m '[0 0]   'A))
+      (lam (m) (up m '[0 1]   '->))
+      (lam (m) (up m '[0 1 0] 'A))
+      (lam (m) (up m '[0 1 1] 'B))
+      (lam (m) (up m '[1]     '->))
+      (lam (m) (up m '[1 0]   'A))
+      (lam (m) (up m '[1 1]   'B))))
 
 (def c
   ;; (A -> (B -> C)) -> (B -> (A -> C))
-  (let ([m  new-root])
-    (update! m '[]      '->)
-    (update! m '[0]     '->)
-    (update! m '[0 0]   '?A)
-    (update! m '[0 1]   '->)
-    (update! m '[0 1 0] '?B)
-    (update! m '[0 1 1] '?C)
-    (update! m '[1]     '->)
-    (update! m '[1 0]   '?B)
-    (update! m '[1 1]   '->)
-    (update! m '[1 1 0] '?A)
-    (update! m '[1 1 1] '?C)
-    m))
+  (>> new-root
+      (lam (m) (up m '[]      '->))
+      (lam (m) (up m '[0]     '->))
+      (lam (m) (up m '[0 0]   'A))
+      (lam (m) (up m '[0 1]   '->))
+      (lam (m) (up m '[0 1 0] 'B))
+      (lam (m) (up m '[0 1 1] 'C))
+      (lam (m) (up m '[1]     '->))
+      (lam (m) (up m '[1 0]   'B))
+      (lam (m) (up m '[1 1]   '->))
+      (lam (m) (up m '[1 1 0] 'A))
+      (lam (m) (up m '[1 1 1] 'C))))
 
 (def b
   ;; (B -> C) -> ((A -> B) -> (A -> C))
   (>> new-root
-      (lam (m)  (update m '[]      '->))
-      (lam (m)  (update m '[0]     '->))
-      (lam (m)  (update m '[1]     '->))
-      (lam (m)  (update m '[1 0]   '->))
-      (lam (m)  (update m '[1 1]   '->))
-      (lam (m)  (update m '[1 0 0] 'A))
-      (lam (m)  (update m '[1 1 0] 'A))
-      (lam (m)  (update m '[0 0]   'B))
-      (lam (m)  (update m '[1 0 1] 'B))
-      (lam (m)  (update m '[0 1]   'C))
-      (lam (m)  (update m '[1 1 1] 'C))))
-
-(def i (detach ai '[0]))
-
-(def k (detach ak '[0]))
-
-(def s (detach as '[0]))
+      (lam (m)  (up m '[]      '->))
+      (lam (m)  (up m '[0]     '->))
+      (lam (m)  (up m '[1]     '->))
+      (lam (m)  (up m '[1 0]   '->))
+      (lam (m)  (up m '[1 1]   '->))
+      (lam (m)  (up m '[1 0 0] 'A))
+      (lam (m)  (up m '[1 1 0] 'A))
+      (lam (m)  (up m '[0 0]   'B))
+      (lam (m)  (up m '[1 0 1] 'B))
+      (lam (m)  (up m '[0 1]   'C))
+      (lam (m)  (up m '[1 1 1] 'C))))

@@ -1,8 +1,16 @@
 #lang racket
 (require "lang/kara.rkt")
 
-(def (num->pair n list1 list2)
-  (let-values ([(i1 i2)  (quotient/remainder n
-                                             (length list2))])
-    (cons (list-ref list1 i1)
-          (list-ref list2 i2))))
+(provide main)
+
+(def (any-double? l)
+  (for*/or ([i   (in-list l)]
+            [i2  (in-list l)])
+    (= i2 (* i 2))))
+
+(def (main ch)
+  (let* ([msg  (place-channel-get ch)]
+         [id   (car msg)]
+         [val  (cadr msg)])
+    (place-channel-put ch
+                       `(,id  ,(any-double? val)))))

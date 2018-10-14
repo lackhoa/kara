@@ -7,6 +7,7 @@
 (provide (all-defined-out))
 
 (def (instance? ins model)
+  ;; mol% -> mol% -> bool
   ;; Check if `ins` is an instance? of `model`
   (def (ctor-arity s)
     (case s
@@ -14,6 +15,7 @@
       [else  0  #|This enables the use of arbitrary variables|#]))
 
   (def (same? root path1 path2)
+    ;; mol% -> path -> path -> bool
     ;; the meaning of uttering "path1 is synced with path2"
     (let ([mol1  (ref root path1)]
           [mol2  (ref root path2)])
@@ -37,66 +39,75 @@
                           (rcdr path1)
                           (rcdr path2)))])))
 
-  (orb (equal? ins model  #|Quick elimination|#)
-       (let loop ([path  '[]])
-         (andb (match (ref-data model path)
-                 [#f  #t]
-                 [md  (eq? md (ref-data ins path))]  #|Data|#)
+  (let loop ([path  '[]])
+    (andb (match (ref-data model path)
+            [#f  #t]
+            [md  (eq? md (ref-data ins path))]  #|Data|#)
 
-               (let* ([sync-ls  (ref-sync model path)]
-                      [pct      (car sync-ls)])
-                 (for/andb ([p  (cdr sync-ls)])
-                   (same? ins pct p)) #|Topology|#)
+          (let* ([sync-ls  (ref-sync model path)]
+                 [pct      (car sync-ls)])
+            (for/andb ([p  (cdr sync-ls)])
+              (same? ins pct p)) #|Topology|#)
 
-               (for/andb ([kid-path  (kids-paths model path)])
-                 (loop kid-path)  #|Recursion|#)))))
+          (for/andb ([kid-path  (kids-paths model path)])
+            (loop kid-path)  #|Recursion|#))))
 
-(def (complexity m)
+(def (complexity m)  ;; mol% -> nat
   (add1 (sum-list (map complexity
                        (mol%-kids m)))))
 
-(def (conclusion cmol)
-  ;; Just rips it out since it's the only node
-  (decompress (first (cmol%-kids cmol))))
+(def (original? reactor ort)
+  ;; mol% -> [cmol%] -> bool
+  (for/andb ([orti  ort])
+    (not (instance? reactor
+                  (decompress orti)))))
+
+(def ((place-version func) pch)
+  (place-channel-put pch
+                     (apply func
+                       (place-channel-get pch))))
+
+(def (place-original? pch)
+  (place-version original?))
 
 (def (collide reactor ort)
-  ;; reactor: mol% (a conclusion)
-  ;; ort    : [cmol%]
-  ;; out    : [cmol%] (discarded, if reactor is original)
-  ;;        | #f      (if reactor is unoriginal)
+  ;; mol% -> [cmol%] -> [cmol%]  (when reactor is original)
+  ;;                  | #f       (when it isn't)
   (def (log-discard ccs1 ccs2)
+    ;; mol% -> mol% -> void
     (call-with-output-file "db/discard.rkt"
       #:exists 'append
       (lam (out)
-        (dm ccs1 out) (displayln "<<<<<<<" out)
+        (dm ccs1 out) (displayln (make-string 80 #\<) out)
         (dm ccs2 out) (newline out))))
 
-  (>> (for/orb ([orti  ort])
-        (instance? reactor
-                   (conclusion orti))  #|Preliminary phase|#)
+  (for/fold ([new-ort  '()]) ([orti  ort])
+    (match (instance? (decompress orti)
+                      reactor)
+      [#f  new-ort]
+      [#t  (cons orti new-ort)])))
 
-      (lam (_)
-        (for/fold ([discarded  '()]) ([orti  ort])
-          (match (instance? (conclusion orti)
-                            reactor)
-            [#f  discarded]
-            [#t  (cons orti discarded)]))  #|Destruction phase|#)))
+(def (place-collide pch)
+  (place-version collide))
 
 (def (combine reactor ort)
-  ;; reactor: mol% (a conclusion)
-  ;; ort    : [cmol%]
-  ;; out    : [cmol%]
+  ;; mol% -> [cmol%] -> [cmol%]  (new formulas)
   (def (make-mp fun arg)
+    ;; mol% -> mol% -> cmol%
     (>> (pull mp '[1] fun)
-        (lam (mol)
-          (pull mol '[2] arg))
-        (lam (mol)
-          (let ([cm  (detach mol '[0]  #|Retain conclusion|#)])
-            (cmol% 'mp=> `(,(compress cm))
-                   #|compress|#)))))
+        (lam (mp1)
+          (pull mp1 '[2] arg))
+        (lam (mp2)
+          (compress (detach mp2 '[0]  #|get conclusion|#)))))
 
-  (for/fold ([accu  '()]) ([orti  ort])
-    (let ([orti  (conclusion orti)])
-      (append (exclude-false `(,(make-mp orti reactor)
-                               ,(make-mp reactor orti)))
-              accu))))
+  (let ([1-2  (for/fold ([accu  '()]) ([orti  ort])
+                (let ([orti  (decompress orti)])
+                  (append (exclude-false `(,(make-mp orti reactor)
+                                           ,(make-mp reactor orti)))
+                          accu)))])
+    (match (make-mp reactor reactor)
+      [#f    1-2]
+      [mprr  (cons mprr 1-2)])))
+
+(def (place-combine pch)
+  (place-version combine))
