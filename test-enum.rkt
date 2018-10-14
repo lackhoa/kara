@@ -5,12 +5,15 @@
          "enum.rkt"
          rackunit)
 
-;;; Assignment (NOT mutation)
-(define-syntax-rule (update! iden more ...)
+(def sy msync)
+
+(def up update)
+
+(define-syntax-rule (up! iden more ...)
   (set! iden (update iden more ...)))
 
-(define-syntax-rule (sync! iden more ...)
-  (set! iden (sync iden more ...)))
+(define-syntax-rule (sy! iden more ...)
+  (set! iden (msync iden more ...)))
 
 (define-syntax-rule (pull! iden more ...)
   (set! iden (pull iden more ...)))
@@ -24,27 +27,27 @@
                          (update new-root '[] '->)))
  (check-true (instance? (update new-root '[] '->)
                         (update new-root '[] '->)))
- (check-true (instance? (sync (update (update new-root '[0] '->)
-                                      '[1] '->)
-                              '[0] '[1])
-                        (sync new-root '[0] '[1])))
- (let ([base (sync (sync new-root '[0] '[1]) '[2] '[3])])
+ (check-true (instance? (msync (update (update new-root '[0] '->)
+                                       '[1] '->)
+                               '[0] '[1])
+                        (msync new-root '[0] '[1])))
+ (let ([base (msync (msync new-root '[0] '[1]) '[2] '[3])])
    (check-false (instance? base
-                           (sync base '[1] '[2])))
-   (check-true (instance? (sync base '[1] '[2])
+                           (msync base '[1] '[2])))
+   (check-true (instance? (msync base '[1] '[2])
                           base))))
 
 (test-case
  "Multi-leveled"
- (def a->a (detach ai '[0]))
+ (def a->a i)
  (def r
    ;; (-> (-> (-> A B) (-> A B))
    ;;     (-> (-> A B) (-> A B)))
    (let ([m  new-root])
-     (update! m '[] '->) (update! m '[0] '->) (update! m '[1] '->)
-     (update! m '[0 0] '->) (update! m '[0 1] '->) (update! m '[1 0] '->) (update! m '[1 1] '->)
-     (sync! m '[0 0 0] '[0 1 0]) (sync! m '[0 1 0] '[1 0 0]) (sync! m '[1 0 0] '[1 1 0])
-     (sync! m '[0 0 1] '[0 1 1]) (sync! m '[0 1 1] '[1 0 1]) (sync! m '[1 0 1] '[1 1 1])
+     (up! m '[] '->) (up! m '[0] '->) (up! m '[1] '->)
+     (up! m '[0 0] '->) (up! m '[0 1] '->) (up! m '[1 0] '->) (up! m '[1 1] '->)
+     (sy! m '[0 0 0] '[0 1 0]) (sy! m '[0 1 0] '[1 0 0]) (sy! m '[1 0 0] '[1 1 0])
+     (sy! m '[0 0 1] '[0 1 1]) (sy! m '[0 1 1] '[1 0 1]) (sy! m '[1 0 1] '[1 1 1])
      m))
 
  (check-true (instance? r a->a))
@@ -54,12 +57,11 @@
  "Generality Ultimate"
  (def r1
    ;; (-> A (-> B A))
-   (detach ak '[0]))
+   (detach k '[0]))
 
  (def r2
    ;; (-> (-> A B) (-> C (-> A B)))
-   (let ([update! update] [sync! sync])
-     (sync! (sync! (update! (update! (update! (update! new-root '[] '->) '[0] '->) '[1] '->) '[1 1] '->) '[0 0] '[1 1 0]) '[0 1] '[1 1 1])))
+   (sy (sy (up (up (up (up new-root '[] '->) '[0] '->) '[1] '->) '[1 1] '->) '[0 0] '[1 1 0]) '[0 1] '[1 1 1]))
 
  (check-true (instance? r2 r1))
  (check-false (instance? r1 r2))

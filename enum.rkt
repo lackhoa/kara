@@ -1,10 +1,19 @@
 #lang racket
 (require "lang/kara.rkt"
          "mol.rkt"
-         "types.rkt"
-         future-visualizer)
+         "types.rkt")
 
 (provide (all-defined-out))
+
+(def (height c/mol)
+  ;; Used for synchronization
+  (match c/mol
+    [(list _ kids)    (match kids
+                        ['()  0]
+                        [_    (add1 (apply max (map height kids)))])]
+    [(list _ _ kids)  (match kids
+                        ['()  0]
+                        [_    (add1 (apply max (map height kids)))])]))
 
 (def (instance? ins model)
   ;; mol% -> mol% -> bool
@@ -67,12 +76,13 @@
                      (apply func
                        (place-channel-get pch))))
 
-(def (place-original? pch)
+(def place-original?
   (place-version original?))
 
 (def (collide reactor ort)
   ;; mol% -> [cmol%] -> [cmol%]  (when reactor is original)
   ;;                  | #f       (when it isn't)
+  ;; Returns ort, after colliding with reactor
   (def (log-discard ccs1 ccs2)
     ;; mol% -> mol% -> void
     (call-with-output-file "db/discard.rkt"
@@ -84,30 +94,28 @@
   (for/fold ([new-ort  '()]) ([orti  ort])
     (match (instance? (decompress orti)
                       reactor)
-      [#f  new-ort]
-      [#t  (cons orti new-ort)])))
+      [#t  new-ort]
+      [#f  (cons orti new-ort)])))
 
-(def (place-collide pch)
+(def place-collide
   (place-version collide))
+
+(def (make-mp fun arg)
+  ;; mol% -> mol% -> cmol%
+  (>> (pull mp '[1] fun)
+      (lam (mp1)
+        (pull mp1 '[2] arg))
+      (lam (mp2)
+        (compress (#|get conclusion|#
+                   detach mp2 '[0])))))
 
 (def (combine reactor ort)
   ;; mol% -> [cmol%] -> [cmol%]  (new formulas)
-  (def (make-mp fun arg)
-    ;; mol% -> mol% -> cmol%
-    (>> (pull mp '[1] fun)
-        (lam (mp1)
-          (pull mp1 '[2] arg))
-        (lam (mp2)
-          (compress (detach mp2 '[0]  #|get conclusion|#)))))
+  (for/fold ([accu  '()]) ([orti  ort])
+    (let ([orti  (decompress orti)])
+      (append (exclude-false `(,(make-mp orti reactor)
+                               ,(make-mp reactor orti)))
+              accu))))
 
-  (let ([1-2  (for/fold ([accu  '()]) ([orti  ort])
-                (let ([orti  (decompress orti)])
-                  (append (exclude-false `(,(make-mp orti reactor)
-                                           ,(make-mp reactor orti)))
-                          accu)))])
-    (match (make-mp reactor reactor)
-      [#f    1-2]
-      [mprr  (cons mprr 1-2)])))
-
-(def (place-combine pch)
+(def place-combine
   (place-version combine))

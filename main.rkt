@@ -14,10 +14,11 @@
 (def CAN-LIM   10)
 
 
-(def db '())
+(def db '()  #|[cmols]|#)
 (def candidates
-  (let ([res  (make-vector CAN-LIM)])
-    (vector-set! res 0 axioms
+  #|[cmols]|#
+  (let ([res  (make-vector CAN-LIM '())])
+    (vector-set! res 0 (map compress axioms)
                  #|axioms' height < 10|#)
     res))
 
@@ -58,6 +59,7 @@
       dm))
 
 (def (get-reactor)
+  ;; -> mol%
   (let loop ([i  0])
     (cond [(= i CAN-LIM)  (error "No new reactor!")]
           [else           (match (vector-ref candidates i)
@@ -66,7 +68,7 @@
                              (vector-set! candidates
                                           i
                                           (cdr (vector-ref candidates i)))
-                             r])])))
+                             (decompress r)])])))
 
 (def (add-candidate c)
   (let ([q  (quotient (height c) 10)])
@@ -76,12 +78,14 @@
           [else           (error "There is ")])))
 
 (def (select)
-  (for/or ([i  (in-naturals)  #|Loop until we can find a reactor|#])
+  (#|Loop until we can find a reactor|#
+   for/or ([_  (in-naturals)])
     (let ([reactor  (get-reactor)]
           [dbs      (split-evenly db CORES)]
-          [pls      (for/list ([i  (in-range CORES)])
-                      (dynamic-place "enum.rkt"
-                                     'place-original?))])
+          [pls      (build-list CORES
+                                (lam (_)
+                                  (dynamic-place "enum.rkt"
+                                                 'place-original?)))])
       (for ([i  (in-range CORES)]
             [p  pls])
         (place-channel-put p `(,reactor
@@ -94,30 +98,44 @@
                         (match res
                           [#f  (begin (for-each place-kill pls)
                                       #f)  #|abort all|#]
-                          [#t  (loop (add1 i))  #|continue|#]))])))))
+                          [#t  (loop (add1 count))
+                               #|continue|#]))])))))
 
 (def (col reactor)
   (let ([dbs  (split-evenly db CORES)]
-        [pls  (for/list ([i  (in-range CORES)])
-                (dynamic-place "enum.rkt"
-                               'place-collide))])
+        [pls  (build-list CORES
+                          (lam (_)
+                            (dynamic-place "enum.rkt"
+                                           'place-collide)))])
     (for ([i  (in-range CORES)]
           [p  pls])
       (place-channel-put p `(,reactor
                              ,(list-ref dbs i))))
 
     (set! db
-      (flatten (map place-channel-get pls)))))
+      (cons (compress reactor  #|reactor was decompressed|#)
+            (flatmap place-channel-get pls))
+      #|db to contain reactor and what's left of itself|#)))
 
 (def (com reactor)
-  (let ([dbs  (split-evenly db CORES)]
-        [pls  (for/list ([i  (in-range CORES)])
-                (dynamic-place "enum.rkt"
-                               'place-collide))])
+  (let ([dbs  (split-evenly db CORES)  #|reactor is included|#]
+        [pls  (build-list CORES
+                          (lam (_)
+                            (dynamic-place "enum.rkt"
+                                           'place-combine)))])
     (for ([i  (in-range CORES)]
           [p  pls])
       (place-channel-put p `(,reactor
                              ,(list-ref dbs i))))
-    (for ([c  (flatten (map place-channel-get
-                            pls))])
+
+    (for ([c  (flatmap place-channel-get
+                       pls)])
       (add-candidate c))))
+
+;;; Jobs
+(let ([r  (select)])
+  (col r)
+  (com r))
+
+(displayln db)
+(displayln candidates)

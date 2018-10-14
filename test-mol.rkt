@@ -12,7 +12,7 @@
   (set! iden (update iden more ...)))
 
 (define-syntax-rule (sync! iden more ...)
-  (set! iden (sync iden more ...)))
+  (set! iden (msync iden more ...)))
 
 (define-syntax-rule (pull! iden more ...)
   (set! iden (pull iden more ...)))
@@ -66,7 +66,7 @@
  (check-eq? (ref-data (dc root) '[1])
             'A)
  (update! root '[2] 'B)
- (check-false (sync (dc root) '[0] '[2]))
+ (check-false (msync (dc root) '[0] '[2]))
  )
 
 (test-case
@@ -74,15 +74,15 @@
  (def root new-root)
  (update! root '[0 0])
  (sync! root '[0 0] '[1])
- (check-false (sync (dc root) '[0] '[1]))
- (check-false (sync (dc root) '[2] '[2 3 4]))
+ (check-false (msync (dc root) '[0] '[1]))
+ (check-false (msync (dc root) '[2] '[2 3 4]))
  )
 
 (test-case
  "Inter-root synchronization"
  (newline)
- (def model1 (sync new-root '[0] '[1]))
- (def model2 (sync new-root '[1] '[2]))
+ (def model1 (msync new-root '[0] '[1]))
+ (def model2 (msync new-root '[1] '[2]))
  (def r (update new-root '[0] 'T))
  (pull! r '[] model1)
  (pull! r '[] model2)
@@ -126,7 +126,7 @@
 
 (test-case
  "Advanced shit"
- (def sy sync)
+ (def sy msync)
  (def up update)
  (def ai (sy (up (up new-root '[] 'ai=>) '[0] '->) '[0 0] '[0 1]))
 

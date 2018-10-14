@@ -116,18 +116,12 @@
                                    (pad-kids m kids next-id)))])))])))
 
 (def (kids-paths root path)
-;; Very helpful utility.
-(let ([kids-indices  (range (length (ref-kids root path)))])
-  (for/list ([i  kids-indices])
-    (rcons path i))))
+  ;; Very helpful utility.
+  (let ([kids-indices  (range (length (ref-kids root path)))])
+    (for/list ([i  kids-indices])
+      (rcons path i))))
 
-(def (height mol)
-;; Used for synchronization
-  (match (mol%-kids mol)
-    [(list)  0]
-    [kids    (add1 (apply max (map height kids)))]))
-
-(def (sync root path1 path2)
+(def (msync root path1 path2)
   ;; Establish a new synchronization, update if needed.
   (def (sync-data root p1 p2)
     (match* ((ref-data root p1)
@@ -210,9 +204,9 @@
   (let* ([unifier new-root]
          [unifier (attach unifier host  '[0])]
          [unifier (attach unifier guest '[1])])
-    (>> (sync unifier
-              (append '[0] to)
-              '[1])
+    (>> (msync unifier
+               (append '[0] to)
+               '[1])
         (lam (unified)
           (detach unified '[0])))))
 

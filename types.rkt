@@ -4,7 +4,7 @@
 (provide (all-defined-out))
 
 (def up update)
-(def sy sync)
+(def sy msync)
 
 ;;; Axioms
 (def i
