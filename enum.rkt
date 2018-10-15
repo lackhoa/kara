@@ -65,23 +65,8 @@
   (add1 (sum-list (map complexity
                        (mol%-kids m)))))
 
-(def (original? reactor ort)
-  ;; mol% -> [cmol%] -> bool
-  (for/andb ([orti  ort])
-    (not (instance? reactor
-                  (decompress orti)))))
-
-(def ((place-version func) pch)
-  (place-channel-put pch
-                     (apply func
-                       (place-channel-get pch))))
-
-(def place-original?
-  (place-version original?))
-
 (def (collide reactor ort)
-  ;; mol% -> [cmol%] -> [cmol%]  (when reactor is original)
-  ;;                  | #f       (when it isn't)
+  ;; mol% -> [cmol%] -> [cmol%]
   ;; Returns ort, after colliding with reactor
   (def (log-discard ccs1 ccs2)
     ;; mol% -> mol% -> void
@@ -97,14 +82,12 @@
       [#t  new-ort]
       [#f  (cons orti new-ort)])))
 
-(def place-collide
-  (place-version collide))
+
 
 (def (make-p fun arg)
   ;; mol% -> mol% -> cmol%
   (>> (pull p '[1] fun)
-      (lam (p1)
-        (pull p1 '[2] arg))
+      (f> pull '[2] arg)
       (lam (p2)
         (compress (#|get conclusion|#
                    detach p2 '[0])))))
@@ -116,6 +99,3 @@
       (append (exclude-false `(,(make-p orti reactor)
                                ,(make-p reactor orti)))
               accu))))
-
-(def place-combine
-  (place-version combine))

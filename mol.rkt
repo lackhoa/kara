@@ -99,7 +99,7 @@
                  [(x x)   root]
                  [(#f _)  (do&inform root
                                      rel
-                                     (lam (m)  (mol%-set-data m val)))]
+                                     (f> mol%-set-data val))]
                  [(_ #f)  root]
                  [(_ _)   #f])]
 
@@ -112,8 +112,7 @@
                  [#f  root]
                  [#t  (do&inform root
                                  rel
-                                 (lam (m)
-                                   (pad-kids m kids next-id)))])))])))
+                                 (f> pad-kids kids next-id))])))])))
 
 (def (kids-paths root path)
   ;; Very helpful utility.
@@ -151,8 +150,7 @@
                       [p2  sy2])
               (incest? p1 p2)))
 
-         (let ([proc  (lam (m)
-                        (mol%-set-sync m (append sy1 sy2)))])
+         (let ([proc  (f> mol%-set-sync (append sy1 sy2))])
            #|Establish the connections|#
            (do&inform (do&inform root p1 proc) p2 proc)))))
 
@@ -164,14 +162,13 @@
       (match (bool (member p1 (ref-sync root p2)))
         [#t  root]
         [#f  (>> root
-                 (lam (r) (sync-data  r p1 p2))
-                 (lam (r) (level-kids r p1 p2))
-                 (lam (r) (sync-sync  r p1 p2))
-                 (lam (r)
-                   (for/fold ([r  r]) ([new-p1  (kids-paths r p1)]
-                                       [new-p2  (kids-paths r p2)])
-                     #:break (not r)
-                     (loop r new-p1 new-p2))))]))))
+                 (f> sync-data  p1 p2)
+                 (f> level-kids p1 p2)
+                 (f> sync-sync  p1 p2)
+                 (lam (r) (for/fold ([r  r]) ([new-p1  (kids-paths r p1)]
+                                            [new-p2  (kids-paths r p2)])
+                          #:break (not r)
+                          (loop r new-p1 new-p2))))]))))
 
 (def (migrate root from to)
   ;; Migrate the molecule from root-`from` to ?-`to`
@@ -207,8 +204,7 @@
     (>> (msync unifier
                (append '[0] to)
                '[1])
-        (lam (unified)
-          (detach unified '[0])))))
+        (f> detach '[0]))))
 
 (def (compress root)
   (let ([dic null  #|Map of sync list to cmol|#])

@@ -3,14 +3,22 @@
 
 (provide main)
 
-(def (any-double? l)
-  (for*/or ([i   (in-list l)]
-            [i2  (in-list l)])
-    (= i2 (* i 2))))
+(def (main)
 
-(def (main ch)
-  (let* ([msg  (place-channel-get ch)]
-         [id   (car msg)]
-         [val  (cadr msg)])
-    (place-channel-put ch
-                       `(,id  ,(any-double? val)))))
+  (def p1
+    (place ch
+      (for ([i  (in-range 10)])
+        (place-channel-put ch i)
+        (sleep 0.1))))
+
+  (def p2
+    (place ch
+      (for ([i  (in-range 10 20)])
+        (place-channel-put ch i)
+        (sleep 0.1))))
+
+  (let loop ()
+    (match (sync/timeout 1 p1 p2)
+      [#f  (displayln "I'm done!")]
+      [a   (printf "~a " a)
+           (loop)])))
