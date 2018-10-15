@@ -1,6 +1,6 @@
 #lang racket
 (require "lang/kara.rkt"
-         "mole.rkt"
+         "mol.rkt"
          "types.rkt")
 
 (def (parse mol)
@@ -14,22 +14,17 @@
 (def (construct e)
   ;; e is a combinatory expression like ((i s) k)
   (match e
-    [(list x y)  (match (pull mp
-                              '[1]
-                              (construct x))
-                   [#f  #f]
-                   [m   (pull m
-                              '[2]
-                              (construct y))])]
+    [(list x y)  (>> (pull mp '[1] (construct x))
+                     (lam (m)
+                       (pull m '[2] (construct y))))]
     [x           (match x
                    ['i  ai]
                    ['k  ak]
                    ['s  as]
-                   [_   (mol% '=> null)
+                   [_   (update new-root '[] '=>)
                         #|An anonymous assertion|#])]))
 
 (def (type e)
   (dm (construct e)))
 
-'((s i) i)
-'(((s i) i) x)
+(dm (construct '(k (k k))))

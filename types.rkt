@@ -35,13 +35,35 @@
       (lam (r)  (sy r '[0 1 0] '[1 0 1]))
       (lam (r)  (sy r '[0 1 1] '[1 1 1]))))
 
-(def axioms `(,k ,s))
+(def ai
+  (>> (up new-root '[] 'ai=>)
+      (lam (r)  (pull r '[0] i))))
 
-(def mp
+(def as
+  (>> (up new-root '[] 'as=>)
+      (lam (r)  (pull r '[0] s))))
+
+(def ak
+  (>> (up new-root '[] 'ak=>)
+      (lam (r)  (pull r '[0] k))))
+
+(def axioms `(,ak ,as))
+(def short-axioms  `(,k ,s))
+
+(def p
   ;; (B (-> A B) A)
   (sy (sy (up new-root '[1] '->)
-          '[0]  '[1 1]  #|B|#)
-      '[1 0]  '[2]      #|A|#))
+          '[0] '[1 1]  #|B|#)
+      '[1 0] '[2]      #|A|#))
+
+(def mp
+  ;; (mp=> B
+  ;;       (=> (-> A B))
+  ;;       (=> A))
+  (sy (sy (up (up new-root '[] 'mp=>)
+              '[1 0] '->)
+          '[0] '[1 0 1]  #|B|#)
+      '[1 0 0] '[2 0]    #|A|#))
 
 ;;; Some theorems to prove
 (def w

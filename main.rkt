@@ -18,11 +18,12 @@
 (def candidates
   #|[cmols]|#
   (let ([res  (make-vector CAN-LIM '())])
-    (vector-set! res 0 (map compress axioms)
+    (vector-set! res 0 (map compress short-axioms)
                  #|axioms' height < 10|#)
     res))
+(def the-reactor #f)
 
-(def (load)
+(def (load!)
   (set! db (file->list DB-FILE))
 
   (for ([i  (in-range CAN-LIM)])
@@ -31,8 +32,15 @@
                  (file->list (string-append CAN-FILE
                                             (~a i))))))
 
+(def (league i)
+  (vector-ref candidates i))
+
 (def (num)
   (length db))
+
+(def (can-num)
+  (for/list ([i  (in-range CAN-LIM)])
+    (length (league i))))
 
 (def (save)
   (call-with-output-file DB-FILE
@@ -44,40 +52,41 @@
     (call-with-output-file (string-append CAN-FILE
                                           (~a i))
       #:exists 'truncate
-      (lam (out) (for ([c  (vector-ref candidates i)])
+      (lam (out) (for ([c  (league i)])
                  (wm c out))))))
 
 (def (view)
   (call-with-output-file VIEW-FILE
     #:exists 'truncate
     (lam (out) (for ([m  db])
-               (dm m) (newline out)))))
+               (dm m out) (newline out)))))
 
 (def (query thm)
-  (>> (for/or ([m  db])
-        (instance? thm (decompress m)))
+  (>> (findf (lam (m)
+               (instance? thm (decompress m)))
+             db)
       dm))
 
 (def (get-reactor)
   ;; -> mol%
   (let loop ([i  0])
     (cond [(= i CAN-LIM)  (error "No new reactor!")]
-          [else           (match (vector-ref candidates i)
+          [else           (match (league i)
                             ['()         (loop (add1 i))]
                             [(cons r _)
                              (vector-set! candidates
                                           i
-                                          (cdr (vector-ref candidates i)))
+                                          (cdr (league i)))
                              (decompress r)])])))
 
 (def (add-candidate c)
-  (let ([q  (quotient (height c) 10)])
+  (let ([q  (quotient (height c) 5)])
     (cond [(< q CAN-LIM)  (vector-set! candidates
                                        q
-                                       (cons c (vector-ref candidates q)))]
+                                       (cons c (league q)))]
           [else           (error "There is ")])))
 
-(def (select)
+(def (select!)
   (#|Loop until we can find a reactor|#
    for/or ([_  (in-naturals)])
     (let ([reactor  (get-reactor)]
@@ -93,7 +102,8 @@
 
       (let loop ([count  0])
         (match count
-          [(== CORES)  reactor  #|All cores approved|#]
+          [(== CORES)  (set! the-reactor reactor)
+           #|All cores approved|#]
           [_          (let ([res  (apply sync pls)])
                         (match res
                           [#f  (begin (for-each place-kill pls)
@@ -101,7 +111,7 @@
                           [#t  (loop (add1 count))
                                #|continue|#]))])))))
 
-(def (col reactor)
+(def (col!)
   (let ([dbs  (split-evenly db CORES)]
         [pls  (build-list CORES
                           (lam (_)
@@ -109,33 +119,45 @@
                                            'place-collide)))])
     (for ([i  (in-range CORES)]
           [p  pls])
-      (place-channel-put p `(,reactor
+      (place-channel-put p `(,the-reactor
                              ,(list-ref dbs i))))
 
     (set! db
-      (cons (compress reactor  #|reactor was decompressed|#)
-            (flatmap place-channel-get pls))
-      #|db to contain reactor and what's left of itself|#)))
+      (flatmap place-channel-get pls)
+      #|db to contain what's left|#)))
 
-(def (com reactor)
-  (let ([dbs  (split-evenly db CORES)  #|reactor is included|#]
+(def (com!)
+  #|The only phase where db and candidates grow|#
+  (let ([dbs  (split-evenly db CORES)]
         [pls  (build-list CORES
                           (lam (_)
                             (dynamic-place "enum.rkt"
                                            'place-combine)))])
     (for ([i  (in-range CORES)]
           [p  pls])
-      (place-channel-put p `(,reactor
+      (place-channel-put p `(,the-reactor
                              ,(list-ref dbs i))))
 
     (for ([c  (flatmap place-channel-get
                        pls)])
-      (add-candidate c))))
+      (add-candidate c))
+
+    (>> (make-p the-reactor the-reactor)
+        add-candidate  #|Cover the blind spot|#)
+
+    (cons! (compress the-reactor)
+           db  #|db grows|#)))
+
 
 ;;; Jobs
-(let ([r  (select)])
-  (col r)
-  (com r))
+(def (job1)
+  (load!)
+  (repeat 5
+          (thunk (select!)
+                 (col!)
+                 (com!)
+                 (displayln (num))
+                 (displayln (can-num))))
+  (save))
 
-(displayln db)
-(displayln candidates)
+;; (job1)

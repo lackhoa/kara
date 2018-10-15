@@ -100,21 +100,21 @@
 (def place-collide
   (place-version collide))
 
-(def (make-mp fun arg)
+(def (make-p fun arg)
   ;; mol% -> mol% -> cmol%
-  (>> (pull mp '[1] fun)
-      (lam (mp1)
-        (pull mp1 '[2] arg))
-      (lam (mp2)
+  (>> (pull p '[1] fun)
+      (lam (p1)
+        (pull p1 '[2] arg))
+      (lam (p2)
         (compress (#|get conclusion|#
-                   detach mp2 '[0])))))
+                   detach p2 '[0])))))
 
 (def (combine reactor ort)
   ;; mol% -> [cmol%] -> [cmol%]  (new formulas)
   (for/fold ([accu  '()]) ([orti  ort])
     (let ([orti  (decompress orti)])
-      (append (exclude-false `(,(make-mp orti reactor)
-                               ,(make-mp reactor orti)))
+      (append (exclude-false `(,(make-p orti reactor)
+                               ,(make-p reactor orti)))
               accu))))
 
 (def place-combine
