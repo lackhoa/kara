@@ -82,8 +82,6 @@
       [#t  new-ort]
       [#f  (cons orti new-ort)])))
 
-
-
 (def (make-p fun arg)
   ;; mol% -> mol% -> cmol%
   (>> (pull p '[1] fun)

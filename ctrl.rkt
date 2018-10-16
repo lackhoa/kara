@@ -13,7 +13,6 @@
 (def VIEW-FILE "db/view.rkt")
 (def CAN-LIM   10)
 
-
 (def db '()  #|[cmols]|#)
 (def candidates
   #|[cmols]|#
@@ -21,7 +20,8 @@
     (vector-set! res 0 (map compress short-axioms)
                  #|axioms' height < 10|#)
     res))
-(def the-reactor #f)
+
+(def the-reactor #f)  #|mol%|#
 
 (def (load!)
   (set! db (file->list DB-FILE))
@@ -38,7 +38,7 @@
 (def (num)
   (length db))
 
-(def (can-num)
+(def (can-nums)
   (for/list ([i  (in-range CAN-LIM)])
     (length (league i))))
 
@@ -93,9 +93,9 @@
                 (place ch
                   (let loop ()
                     (match (place-channel-get ch)
-                      [`(instance? ,can ,og)
+                      [`(extra-instance? ,can ,og)
                        (place-channel-put ch
-                                          (instance? can og))]
+                                          (instance? can (decompress og)))]
                       [`(collide ,reactor ,ort)
                        (place-channel-put ch
                                           (collide reactor ort))]
@@ -104,34 +104,42 @@
                                           (combine reactor ort))])
                     (loop))))))
 
-(define (main)
+(define (main!)
   (def (select!)
     (#|Loop until we can find a reactor|#
      for/or ([_  (in-naturals)])
       (let ([can  (get-can!)])
-        (with-handlers)
-        (for ([p  pls]  [db-it  (take db CORES)])
-          (place-channel-put p `(,can ,db-it)))
+        (let ([involved  (if (len<= db CORES  #|Booting occurence|#)
+                             (take pls (length db))
+                             pls)])
+          (for ([p      involved]
+                [db-it  (take-not-more db CORES)])
+            (place-channel-put p `(extra-instance? ,can ,db-it)))
 
-        (let test-loop ([db-deck  (list-tail db CORES)  #|We are exhausting db|#]
-                        [running  pls])
-          (def (make-test-handler p)
-            (handle-evt p
-                        (lam (m)
-                          (match m
-                            [#f  (begin (for-each place-wait pls)
-                                        #f  #|dropping this candidate|#)]
-                            [#t  (match db-deck
-                                   ['()         (test-loop '() (remove p running))]
-                                   [(cons m ms)
-                                    (place-channel-put p `(instance? ,can ,m))
-                                    (test-loop ms running)])])))
-            #|Defined and applied here b/c it refers to db-deck and running# |#)
-          (match running
-            ['()  (set! the-reactor can)
-             #|All cores approved|#]
-            [_    (apply sync
-                    (map make-test-handler running))])))))
+          (let test-loop ([db-deck  (list-tail-safe db CORES)  #|Exhausting db|#]
+                          [running  involved])
+            (def (make-test-handler p)
+              (handle-evt p
+                          (lam (m)
+                            (match m
+                              [#t  (#|Abort candidate, wait for everyone to return|#
+                                    let wait-loop ([running#  (sub1 (length running)
+                                                                    #|minus `p`|#)])
+                                     (match running#
+                                       [0  #f]
+                                       [_  (apply sync running)
+                                           (wait-loop (sub1 running#))]))]
+                              [#f  (match db-deck
+                                     ['()         (test-loop '() (remove p running))]
+                                     [(cons m ms)
+                                      (place-channel-put p `(extra-instance? ,can ,m))
+                                      (test-loop ms running)])])))
+              #|Defined here b/c it refers to `db-deck` and `running`|#)
+            (match running
+              ['()  (set! the-reactor can)
+               #|All cores approved|#]
+              [_    (apply sync
+                      (map make-test-handler running))]))))))
 
   (def (col!)
     (#|db to be reduced to its subset|#
@@ -155,4 +163,7 @@
     (cons! (compress the-reactor)
            db  #|db grows|#))
 
-  (begin (select!) (col!) (com!)))
+  (begin (select!)
+         (col!)
+         (com!)
+         (collect-garbage)))
