@@ -87,74 +87,22 @@
           [else           (error "A super-height has appeared"
                                  (height c))])))
 
-(def pls
-  (build-list CORES
-              (lam (_)
-                (place ch
-                  (let loop ()
-                    (match (place-channel-get ch)
-                      [`(extra-instance? ,can ,og)
-                       (place-channel-put ch
-                                          (instance? can (decompress og)))]
-                      [`(collide ,reactor ,ort)
-                       (place-channel-put ch
-                                          (collide reactor ort))]
-                      [`(combine ,reactor ,ort)
-                       (place-channel-put ch
-                                          (combine reactor ort))])
-                    (loop))))))
-
 (define (main!)
   (def (select!)
     (#|Loop until we can find a reactor|#
      for/or ([_  (in-naturals)])
       (let ([can  (get-can!)])
-        (let ([involved  (if (len<= db CORES  #|Booting occurence|#)
-                             (take pls (length db))
-                             pls)])
-          (for ([p      involved]
-                [db-it  (take-not-more db CORES)])
-            (place-channel-put p `(extra-instance? ,can ,db-it)))
-
-          (let test-loop ([db-deck  (list-tail-safe db CORES)  #|Exhausting db|#]
-                          [running  involved])
-            (def (make-test-handler p)
-              (handle-evt p
-                          (lam (m)
-                            (match m
-                              [#t  (#|Abort candidate, wait for everyone to return|#
-                                    let wait-loop ([running#  (sub1 (length running)
-                                                                    #|minus `p`|#)])
-                                     (match running#
-                                       [0  #f]
-                                       [_  (apply sync running)
-                                           (wait-loop (sub1 running#))]))]
-                              [#f  (match db-deck
-                                     ['()         (test-loop '() (remove p running))]
-                                     [(cons m ms)
-                                      (place-channel-put p `(extra-instance? ,can ,m))
-                                      (test-loop ms running)])])))
-              #|Defined here b/c it refers to `db-deck` and `running`|#)
-            (match running
-              ['()  (set! the-reactor can)
-               #|All cores approved|#]
-              [_    (apply sync
-                      (map make-test-handler running))]))))))
+        (if (findf (lam (m) (instance? can (decompress m)))
+                   db)
+            #f
+            (set! the-reactor can)))))
 
   (def (col!)
-    (#|db to be reduced to its subset|#
-     set! db
-      (flatten1 (for/list ([db-part  (split-evenly db CORES)]
-                           [pl       pls])
-                  (place-channel-put/get pl
-                                         `(collide ,the-reactor ,db-part))))))
+    (set! db (collide the-reactor db)))
 
   (def (com!)
     #|The only phase where db and candidates grow|#
-    (for ([c  (flatten1 (for/list ([db-part  (split-evenly db CORES)]
-                                   [pl       pls])
-                          (place-channel-put/get pl
-                                                 `(combine ,the-reactor ,db-part))))])
+    (for ([c  (combine the-reactor db)])
       (add-can! c))
 
     (>> (make-p the-reactor the-reactor)
@@ -163,7 +111,4 @@
     (cons! (compress the-reactor)
            db  #|db grows|#))
 
-  (begin (select!)
-         (col!)
-         (com!)
-         (collect-garbage)))
+  (begin (select!) (col!) (com!)))

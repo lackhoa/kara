@@ -5,9 +5,11 @@
          "enum.rkt"
          "types.rkt")
 
-
-(begin (load!)
-       (main!)
-       (displayln (num))
-       (displayln (can-nums))
-       (save))
+(load!)
+(repeat 10000
+        (thunk
+         (repeat 20 (thunk
+                     (main!)
+                     (displayln (num))
+                     (displayln (can-nums))))
+         (save)))
