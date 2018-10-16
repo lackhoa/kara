@@ -86,9 +86,8 @@
   ;; mol% -> mol% -> cmol%
   (>> (pull p '[1] fun)
       (f> pull '[2] arg)
-      (lam (p2)
-        (compress (#|get conclusion|#
-                   detach p2 '[0])))))
+      (f> detach '[0]  #|get conclusion|#)
+      compress))
 
 (def (combine reactor ort)
   ;; mol% -> [cmol%] -> [cmol%]  (new formulas)
