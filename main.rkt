@@ -5,7 +5,7 @@
          "enum.rkt"
          "types.rkt")
 
-(load!)
+;; (load!)
 (repeat 10000
         (thunk
          (repeat 20 (thunk

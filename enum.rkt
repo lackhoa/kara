@@ -44,6 +44,7 @@
                                                 `(,@path1 ,i)
                                                 `(,@path2 ,i)))))]
                [_         #f]))))
+    (trace same-down?)
 
     (let-values ([(post p1 p2)
                   (split-common-postfix path1 path2)])
@@ -52,6 +53,7 @@
                  [p2i    p2]
                  [mol1   (ref root p1)]
                  [mol2   (ref root p2)])
+        (displayln "This is mol1")(displayln mol1)
         (andb (andb mol1 mol2  #|Both do exist|#)
               (match posti
                 ['()              (same-down? mol1 mol2 p1i p2i)]
