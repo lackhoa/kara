@@ -179,13 +179,13 @@
       (append new-pre
               (list-tail li (length pre)))))
 
-  (let loop ([p  from])
-    (mol% (swap-prefix (ref-sync root p)
+  (let loop ([mol  (ref root from)])
+    (mol% (swap-prefix (mol%-sync mol)
                        from
                        to)
-          (ref-data root p)
-          (for/list ([kid-path  (kids-paths root p)])
-            (loop kid-path)))))
+          (mol%-data mol)
+          (for/list ([kid  (mol%-kids mol)])
+            (loop kid)))))
 
 (def (attach root branch to)
   (replace (update root to)

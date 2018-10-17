@@ -134,7 +134,7 @@
 
  (def mp (sy (sy (up (up new-root '[]  'mp=>) '[1 0]  '->) '[0]  '[1 0 1]) '[1 0 0]  '[2 0]))
 
- (newline) (displayln "Let's begin MOTHERFUCKER!")
+ (newline)
  (def rt mp)
  (set! rt (pull rt '[1] ai))
  (displayln "Conclusion says (-> A (-> B A))")

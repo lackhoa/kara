@@ -48,18 +48,22 @@
                           (rcdr path1)
                           (rcdr path2)))])))
 
-  (let loop ([path  '[]])
-    (andb (match (ref-data model path)
+  (let loop ([path  '[]]
+             [mol   model])
+    (andb (match (mol%-data mol)
             [#f  #t]
             [md  (eq? md (ref-data ins path))]  #|Data|#)
 
-          (let* ([sync-ls  (ref-sync model path)]
+          (let* ([sync-ls  (mol%-sync mol)]
                  [pct      (car sync-ls)])
             (for/andb ([p  (cdr sync-ls)])
-              (same? ins pct p)) #|Topology|#)
+              (same? ins pct p))  #|Topology|#)
 
-          (for/andb ([kid-path  (kids-paths model path)])
-            (loop kid-path)  #|Recursion|#))))
+          (let ([kids  (mol%-kids mol)])
+            (for/andb ([kid-path  (for/list ([i  (range (length kids))])
+                                    (rcons path i))]
+                       [kid       kids])
+              (loop kid-path kid)  #|Recursion|#)))))
 
 (def (complexity m)  ;; mol% -> nat
   (add1 (sum-list (map complexity
