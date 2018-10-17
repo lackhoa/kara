@@ -17,23 +17,29 @@
                     (time (com 10))
                     (time (col 1))
                     (displayln (num))
-                    (save FILE-NAME)))]
+                    (save FILE-NAME)))]))
 
-    [("3")      (let* ([db1        (file->list "db/data1")]
-                       [db2        (file->list "db/data2")]
-                       [merge      (append db1 db2)]
-                       [avg-len    (round (/ (length merge) 2))]
-                       [new-merge  (shuffle merge)])
-                  (let-values ([(new-db1 new-db2)
-                                (split-at new-merge avg-len)])
-                    (call-with-output-file "db/data1"
-                      #:exists 'truncate
-                      (lam (out)
-                        (for ([m  new-db1])
-                          (wm m out))))
-
-                    (call-with-output-file "db/data2"
-                      #:exists 'truncate
-                      (lam (out)
-                        (for ([m  new-db2])
-                          (wm m out))))))]))
+(def (same? root path1 path2)
+  ;; mol% -> path -> path -> bool
+  ;; the meaning of uttering "path1 is synced with path2"
+  (let ([mol1  (ref root path1)]
+        [mol2  (ref root path2)])
+    (match (andb mol1 mol2)
+      [#t  (orb (member path1 (mol%-sync mol2))
+                (let ([ctor  (mol%-data mol1)])
+                  (match (mol%-data mol2)
+                    [#f        #f]
+                    [(== ctor)  (let ([kpaths1  (kids-paths root path1)]
+                                     [kpaths2  (kids-paths root path2)])
+                                 (andb (eq? (ctor-arity ctor)
+                                            (length kpaths1)
+                                            (length kpaths2))
+                                       (for/andb ([kp1  kpaths1]
+                                                  [kp2  kpaths2])
+                                         (same? root kp1 kp2))))]
+                    [_         #f])))]
+      [#f  (andb (not (orb mol1 mol2)
+                    #|If they were synced, both would exist|#)
+                 (same? root
+                        (rcdr path1)
+                        (rcdr path2)))])))

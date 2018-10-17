@@ -81,10 +81,10 @@
         (dm ccs2 out) (newline out))))
 
   (for/fold ([new-ort  '()]) ([orti  ort])
-    (match (instance? (decompress orti)
-                      reactor)
-      [#t  new-ort]
-      [#f  (cons orti new-ort)])))
+    (if (instance? (decompress orti)
+                   reactor)
+        new-ort
+        (cons orti new-ort))))
 
 (def (make-p fun arg)
   ;; mol% -> mol% -> cmol%

@@ -67,3 +67,26 @@
  (check-false (instance? r1 r2))
  (check-true (< (complexity r1)
                 (complexity r2))))
+
+(test-case
+ "Super edgy cases (well not really)"
+ (def r1
+   ;; (-> (-> A B) (-> B A))
+   (sy (sy (up (up (up new-root '[] '->) '[0] '->) '[1] '->) '[0 0] '[1 1]) '[0 1] '[1 0]))
+ (dm r1)
+
+ (def r2
+   ;; (-> A A)
+   (sy (up (up (up new-root '[] '->) '[0] '->) '[1] '->) '[0] '[1]))
+ (dm r2)
+
+ (check-false (instance? r2 r1))
+
+ (def r3
+   ;; (-> (-> A ?) (-> ? A))
+   (sy (up (up (up new-root '[] '->) '[0] '->) '[1] '->) '[0 0] '[1 1]))
+ (dm r3)
+
+ (check-false (instance? r2 r3))
+ (check-true (instance? r1 r3))
+ )

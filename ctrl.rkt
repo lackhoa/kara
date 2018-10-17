@@ -7,15 +7,13 @@
 
 (print-graph #t)
 
-(def CORES     2)
 (def DB-FILE   "db/db")
 (def CAN-FILE  "db/can")
 (def VIEW-FILE "db/view.rkt")
 (def CAN-LIM   10)
 
-(def db '()  #|[cmols]|#)
-(def candidates
-  #|[cmols]|#
+(def db '()  #| [cmols] |#)
+(def candidates  #| [cmols] |#
   (let ([res  (make-vector CAN-LIM '())])
     (vector-set! res 0 (map compress short-axioms)
                  #|axioms' height < 10|#)
@@ -89,7 +87,7 @@
 
 (define (main!)
   (def (select!)
-    (#|Loop until we can find a reactor|#
+    (#|Loop until we can find a new value for `the-reactor`|#
      for/or ([_  (in-naturals)])
       (let ([can  (get-can!)])
         (if (findf (lam (m) (instance? can (decompress m)))
