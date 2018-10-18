@@ -15,59 +15,52 @@
                         ['()  0]
                         [_    (add1 (apply max (map height kids)))])]))
 
-(def (instance? ins model)
-  ;; mol% -> mol% -> bool
-  ;; Check if `ins` is an instance? of `model`
-  (def (ctor-arity s)
-    (case s
-      [(->)   2]
-      [else  0  #|This enables the use of arbitrary variables|#]))
+(def (ctor-arity s)
+  (case s
+    [(->)   2]
+    [else  0  #|This enables the use of arbitrary variables|#]))
 
-  (def (same? root path1 path2)
+(def (normalize mol)
+  (let inner ([m     mol]
+              [path  '[]])
+    (match (mol%-data m)
+      [#f    (mol%-set-kids m
+                            (for/list ([kid  (mol%-kids m)]
+                                       [i    (in-naturals)])
+                              (inner kid `[,@path ,i])))]
+
+      [ctor  (let ([arity  (ctor-arity ctor)])
+               (match arity
+                 [0  m  #|No children|#]
+                 [_  (>> (update m `[,(sub1 arity)]  #|Fill to arity|#)
+                         (f> mol%-set-sync `(,path)  #|Cut all ties, bond at lower level|#)
+                         (f> mol%-set-kids (for/list ([kid  (mol%-kids m)]
+                                                      [i    (in-naturals)])
+                                             (inner kid `[,@path ,i]))))]))])))
+
+(def (instance? ins model)
+  (def (same? root path1 path2 path1 path2)
     ;; mol% -> path -> path -> bool
     ;; the meaning of uttering "path1 is synced with path2"
-    (def (same-down? mol1 mol2 path1 path2)
-      (orb (member path1 (mol%-sync mol2)  #|explicitly synced|#)
-           (let ([ctor  (mol%-data mol1)])
-             (match (mol%-data mol2)
-               [#f        #f]
-               [(== ctor)  (let* ([kids1  (mol%-kids mol1)]
-                                 [kids2  (mol%-kids mol2)]
-                                 [klen   (length kids1)])
-                            (andb (eq? klen
-                                       (ctor-arity ctor)
-                                       (length kids2))
-                                  (for/andb ([kid1  kids1]
-                                             [kid2  kids2]
-                                             [i     (in-range klen)])
-                                    (same-down? kid1 kid2
-                                                `(,@path1 ,i)
-                                                `(,@path2 ,i)))))]
-               [_         #f]))))
-    (trace same-down?)
+    (orb (member path1 (mol%-sync mol2)  #|explicitly synced|#)
+         (let ([ctor  (mol%-data mol1)])
+           (match (mol%-data mol2)
+             [#f        #f]
+             [(== ctor)  (let* ([kids1  (mol%-kids mol1)]
+                               [kids2  (mol%-kids mol2)]
+                               [klen   (length kids1)])
+                          (andb (eq? klen
+                                     (ctor-arity ctor)
+                                     (length kids2))
+                                (for/andb ([kid1  kids1]
+                                           [kid2  kids2]
+                                           [i     (in-naturals)])
+                                  (same-down? kid1 kid2
+                                              `(,@path1 ,i)
+                                              `(,@path2 ,i)))))]
+             [_         #f]))))
 
-    (let-values ([(post p1 p2)
-                  (split-common-postfix path1 path2)])
-      (let loop ([posti  post  #|Tracing the path down|#]
-                 [p1i    p1]
-                 [p2i    p2]
-                 [mol1   (ref root p1)]
-                 [mol2   (ref root p2)])
-        (displayln "This is mol1")(displayln mol1)
-        (andb (andb mol1 mol2  #|Both do exist|#)
-              (match posti
-                ['()              (same-down? mol1 mol2 p1i p2i)]
-                [`(,pcar ,@pcdr)  (let ([kid1  (ref mol1 `[,pcar])]
-                                        [kid2  (ref mol2 `[,pcar])])
-                                    (orb (andb (not (orb kid1 kid2)  #|Both do not exist|#)
-                                               (member p1i (mol%-sync mol2)  #|explicit sync|#))
-                                         (loop pcdr
-                                               kid1
-                                               kid2
-                                               `(,@p1i ,pcar)
-                                               `(,@p2i ,pcar))))])))))
-
-  (let ([cache  '()  #|The cache, in the sync list is long|#])
+  (let ([cache  '()])
     (let loop ([path  '[]]
                [mol   model])
       (andb (match (mol%-data mol)
