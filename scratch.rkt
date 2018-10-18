@@ -58,17 +58,17 @@
              (match (mol%-data mol2)
                [#f        #f]
                [(== ctor)  (let* ([kids1  (mol%-kids mol1)]
-                                 [kids2  (mol%-kids mol2)]
-                                 [klen   (length kids1)])
-                            (andb (eq? klen
-                                       (ctor-arity ctor)
-                                       (length kids2))
-                                  (for/andb ([kid1  kids1]
-                                             [kid2  kids2]
-                                             [i     (in-range klen)])
-                                    (same-down? kid1 kid2
-                                                `(,@path1 ,i)
-                                                `(,@path2 ,i)))))]
+                                  [kids2  (mol%-kids mol2)]
+                                  [klen   (length kids1)])
+                             (andb (eq? klen
+                                        (ctor-arity ctor)
+                                        (length kids2))
+                                   (for/andb ([kid1  kids1]
+                                              [kid2  kids2]
+                                              [i     (in-range klen)])
+                                     (same-down? kid1 kid2
+                                                 `(,@path1 ,i)
+                                                 `(,@path2 ,i)))))]
                [_         #f]))))
     (trace same-down?)
 
@@ -113,3 +113,53 @@
                                       (rcons path i))]
                          [kid       kids])
                 (loop kid-path kid)  #|Recursion|#))))))
+
+(def (msync root path1 path2)
+  ;; Establish a new synchronization, update if needed.
+  (def (sync-data root p1 p2)
+    (match* ((ref-data root p1)
+             (ref-data root p2))
+      [(x x)    root]
+      [(#f d2)  (update root p1 d2)]
+      [(d1 #f)  (update root p2 d1)]
+      [(_ _)    #f]))
+
+  (def (level-kids root p1 p2)
+    (let ([i1  (last-index (ref-kids root p1))]
+          [i2  (last-index (ref-kids root p2))])
+      ;; Add the missing kids
+      (cond [(< i1 i2)  (update root (rcons p1 i2))]
+            [(> i1 i2)  (update root (rcons p2 i1))]
+            [else       root])))
+
+  (def (sync-sync root p1 p2)
+    (def (incest? p1 p2  #|Naming much?|#)
+      (let-values ([(tl1 tl2)
+                    (drop-common-prefix p1 p2)])
+        (or (null? tl1) (null? tl2))))
+
+    (let ([sy1  (ref-sync root p1)]
+          [sy2  (ref-sync root p2)])
+      (and (not (for*/or ([p1  sy1]
+                      [p2  sy2])
+              (incest? p1 p2)))
+
+         (let ([proc  (f> mol%-set-sync (append sy1 sy2))])
+           #|Establish the connections|#
+           (do&inform (do&inform root p1 proc) p2 proc)))))
+
+  (let* ([root        (update root path1)]
+         [root        (update root path2)])
+    (let loop ([root  root]
+               [p1    path1]
+               [p2    path2])
+      (match (bool (member p1 (ref-sync root p2)))
+        [#t  root]
+        [#f  (>> root
+                 (f> sync-data  p1 p2)
+                 (f> level-kids p1 p2)
+                 (f> sync-sync  p1 p2)
+                 (lam (r) (for/fold ([r  r]) ([new-p1  (kids-paths r p1)]
+                                            [new-p2  (kids-paths r p2)])
+                          #:break (not r)
+                          (loop r new-p1 new-p2))))]))))
