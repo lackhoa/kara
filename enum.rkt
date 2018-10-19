@@ -5,6 +5,17 @@
 
 (provide (all-defined-out))
 
+(def instance-file (make-parameter "log/instance.rkt"))
+(def debug? (make-parameter '#f))
+
+(def (log-instance ccs1 ccs2)
+  ;; mol% -> mol% -> void
+  (with-output-to-file (instance-file)
+    #:exists 'append
+    (thunk
+     (pdisplay ccs1 35) (displayln (make-string 80 #\<))
+     (pdisplay ccs2 35) (newline))))
+
 (def (height mol/var)
   ;; Just a metric
   (mdispatch mol/var
@@ -30,8 +41,8 @@
                               (const #f  #|not here, instance is even more general|#)
                               (lam (ins-data ins-kids)
                                 (and (eq? mod-data ins-data)
-                                   (for/and ([ins-kid ins-kids]
-                                             [mod-kid mod-kids])
+                                   (for/and ([ins-kid  ins-kids]
+                                             [mod-kid  mod-kids])
                                      (inner ins-kid mod-kid)))))))))
 
   (def (get-topology)
@@ -62,35 +73,8 @@
 
   (and (data-match?)
      (for/and ([paths (get-topology)])
-       (synced? instance paths))))
-
-;; (def (collide reactor ort)
-;;   ;; mol% -> [cmol%] -> [cmol%]
-;;   ;; Returns ort, after colliding with reactor
-;;   (def (log-discard ccs1 ccs2)
-;;     ;; mol% -> mol% -> void
-;;     (with-output-to-file "db/discard.rkt"
-;;       (thunk
-;;        (displayln ccs1) (displayln (make-string 80 #\<))
-;;        (displayln ccs2) (newline))))
-
-;;   (for/fold ([new-ort  '()]) ([orti  ort])
-;;     (if (instance? (decompress orti)
-;;                    reactor)
-;;         new-ort
-;;         (cons orti new-ort))))
-
-;; (def (make-p fun arg)
-;;   ;; mol% -> mol% -> cmol%
-;;   (>> (pull p '[1] fun)
-;;       (f> pull '[2] arg)
-;;       (f> detach '[0]  #|get conclusion|#)
-;;       compress))
-
-;; (def (combine reactor ort)
-;;   ;; mol% -> [cmol%] -> [cmol%]  (new formulas)
-;;   (for/fold ([accu  '()]) ([orti  ort])
-;;     (let ([orti  (decompress orti)])
-;;       (append (exclude-false `(,(make-p orti reactor)
-;;                                ,(make-p reactor orti)))
-;;               accu))))
+       (synced? instance paths))
+     #|Done|#
+     (begin (when (debug?)
+              (log-instance instance model))
+            #t)))

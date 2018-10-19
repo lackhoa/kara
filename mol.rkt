@@ -63,12 +63,12 @@
        (and (eq? ctor1 ctor2)
           (let ([new-paths  (for/list ([i  (range (length kids1))])
                               `(,@p ,i))])
-            (let inner2 ([m   m]
-                         [ps  new-paths])
+            (let inner2 ([m  m]
+                         [ps new-paths])
               (match ps
                 ['()               m]
-                [`(,new-p ,@rest) (>> (inner m new-p)
-                                      (f> inner2 rest))]))))])))
+                [`(,new-p ,@rest)  (>> (inner m new-p)
+                                       (f> inner2 rest))]))))])))
 
 (def (last-var mol/var)
   (mdispatch mol/var
