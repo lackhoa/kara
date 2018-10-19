@@ -5,114 +5,92 @@
 
 (provide (all-defined-out))
 
-(def (height c/mol)
-  ;; Used for synchronization
-  (match c/mol
-    [(list _ kids)    (match kids
-                        ['()  0]
-                        [_    (add1 (apply max (map height kids)))])]
-    [(list _ _ kids)  (match kids
-                        ['()  0]
-                        [_    (add1 (apply max (map height kids)))])]))
+(def (height mol/var)
+  ;; Just a metric
+  (mdispatch mol/var
+             (const 0)
+             (lam (_ kids)
+               (add1 (apply max (map height kids))))))
 
-(def (ctor-arity s)
-  (case s
-    [(->)   2]
-    [else  0  #|This enables the use of arbitrary variables|#]))
+(def (size mol/var)
+  ;; A better metric?
+  (mdispatch mol/var
+             (const 1)
+             (lam (_ kids)
+               (add1 (apply + (map size kids))))))
 
-(def (normalize mol)
-  (let inner ([m     mol]
-              [path  '[]])
-    (match (mol%-data m)
-      [#f    (mol%-set-kids m
-                            (for/list ([kid  (mol%-kids m)]
-                                       [i    (in-naturals)])
-                              (inner kid `[,@path ,i])))]
+(def (instance? instance model)
+  (def (data-match?)
+    (let inner ([ins  instance]
+                [mod  model])
+      (mdispatch mod
+                 (const #t   #|variables can be anything|#)
+                 (lam (mod-data mod-kids)
+                   (mdispatch ins
+                              (const #f  #|not here, instance is even more general|#)
+                              (lam (ins-data ins-kids)
+                                (and (eq? mod-data ins-data)
+                                   (for/and ([ins-kid ins-kids]
+                                             [mod-kid mod-kids])
+                                     (inner ins-kid mod-kid)))))))))
 
-      [ctor  (let ([arity  (ctor-arity ctor)])
-               (match arity
-                 [0  m  #|No children|#]
-                 [_  (>> (update m `[,(sub1 arity)]  #|Fill to arity|#)
-                         (f> mol%-set-sync `(,path)  #|Cut all ties, bond at lower level|#)
-                         (f> mol%-set-kids (for/list ([kid  (mol%-kids m)]
-                                                      [i    (in-naturals)])
-                                             (inner kid `[,@path ,i]))))]))])))
+  (def (get-topology)
+    ;; Returns map of variable to paths
+    (hash-values  #|We only care about the paths|#
+     (let inner ([res   (hasheq)]
+                 [m/v   model]
+                 [path  '[]])
+       (mdispatch m/v
+                  (lam (v)
+                    (hash-set res
+                              v
+                              (match (hash-ref res v #f)
+                                [#f  `(,path)]
+                                [ps  `(,path ,@ps)])))
 
-(def (instance? ins model)
-  (def (same? root path1 path2 path1 path2)
-    ;; mol% -> path -> path -> bool
-    ;; the meaning of uttering "path1 is synced with path2"
-    (orb (member path1 (mol%-sync mol2)  #|explicitly synced|#)
-         (let ([ctor  (mol%-data mol1)])
-           (match (mol%-data mol2)
-             [#f        #f]
-             [(== ctor)  (let* ([kids1  (mol%-kids mol1)]
-                               [kids2  (mol%-kids mol2)]
-                               [klen   (length kids1)])
-                          (andb (eq? klen
-                                     (ctor-arity ctor)
-                                     (length kids2))
-                                (for/andb ([kid1  kids1]
-                                           [kid2  kids2]
-                                           [i     (in-naturals)])
-                                  (same-down? kid1 kid2
-                                              `(,@path1 ,i)
-                                              `(,@path2 ,i)))))]
-             [_         #f]))))
+                  (lam (_ kids)
+                    (for/fold
+                        ([res res])
+                        ([kid kids] [kpath (for/list ([i  (range (length kids))])
+                                             `(,@path ,i))])
+                      (inner res kid kpath)))))))
 
-  (let ([cache  '()])
-    (let loop ([path  '[]]
-               [mol   model])
-      (andb (match (mol%-data mol)
-              [#f  #t]
-              [md  (eq? md (ref-data ins path))]  #|Data|#)
+  (def (synced? mol paths)
+    ;; the meaning of saying "`paths` are synchronized"
+    (apply equal?
+      (map (curry ref mol) paths)))
 
-            (let* ([sync-ls  (mol%-sync mol)]
-                   [pct      (car sync-ls)])
-              (orb (findf (lam (ci)  (member pct ci))
-                          cache)
-                   (andb (for/andb ([p  (cdr sync-ls)])
-                           (same? ins pct p))
-                         (cons! sync-ls cache))) #|Topology|#)
+  (and (data-match?)
+     (for/and ([paths (get-topology)])
+       (synced? instance paths))))
 
-            (let ([kids  (mol%-kids mol)])
-              (for/andb ([kid-path  (for/list ([i  (range (length kids))])
-                                      (rcons path i))]
-                         [kid       kids])
-                (loop kid-path kid)  #|Recursion|#))))))
+;; (def (collide reactor ort)
+;;   ;; mol% -> [cmol%] -> [cmol%]
+;;   ;; Returns ort, after colliding with reactor
+;;   (def (log-discard ccs1 ccs2)
+;;     ;; mol% -> mol% -> void
+;;     (with-output-to-file "db/discard.rkt"
+;;       (thunk
+;;        (displayln ccs1) (displayln (make-string 80 #\<))
+;;        (displayln ccs2) (newline))))
 
-(def (complexity m)  ;; mol% -> nat
-  (add1 (sum-list (map complexity
-                       (mol%-kids m)))))
+;;   (for/fold ([new-ort  '()]) ([orti  ort])
+;;     (if (instance? (decompress orti)
+;;                    reactor)
+;;         new-ort
+;;         (cons orti new-ort))))
 
-(def (collide reactor ort)
-  ;; mol% -> [cmol%] -> [cmol%]
-  ;; Returns ort, after colliding with reactor
-  (def (log-discard ccs1 ccs2)
-    ;; mol% -> mol% -> void
-    (call-with-output-file "db/discard.rkt"
-      #:exists 'append
-      (lam (out)
-        (dm ccs1 out) (displayln (make-string 80 #\<) out)
-        (dm ccs2 out) (newline out))))
+;; (def (make-p fun arg)
+;;   ;; mol% -> mol% -> cmol%
+;;   (>> (pull p '[1] fun)
+;;       (f> pull '[2] arg)
+;;       (f> detach '[0]  #|get conclusion|#)
+;;       compress))
 
-  (for/fold ([new-ort  '()]) ([orti  ort])
-    (if (instance? (decompress orti)
-                   reactor)
-        new-ort
-        (cons orti new-ort))))
-
-(def (make-p fun arg)
-  ;; mol% -> mol% -> cmol%
-  (>> (pull p '[1] fun)
-      (f> pull '[2] arg)
-      (f> detach '[0]  #|get conclusion|#)
-      compress))
-
-(def (combine reactor ort)
-  ;; mol% -> [cmol%] -> [cmol%]  (new formulas)
-  (for/fold ([accu  '()]) ([orti  ort])
-    (let ([orti  (decompress orti)])
-      (append (exclude-false `(,(make-p orti reactor)
-                               ,(make-p reactor orti)))
-              accu))))
+;; (def (combine reactor ort)
+;;   ;; mol% -> [cmol%] -> [cmol%]  (new formulas)
+;;   (for/fold ([accu  '()]) ([orti  ort])
+;;     (let ([orti  (decompress orti)])
+;;       (append (exclude-false `(,(make-p orti reactor)
+;;                                ,(make-p reactor orti)))
+;;               accu))))

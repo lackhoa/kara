@@ -3,108 +3,83 @@
          "mol.rkt")
 (provide (all-defined-out))
 
-(def up update)
-(def sy msync)
+;;; Models
+(def (get-model x)
+  (match x
+    ['->           `(mol% -> (var% 0) (var% 1))]
+    [(? symbol?)  `(mol% ,x)]
+    [(? number?)  `(mol% #f ,@(for/list ([i  (range x)])
+                                `(var% ,i)))]))
 
 ;;; Axioms
-(def i
-  ;; A -> A
-  (sy (up new-root '[] '->)
-      '[0] '[1]))
+(def i '(mol% -> (var% 0) (var% 0)) )
 
-(def k
-  ;; (-> A (-> B A))
-  (sy (up (up new-root '[] '->)
-          '[1] '->)
-      '[0] '[1 1]))
+(def k '(mol% ->
+              (var% 0)
+              (mol% -> (var% 1) (var% 0))))
+
+(def p '(mol% =>
+              (mol% -> (var% 0) (var% 1))
+              (var% 0)
+              (var% 1)))
 
 (def s
   ;; (-> (-> A
   ;;         (-> B C))
   ;;     (-> (-> A B)
   ;;         (-> A C)))
-  (>> new-root
-      (lam (r)  (up r '[]    '->))
-      (lam (r)  (up r '[0]   '->))
-      (lam (r)  (up r '[0 1] '->))
-      (lam (r)  (up r '[1]   '->))
-      (lam (r)  (up r '[1 0] '->))
-      (lam (r)  (up r '[1 1] '->))
-      (lam (r)  (sy r '[0 0]   '[1 0 0]))
-      (lam (r)  (sy r '[0 0]   '[1 1 0]))
-      (lam (r)  (sy r '[0 1 0] '[1 0 1]))
-      (lam (r)  (sy r '[0 1 1] '[1 1 1]))))
-
-(def ai
-  (>> (up new-root '[] 'ai=>)
-      (lam (r)  (pull r '[0] i))))
-
-(def as
-  (>> (up new-root '[] 'as=>)
-      (lam (r)  (pull r '[0] s))))
+  '(mol% ->
+         (mol% ->
+               (var% 0)
+               (mol% -> (var% 1) (var% 2)))
+         (mol% ->
+               (mol% ->
+                     (var% 0)
+                     (var% 1))
+               (mol% ->
+                     (var% 0)
+                     (var% 2)))))
 
 (def ak
-  (>> (up new-root '[] 'ak=>)
-      (lam (r)  (pull r '[0] k))))
+  '(mol% => (var% 0) (var% 1) ,k))
 
-(def axioms `(,ak ,as))
-(def short-axioms  `(,k ,s))
+(def as
+  '(mol% => (var% 0) (var% 1) ,s))
 
-(def p
-  ;; (B (-> A B) A)
-  (sy (sy (up new-root '[1] '->)
-          '[0] '[1 1]  #|B|#)
-      '[1 0] '[2]      #|A|#))
+(def mp '(mol% =>
+               (mol% =>
+                     (var% 2)
+                     (var% 3)
+                     (mol% -> (var% 0) (var% 1)))
+               (mol% => (var% 4) (var% 5) (var% 0))
+               (mol% => (var% 4) (var% 5) (var% 1))))
 
-(def mp
-  ;; (mp=> B
-  ;;       (=> (-> A B))
-  ;;       (=> A))
-  (sy (sy (up (up new-root '[] 'mp=>)
-              '[1 0] '->)
-          '[0] '[1 0 1]  #|B|#)
-      '[1 0 0] '[2 0]    #|A|#))
+(def axioms `(,ak ,as ,mp))
+(def maxims `(,k ,s ,p))
 
 ;;; Some theorems to prove
 (def w
   ;; (A -> (A -> B)) -> (A -> B)
-  (>> new-root
-      (lam (m) (up m '[]      '->))
-      (lam (m) (up m '[0]     '->))
-      (lam (m) (up m '[0 0]   'A))
-      (lam (m) (up m '[0 1]   '->))
-      (lam (m) (up m '[0 1 0] 'A))
-      (lam (m) (up m '[0 1 1] 'B))
-      (lam (m) (up m '[1]     '->))
-      (lam (m) (up m '[1 0]   'A))
-      (lam (m) (up m '[1 1]   'B))))
+  '(mol% ->
+         (mol% ->
+               (var% 0)
+               (mol% -> (var% 0) (var% 1)))
+         (mol% -> (var% 0) (var% 1))))
 
 (def c
   ;; (A -> (B -> C)) -> (B -> (A -> C))
-  (>> new-root
-      (lam (m) (up m '[]      '->))
-      (lam (m) (up m '[0]     '->))
-      (lam (m) (up m '[0 0]   'A))
-      (lam (m) (up m '[0 1]   '->))
-      (lam (m) (up m '[0 1 0] 'B))
-      (lam (m) (up m '[0 1 1] 'C))
-      (lam (m) (up m '[1]     '->))
-      (lam (m) (up m '[1 0]   'B))
-      (lam (m) (up m '[1 1]   '->))
-      (lam (m) (up m '[1 1 0] 'A))
-      (lam (m) (up m '[1 1 1] 'C))))
+  '(mol% ->
+         (mol% -> (var% 0) (mol% ->
+                                (var% 1)
+                                (var% 2)))
+         (mol% -> (var% 1) (mol% ->
+                                (var% 0)
+                                (var% 2)))))
 
 (def b
   ;; (B -> C) -> ((A -> B) -> (A -> C))
-  (>> new-root
-      (lam (m)  (up m '[]      '->))
-      (lam (m)  (up m '[0]     '->))
-      (lam (m)  (up m '[1]     '->))
-      (lam (m)  (up m '[1 0]   '->))
-      (lam (m)  (up m '[1 1]   '->))
-      (lam (m)  (up m '[1 0 0] 'A))
-      (lam (m)  (up m '[1 1 0] 'A))
-      (lam (m)  (up m '[0 0]   'B))
-      (lam (m)  (up m '[1 0 1] 'B))
-      (lam (m)  (up m '[0 1]   'C))
-      (lam (m)  (up m '[1 1 1] 'C))))
+  '(mol% ->
+         (mol% -> (var% 1) (var% 2))
+         (mol% ->
+               (mol% -> (var% 0) (var% 1))
+               (mol% -> (var% 0) (var% 2)))))
