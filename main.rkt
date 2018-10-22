@@ -5,6 +5,46 @@
          "enum.rkt"
          "types.rkt")
 
+(define (collide reactor ort)
+  ;; mol% -> [mol%] -> [mol%]
+  ;; Returns ort, after colliding with reactor
+  (for/fold
+      ([new-ort  '()])
+      ([orti     ort])
+    (if (instance? orti reactor)
+        new-ort
+        (cons orti new-ort))))
+
+(define (make-p fun arg)
+  ;; mol% -> mol% -> mol%
+  (>> (up p '[0] fun)
+      (f> up '[1] arg)
+      (f> ref '[2]  #|get conclusion|#)))
+
+(define (combine reactor ort)
+  ;; mol% -> [mol%] -> [mol%]  (new formulas)
+  (for/fold
+      ([accu  '()])
+      ([orti  ort])
+    `(,@(remq #f `(,(make-p orti reactor)
+                   ,(make-p reactor orti)))
+      ,@accu)))
+
+(define (split-evenly ls n)
+  (let-values ([(q r)  (quotient/remainder (length ls)
+                                           n)])
+    (let loop ([ls   ls]
+               [res  '()]
+               [i    0])
+      (cond [(= i (sub1 n))  (rcons res ls)]
+            [else
+             (let-values ([(ls1 ls2)  (split-at ls (if (< i r)
+                                                       (add1 q)
+                                                       q))])
+               (loop ls2
+                     (rcons res ls1)
+                     (add1 i)))]))))
+
 ;;; Parameters
 (debug? #f)
 (def db-file   (make-parameter "db/data"))

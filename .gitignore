@@ -2,7 +2,7 @@
 *.swo
 *.bak
 *~
-*.dep
-*.zo
-lang/
+*.so
+kara-lang/
+log/
 db/
