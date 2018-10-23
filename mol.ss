@@ -82,16 +82,17 @@
   (define (clean mol/var)
     (let ([dic      (make-eq-hashtable)]
           [counter  -1]  #|State variables|#)
-      (mol-< mol/var
-             (lambda (v)
-               (let ([lookup  (eq-hashtable-ref dic v #f)])
-                 (case lookup
-                   [#f    (set! counter (+ counter 1))
-                          (eq-hashtable-set! dic v counter)
-                          counter]
-                   [else  lookup])))
-             (lambda (ctor kids)
-               `(,ctor
-                 ,(map (lambda (kid)
-                         (clean kid  #|Influenced by `dic` and `counter`|#))
-                       kids)))))))
+      (let inner ([m/v  mol/var])
+        (mol-< m/v
+               (lambda (v)
+                 (let ([lookup  (eq-hashtable-ref dic v #f)])
+                   (case lookup
+                     [#f    (set! counter (+ counter 1))
+                            (eq-hashtable-set! dic v counter)
+                            counter]
+                     [else  lookup])))
+               (lambda (ctor kids)
+                 `(,ctor
+                   ,@(map (lambda (kid)
+                            (inner kid  #|Influenced by `dic` and `counter`|#))
+                          kids))))))))
