@@ -1,5 +1,5 @@
 (library (types)
-  (export i k p s)
+  (export i k p s b c maxims)
   (import (chezscheme)
           (kara-lang main)
           (mol))
@@ -15,6 +15,8 @@
     '(-> (-> 0 (-> 1 2))
         (-> (-> 0 1)
            (-> 0 2))))
+
+  (define maxims (list i k p))
 
   (define ak
     '(=> (#f) (#f) ,k))
