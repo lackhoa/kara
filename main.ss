@@ -1,4 +1,4 @@
-(library (main-funcs)
+(library (main-procs)
   (export cycle! load! save num can-nums view)
   (import (chezscheme) (kara-lang main)
           (mol) (enum) (types))
@@ -31,16 +31,19 @@
 
 ;;; State
   (define db '()      #| [mols] |#)
-  (define candidates  #| [mols] |#
-    maxims)
 
   (define the-reactor #f)  #|mol%|#
 
 ;;; State-altering procedures
   (define load!
-    (lambda ()
-      (set! db         (read (open-input-file (db-file))))
-      (set! candidates (read (open-input-file (can-file))))))
+    (let ([cmd   (string-append "sqlite 3 "
+                                (db-file)
+                                " "
+                                (ort-table))]
+          [out   (car (process cmd))])
+      (read proc))
+    (lambda () (set! db
+            (read (open-input-file )))))
 
   (define num
     (lambda () (length db)))
@@ -54,13 +57,7 @@
         (delete-file (db-file)))
 
       (call-with-output-file (db-file)
-        (lambda (out) (write db out)))
-
-      (when (file-exists? (can-file))
-        (delete-file (can-file)))
-
-      (call-with-output-file (can-file)
-        (lambda (out) (write candidates out)))))
+        (lambda (out) (write db out)))))
 
   (define view
     (lambda ()
@@ -78,22 +75,35 @@
           pydisplay)))
 
 ;;; The fun stuff
-;;; Parameters
-  (define db-file   (make-parameter "db/data"))
-  (define can-file  (make-parameter "db/can"))
-  (define view-file (make-parameter "log/view.ss"))
-  (define can-lim   (make-parameter 10))
+;;; Parameters (preferably strings)
+  (define db-file    (make-parameter "db/data.db"))
+  (define can-table  (make-parameter "can"))
+  (define view-file  (make-parameter "log/view.ss"))
+  (define can-lim    (make-parameter 10))
 
   (define get-can!
     ;; -> mol%
-    (lambda ()
-      (let ([res  (car candidates)])
-        (set! candidates (cdr candidates))
-        res)))
+    (#|Delete the old candidate|#
+     process
+     (format "sqlite3 ~a \"DELETE FROM ~a WHERE data = (SELECT data FROM ~a LIMIT 1)\""
+             (db-file)
+             (can-table)
+             (can-table)))
 
-  (define add-can!
-    (lambda (c)
-      (set! candidates (cons c candidates))))
+    (with-input-from-string
+        (get-string-some (format "sqlite3 ~s \"SELECT data FROM ~a LIMIT 1\""
+                                 (db-file)
+                                 (can-table)))
+      (eval `(quote ,(read)))))
+
+  (define add-cans!
+    (lambda (cans)
+      (process
+       (format "sqlite3 ~a \"INSERT INTO ~a VALUES ~a\""
+               (db-file)
+               (can-table)
+               (map (lambda (can) (format "(~a)" can))
+                    cans)))))
 
   (define cycle!
     (lambda ()
@@ -115,8 +125,7 @@
       (define com!
         #|The only phase where db and candidates grow|#
         (lambda ()
-          (for-each (lambda (c) (add-can! c))
-                    (combine the-reactor db))
+          (add-cans! (combine the-reactor db))
 
           (>> (make-p the-reactor the-reactor)
               add-can!  #|Cover the blind spot|#)
@@ -131,7 +140,7 @@
 
 (top-level-program
  (import (chezscheme) (kara-lang main)
-         (enum) (main-funcs))
+         (enum) (main-procs))
 
  (debug? #f)
 ;;; Jobs

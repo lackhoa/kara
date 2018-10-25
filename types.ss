@@ -19,10 +19,10 @@
   (define maxims (list i k p))
 
   (define ak
-    '(=> (#f) (#f) ,k))
+    '(=> (f) (f) ,k))
 
   (define as
-    '(=> (#f) (#f) ,s))
+    '(=> (f) (f) ,s))
 
   (define mp '(=> (=> 2 3 (-> 0 1))
                  (=> 4 5 0)
