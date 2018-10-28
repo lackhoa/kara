@@ -1,10 +1,24 @@
 (library (types)
-  (export i k p s b c maxims)
+  (export i k p s b c as ak mp
+          equality ent% ent-prem ent-ccs)
   (import (chezscheme)
           (kara-lang main)
           (mol))
 
 ;;; Combinators
+  (define ent%
+    (lambda (prem concl)
+      `(=> (pre ,@prem) ,concl)))
+
+  (define ent-prem
+    (lambda (ent)
+      (mol-< (ref ent '[0])
+             (lambda (_) #f  #|Be careful!|#)
+             (lambda (_ kids) kids))))
+
+  (define ent-ccs
+    (f> ref '[1]))
+
   (define i '(-> 0 0))
 
   (define k '(-> 0 (-> 1 0)))
@@ -16,17 +30,16 @@
         (-> (-> 0 1)
            (-> 0 2))))
 
-  (define maxims (list i k p))
-
   (define ak
-    '(=> (f) (f) ,k))
+    `(=> (pre) ,k))
 
   (define as
-    '(=> (f) (f) ,s))
+    `(=> (pre) ,s))
 
-  (define mp '(=> (=> 2 3 (-> 0 1))
-                 (=> 4 5 0)
+  (define mp '(=> (pre (=> 100 (-> 0 1))
+                      (=> 200 0))
                  1))
+
 
 ;;; Some more combinators
   (define w
@@ -40,4 +53,15 @@
   (define b
     '(-> (-> 1 2)
         (-> (-> 0 1)
-           (-> 0 2)))))
+           (-> 0 2))))
+
+  (define equality
+    '((=> (pre) (= 0 0))
+
+      (=> (pre (=> 100 (= 1 0)))
+         (= 0 1))
+
+      (=> (pre (=> 100 (= 0 1))
+              (=> 200 (= 1 2)))
+         (= 0 2))))
+  )
