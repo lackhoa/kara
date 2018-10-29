@@ -4,7 +4,7 @@
           (mol) (enum) (types))
 
 ;;; State
-  (define db (append equality))
+  (define db (append equality category))
   (define current #f)
 
   (define load!
@@ -30,7 +30,7 @@
     (lambda (ent)
       (define gather-nongrounded
         (lambda (ent)
-          (if (not (ent-prem ent))  (list ent)
+          (if (not (ent-prem ent))  (list (ent-ccs ent))
               (flatmap gather-nongrounded
                        (ent-prem ent)))))
 
@@ -41,6 +41,7 @@
     (lambda (root)
       (define cycle?
         (lambda (root path)
+          (pydisplay "This is cycle")
           (do ([p1    '[]   (append p1 (list-head p2 2))]
                [p2    path  (list-tail p2 2  #|2 is to skip to the premise|#)]
                [seen  '()   (cons (ent-ccs (ref root p1))
@@ -52,6 +53,7 @@
       (define extend
         ;; fill in an open entailment, #f if no method is available
         (lambda (root path)
+          (pydisplay "This is extend")
           (let ([candidates
                  (filter (f>> (negate (f> cycle? path)))
                          (map (l> up root path) db))])
@@ -69,7 +71,7 @@
                       (cond [(ent-prem (ref res p))
                              (loop res p)  #|Already filled, go down|#]
 
-                            [(ran-elem '(#f #t #t))
+                            [(ran-elem '(#f #t))
                              (let ([ext  (extend res p)])
                                (if ext (loop ext p)
                                    res))  #|Fill in a method|#]
