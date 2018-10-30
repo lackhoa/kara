@@ -1,6 +1,7 @@
 (import (kara-lang main)
-        (mol)
-        (types))
+        (mol))
+
+(load "types.ss")
 
 ;;; Assignment syntax
 (define-syntax up!
@@ -139,3 +140,7 @@
                     (ref root '[2]))))
   )
 (tricky-topology)
+
+(define (obvious)
+  (assert (up '(-> 0 0) '[] '(-> 0 0))))
+(obvious)

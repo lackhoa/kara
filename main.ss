@@ -1,96 +1,45 @@
-(library (main-procs)
-  (export main load! save store!)
-  (import (chezscheme) (kara-lang main)
-          (mol) (enum) (types))
+(import (chezscheme)
+        (kara-lang main)
+        (mol))
+(load "types.ss")
 
 ;;; State
-  (define db (append equality category))
-  (define current #f)
+(define db (append equality category))
+(define current #f)
 
-  (define load!
-    (lambda () (read (open-input-file (db-file)))))
+(define load!
+  (lambda () (read (open-input-file (db-file)))))
 
-  (define save
-    (lambda () (with-output-to-file (db-file)
-            (lambda () (write db)))))
+(define save
+  (lambda () (with-output-to-file (db-file)
+          (lambda () (write db)))))
 
 ;;; Parameters (preferably strings)
-  (define db-file    (make-parameter "db/data.db"))
-  (define view-file  (make-parameter "log/view.ss"))
+(define db-file    (make-parameter "db/data.db"))
+(define view-file  (make-parameter "log/view.ss"))
 
-  (define store!
-    (lambda () (set! db `(,current ,@db))))
+(define store!
+  (lambda () (set! db `(,current ,@db))))
 
 ;;; Functions
-  (define ran-elem
-    (lambda (ls)
-      (list-ref ls  (random (length ls)))))
+(define ran-elem
+  (lambda (ls)
+    (list-ref ls  (random (length ls)))))
 
-  (define shorten
-    (lambda (ent)
-      (define gather-nongrounded
-        (lambda (ent)
-          (if (not (ent-prem ent))  (list (ent-ccs ent))
-              (flatmap gather-nongrounded
-                       (ent-prem ent)))))
+(define ma
+  (lambda ()
+    ;; Choose one of the options: a. modus ponens, b. apply an axiom form
+    (clean
+     (trace-let loop ([root  mp]
+                      [path  '[]])
+       (cond [(and (not (equal? path '[]))
+                 (ran-elem '(#t #f)))
+              (>> (map (l> up root `[,@path 2])
+                       db)
+                  filter-false
+                  (lambda (ls) (if (null? ls) root
+                              (ran-elem ls))))]
 
-      (ent% (gather-nongrounded ent)
-            (ent-ccs ent))))
-
-  (define rmain
-    (lambda (root)
-      (define cycle?
-        (lambda (root path)
-          (pydisplay "This is cycle")
-          (do ([p1    '[]   (append p1 (list-head p2 2))]
-               [p2    path  (list-tail p2 2  #|2 is to skip to the premise|#)]
-               [seen  '()   (cons (ent-ccs (ref root p1))
-                                  seen)])
-              ((null? p2)
-               (ormap (f>> ent-ccs (f> member seen) bool)
-                      (ent-prem (ref root path)))))))
-
-      (define extend
-        ;; fill in an open entailment, #f if no method is available
-        (lambda (root path)
-          (pydisplay "This is extend")
-          (let ([candidates
-                 (filter (f>> (negate (f> cycle? path)))
-                         (map (l> up root path) db))])
-            (if (null? candidates) #f
-                (ran-elem candidates)))))
-
-      (let loop ([root  root]
-                 [path  '[]])
-        (let ([pnum
-               (length (ent-prem (ref root path)))])
-          (do ([i   0
-                    (+ i 1)]
-               [res root
-                    (let ([p  `(,@path 0 ,i)  #|To premise i|#])
-                      (cond [(ent-prem (ref res p))
-                             (loop res p)  #|Already filled, go down|#]
-
-                            [(ran-elem '(#f #t))
-                             (let ([ext  (extend res p)])
-                               (if ext (loop ext p)
-                                   res))  #|Fill in a method|#]
-
-                            [else  res  #|Bad roll|#]))])
-
-              ((>= i pnum)  res))))))
-
-  (define main
-    (lambda ()
-      (let* ([chosen  (ran-elem
-                       (filter (lambda (ent)
-                                 (not (null? (ent-prem ent))))
-                               db))]
-             [res     (>> chosen rmain shorten clean)])
-        (set! current res)
-        res))))
-
-(import (chezscheme) (kara-lang main)
-        (enum) (main-procs))
-
-(debug? #f)
+             [else  (>> (up root path mp)
+                        (f> loop `[,@path 0])
+                        (f> loop `[,@path 1]))])))))

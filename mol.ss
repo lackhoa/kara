@@ -38,7 +38,9 @@
             [m/v2  (ref m `[,@path2 ,@p])])
         (mol-< m/v1
                (lambda (v1)
-                 (and (not (has-var? m/v2 v1)  #|No Incest!|#)
+                 (and (mol-< m/v2
+                           (lambda _ #t)
+                           (lambda _ (not (has-var? m/v2 v1)  #|No Incest!|#)))
                     (substq m/v2 v1 m  #|v1 to be replaced by m/v2|#)))
                (lambda (ctor1 kids1)
                  (mol-< m/v2
