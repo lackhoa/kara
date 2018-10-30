@@ -57,10 +57,6 @@
             (-> (morph 0 2 3)
                (-> (morph 1 4 5) (= 3 5))))
 
-        '(-> (= (comp 0 1) 0)
-            (-> (= (comp 1 0) 0) (im 0))
-            #|im requirement|#)
-
         '(-> (im 0) (= (comp 0 1) 0)
             #|Left identity|#)
 

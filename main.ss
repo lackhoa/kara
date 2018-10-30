@@ -30,8 +30,8 @@
   (lambda ()
     ;; Choose one of the options: a. modus ponens, b. apply an axiom form
     (clean
-     (trace-let loop ([root  mp]
-                      [path  '[]])
+     (let loop ([root  mp]
+                [path  '[]])
        (cond [(and (not (equal? path '[]))
                  (ran-elem '(#t #f)))
               (>> (map (l> up root `[,@path 2])
