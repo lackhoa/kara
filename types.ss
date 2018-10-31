@@ -2,6 +2,10 @@
         (kara-lang main)
         (mol))
 
+;;; Utility functions
+(define conclusion
+  (f> ref '[2]))
+
 ;;; Combinators
 (define i '(-> 0 0))
 
@@ -39,26 +43,18 @@
         '(-> (= 0 1)
             (-> (= 1 2) (= 0 2)))))
 
+(define and-rules
+  (list '(-> 0 (-> 1 (and 0 1)))
+        '(-> (and 0 1) 0)
+        '(-> (and 0 1) 1)))
+
 (define category
-  (list '(-> (morph 0 1 2)
-            (-> (morph 3 2 4)
-               (morph (comp 3 0) 1 4))
-            #|Composition type|#)
+  (list '(-> (im 0)
+            (and (= (compose 0 1) 0)
+               (= (compose 1 0) 0))
+            #|Left & right identity|#)
 
-        '(-> (im 1)
-            (-> (= 0 2) (morph 1 0 2))
-            #|Type of identity morphism|#)
-
-        '(-> (= 0 1)
-            (-> (morph 0 2 3)
-               (-> (morph 1 4 5) (= 2 4))))
-
-        '(-> (= 0 1)
-            (-> (morph 0 2 3)
-               (-> (morph 1 4 5) (= 3 5))))
-
-        '(-> (im 0) (= (comp 0 1) 0)
-            #|Left identity|#)
-
-        '(-> (im 0) (= (comp 1 0) 0)
-            #|Right identity|#)))
+        '(-> (and (= (compose 0 (pvar 1)) 0)
+               (= (compose (pvar 1) 0) 0))
+            (im 0)
+            #|The demand for identity morphism|#)))
