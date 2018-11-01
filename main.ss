@@ -21,22 +21,27 @@
 (define store!
   (lambda () (set! db `(,current ,@db))))
 
-;;; Functions
+;;; Main Routines
 (define ran-elem
   (lambda (ls)
     (list-ref ls  (random (length ls)))))
 
 (define cycle?
-  #|Test whether or not the conclusion at path is already seen|#
-  (lambda (root path)
-    (do ([m     root   (ref m `[,(car p)])]
-         [p     path   (cdr p)]
-         [seen  '()    (cons (conclusion m)
-                             seen)])
-        [(null? p)
-         (>> (member (conclusion m)
-                     seen)
-             bool)])))
+  #|Test whether or not we're encountering goal duplication|#
+  (lambda (root)
+    (let loop ([mol   root]
+               [seen  '()])
+      (mol-< mol
+             (lambda (_)  #f)
+             (lambda (data kids)
+               (cond [(eq? data 'f)             #f]
+                     [(member (conclusion mol)
+                              seen)             #t]
+                     [else
+                      (let ([new-seen  (cons (conclusion mol)
+                                             seen)])
+                        (or (loop (car kids) new-seen)
+                           (loop (cadr kids) new-seen)))]))))))
 
 (define ma
   (lambda ()
@@ -46,16 +51,20 @@
                 [path  '[]])
        (cond [(and (not (equal? path '[]))
                  (ran-elem '(#t #f)))
-              (>> (map (l> up root `[,@path 2])
+              (#|Try a random axiom and be done with it|#
+               >> (map (l> up root `[,@path 2])
                        db)
-                  (l> filter
-                      (lambda (x)  (and x (not (cycle? x path)))))
-                  (lambda (ls) (if (null? ls) root  #|Leave the hypotheses open|#
-                              (>> (ran-elem ls)
-                                  (f> up `[,@path 0] '(f))
-                                  (f> up `[,@path 1] '(f))
-                                  #|Knock off the hypotheses|#))))]
+                  (l> filter (f>> (negate cycle?)))
+                  (lambda (ls)
+                    (if (null? ls)  root  #|Leave the hypotheses open|#
+                        (>> (ran-elem ls)
+                            (f> up `[,@path 0] '(f))
+                            (f> up `[,@path 1] '(f))
+                            #|Knock off the hypotheses|#))))]
 
-             [else  (>> (up root path mp)
+             [else  (#|Keep grinding with modus ponens|#
+                     >> (up root path mp)
                         (f> loop `[,@path 0])
                         (f> loop `[,@path 1]))])))))
+
+(define m (lambda () (ma) 0))
