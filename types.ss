@@ -50,11 +50,11 @@
 
 (define category
   (list '(-> (im 0)
-            (and (= (compose 0 1) 0)
-               (= (compose 1 0) 0))
-            #|Left & right identity|#)
+            (= (compose 0 1) 0)  #|Left identity|#)
+        '(-> (im 0)
+            (= (compose 1 0) 0)  #|Right identity|#)
 
-        '(-> (and (= (compose 0 (pvar 1)) 0)
-               (= (compose (pvar 1) 0) 0))
-            (im 0)
+        '(-> (= (compose 0 (pvar 1)) 0)
+            (-> (= (compose (pvar 1) 0) 0)
+               (im 0))
             #|The demand for identity morphism|#)))
