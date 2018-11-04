@@ -3,50 +3,21 @@
         (mol))
 (load "types.ss")
 (load "enum.ss")
+(load "stream.ss")
 
 ;;; State
-(define db (append equality category))
-(define current #f)
-(define blacklist '())
+(define db
+  (map (lambda (x)  `(=> (f) (f) ,x))
+       (append equality category)))
 
-(define load!
-  (lambda ()
-    (set! db
-      (read (open-input-file (db-file))))
-
-    (set! blacklist
-      (read (open-input-file (bl-file))))))
-
-(define save
-  (lambda ()
-    (when (file-exists? (db-file))
-      (delete-file (db-file)))
-    (with-output-to-file (db-file)
-      (lambda () (write db)))
-    (when (file-exists? (bl-file))
-      (delete-file (bl-file)))
-    (with-output-to-file (bl-file)
-      (lambda () (write blacklist)))))
-
-(define bl
-  (lambda ()
-    (set! blacklist (cons current blacklist))))
+(define db-len
+  (length db))
 
 ;;; Parameters (files are preferably strings)
-(define db-file    (make-parameter "db/data.db"))
-(define bl-file    (make-parameter "db/bl.db"))
-(define view-file  (make-parameter "log/view.ss"))
-(define size-limit (make-parameter 1000))
-(define dice       (make-parameter (cons #f (make-list 10 #t))))
+(define max-size (make-parameter 100))
 
-(define store!
-  (lambda () (set! db (cons current db))))
 
 ;;; Main Routines
-(define ran-elem
-  (lambda (ls)
-    (list-ref ls  (random (length ls)))))
-
 (define cycle?
   #|Test whether or not we're encountering goal duplication|#
   (lambda (root)
@@ -64,62 +35,62 @@
                         (or (loop (car kids) new-seen  #|First premise|#)
                            (loop (cadr kids) new-seen  #|Second premise|#)))]))))))
 
+(define get-ungrounded
+  (lambda (proof)
+    (mol-< (ref proof '[0])
+           (lambda (_)  (list (conclusion proof)))
+           (lambda (data _)
+             (if (eq? data 'f)  '()
+                 (append (get-ungrounded (ref proof '[0]))
+                         (get-ungrounded (ref proof '[1]))))))))
+
+(define assume-much?
+  (lambda (thm)
+    (mol-< thm
+           (lambda (_) #f)
+           (lambda (data kids)
+             (and (eq? data '->)
+                (or (mol-< (list-ref kids 0)
+                          (lambda (_) #t)
+                          (lambda (data _) (eq? data '->)))
+                   (assume-much? (list-ref kids 1))))))))
+
 (define shorten
   (lambda (proof)
-    (let builder
-        ([assumptions
-          (let gather-ungrounded ([pr proof])
-            (mol-< (ref pr '[0])
-                   (lambda (_)  (list (conclusion pr)))
-                   (lambda (data _)
-                     (if (eq? data 'f)  '()
-                         (append (gather-ungrounded (ref pr '[0]))
-                                 (gather-ungrounded (ref pr '[1])))))))])
-      (if (null? assumptions)  (conclusion proof)
-          `(-> ,(car assumptions)
-              ,(builder (cdr assumptions)))))))
+    (let ([assumptions  (>> (get-ungrounded proof)
+                            strip-duplicates)])
+      (let builder ([asmps  assumptions])
+        (if (null? asmps)  (conclusion proof)
+            `(-> ,(car asmps)
+                ,(builder (cdr asmps))))))))
 
-(define ma
+(define bleed
+  ;; Returns: a stream
   (lambda ()
-    (>> (let loop ([root  mp]
-                   [path  '[]])
-          (let ([candidates
-                 (#|Check if there is an axiom waiting|#
-                  >> (map (l> up root `[,@path 2])
-                          db)
-                     (l> filter (f>> (negate cycle?))))])
-            (cond [(and (null? candidates)
-                      (not (eq? (>> (ref root path)
-                                  conclusion
-                                  car)
-                              '->)))
-                   root]
-                  [(and (not (null? candidates))
-                      (not (equal? path '[]))
-                      (not (ran-elem (dice))))
-                   (>> (ran-elem candidates)
-                       (f> up `[,@path 0] '(f))
-                       (f> up `[,@path 1] '(f))
-                       #|Knock off the hypotheses|#)]
-                  [(< (size root) (size-limit))
-                   (#|Keep grinding with modus ponens|#
-                    >> (up root path mp)
-                       (f> loop `[,@path 0])
-                       (f> loop `[,@path 1]))]
-                  [else  #f])))
-        shorten
-        clean)))
-
-(define go
-  (lambda ()
-    (do ([res #f (ma)])
-        [(>> res
-             (lambda (x)
-               (andmap (lambda (thm)
-                         (not (instance? res thm)))
-                       (append db blacklist))))
-         (set! current res)
-         res])))
+    (let loop ([root  `(=> 0 1 2)]
+               [path  '[]])
+      (s-append (cond [(mol-< (ref root `[,@path 2])
+                              (lambda (_)       #f)
+                              (lambda (data _)  (not (or (eq? data '->)
+                                                 (eq? data '=)))))
+                       (s-cons root '())  #|Assume conclusion|#]
+                      [else  '()])
+                (>> (map (l> up root path)
+                         db)
+                    filter-false
+                    list->stream  #|Substitute axiom|#)
+                (if (> (size root) (max-size))  '()
+                    (>> (up root `[,@path] mp)
+                        (f> loop `[,@path 0])
+                        (l> s-flatmap
+                            (f> loop `[,@path 1]))))))))
 
 ;;; Jobs
-;; (load!)
+(define b (bleed))
+(do ([i 1 (+ i 1)])
+    [(> i 1000)]
+  (>> (begin (set! b (s-cdr b))
+             (s-car b))
+      shorten
+      clean
+      pydisplay))

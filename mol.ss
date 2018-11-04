@@ -56,21 +56,23 @@
 
                                    ((or (not m) (null? ps))  m)))))))))))
 
-  (define (last-var mol/var)
-    (mol-< mol/var
-           (lambda (v) v)
-           (lambda (_ kids)
-             (cond [(null? kids)  0]
-                   [else          (apply max (map last-var kids))]))))
+  (define last-var
+    (f> mol-<
+        (lambda (v) v)
+        (lambda (_ kids)
+          (cond [(null? kids)  0]
+                [else          (apply max (map last-var kids))]))))
 
-  (define (translate mol/var n)
-    (mol-< mol/var
-           (l> + n)
-           (lambda (ctor kids)
-             `(,ctor ,@(map (f> translate n) kids)))))
+  (define translate
+    (lambda (mol n)
+      (mol-< mol
+             (l> + n)
+             (lambda (ctor kids)
+               (cons ctor
+                     (map (f> translate n) kids))))))
 
   (define (up host to guest)
-    (let ([unifier  `(#f  #|Dummy constructor|#
+    (let ([unifier  `(f  #|Dummy constructor|#
                       ,host
                       ,(translate guest
                                   (add1 (last-var host))))

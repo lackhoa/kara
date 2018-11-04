@@ -54,7 +54,7 @@
         '(-> (im 0)
             (= (compose 1 0) 0)  #|Right identity|#)
 
-        '(-> (= (compose 0 (pvar 1)) 0)
-            (-> (= (compose (pvar 1) 0) 0)
+        '(-> (= (compose 0 (f)) 0)
+            (-> (= (compose (f) 0) 0)
                (im 0))
             #|The demand for identity morphism|#)))
