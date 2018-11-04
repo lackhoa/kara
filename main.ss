@@ -14,7 +14,7 @@
   (length db))
 
 ;;; Parameters (files are preferably strings)
-(define max-size (make-parameter 100))
+(define max-size (make-parameter 150))
 
 
 ;;; Main Routines
@@ -67,12 +67,14 @@
 (define bleed
   ;; Returns: a stream
   (lambda ()
-    (let loop ([root  `(=> 0 1 2)]
+    (let loop ([root  '(=> 0 1 2)]
                [path  '[]])
-      (s-append (cond [(mol-< (ref root `[,@path 2])
-                              (lambda (_)       #f)
-                              (lambda (data _)  (not (or (eq? data '->)
-                                                 (eq? data '=)))))
+      (s-append (cond [(and (not (equal? (conclusion root)
+                                     (conclusion (ref root path))))
+                          (mol-< (ref root `[,@path 2])
+                                 (lambda (_)       #f)
+                                 (lambda (data _)  (and (not (eq? data '->))
+                                                 (not (eq? data '=))))))
                        (s-cons root '())  #|Assume conclusion|#]
                       [else  '()])
                 (>> (map (l> up root path)
