@@ -5,17 +5,19 @@
 (load "enum.ss")
 (load "stream.ss")
 
-;;; State
+;;; State variables
+
+
+;;; Parameters (files are preferably strings)
 (define db
   (map (lambda (x)  `(=> (f) (f) ,x))
        (append equality category)))
 
-(define db-len
-  (length db))
+(define max-size 50)
 
-;;; Parameters (files are preferably strings)
-(define max-size (make-parameter 130))
-
+(define banned-data
+  #|data not allowed in the hypotheses|#
+  '(= ->))
 
 ;;; Main Routines
 (define cycle?
@@ -35,6 +37,16 @@
                         (or (loop (car kids)  new-seen  #|First premise|#)
                            (loop (cadr kids) new-seen  #|Second premise|#)))]))))))
 
+(define proof-steps
+  (lambda (proof)
+    (mol-< (ref proof '[0])
+           (lambda (_) 0)
+           (lambda (data _)
+             (if (eq? data 'f)  0
+                 (+ 1
+                    (proof-steps (ref proof '[0]))
+                    (proof-steps (ref proof '[1]))))))))
+
 (define get-ungrounded
   (lambda (proof)
     (mol-< (ref proof '[0])
@@ -43,17 +55,6 @@
              (if (eq? data 'f)  '()
                  (append (get-ungrounded (ref proof '[0]))
                          (get-ungrounded (ref proof '[1]))))))))
-
-(define assume-much?
-  (lambda (thm)
-    (mol-< thm
-           (lambda (_) #f)
-           (lambda (data kids)
-             (and (eq? data '->)
-                (or (mol-< (list-ref kids 0)
-                          (lambda (_) #t)
-                          (lambda (data _) (eq? data '->)))
-                   (assume-much? (list-ref kids 1))))))))
 
 (define shorten
   (lambda (proof)
@@ -69,34 +70,42 @@
   (lambda ()
     (let loop ([root  '(=> 0 1 2)]
                [path  '[]])
-      (s-append (cond [(and (not (equal? (conclusion root)
+      (s-append (#|Assume conclusion|#
+                 cond [(and (not (equal? (conclusion root)
                                      (conclusion (ref root path))))
                           (mol-< (ref root `[,@path 2])
                                  (lambda (_)       #f)
-                                 (lambda (data _)  (and (not (eq? data '->))
-                                                 (not (eq? data '=))))))
-                       (s-cons root '())  #|Assume conclusion|#]
-                      [else  '()])
-                (>> (map (l> up root path)
-                         db)
-                    (l> filter (lambda (x)
-                                 (and x (not (cycle? x)))))
-                    list->stream  #|Substitute axiom|#)
-                (if (> (size root) (max-size))  '()
-                    (>> (up root `[,@path] mp)
-                        (pass (negate cycle?))
-                        (f> loop `[,@path 0])
-                        (l> s-flatmap
-                            (f> loop `[,@path 1]))))))))
+                                 (lambda (data _)  (not (memq data banned-data)))))
+                       (s-cons root '())]
+                      [else                '()])
+                (#|Substitute axiom|#
+                 >> (s-map (l> up root path)
+                           (apply stream db))
+                    (l> s-filter
+                        (f>> (negate cycle?))))
+                (#|Grinding with modus ponens|#
+                 let ([root  (up root `[,@path] mp)])
+                  (if (cycle? root)  '()
+                      (delay  #|Crucial delay to avoid infinite loop|#
+                        (begin (pydisplay "Hello")
+                               (pydisplay (s-flatmap (lambda (x) (s-cons x '()))
+                                                     (loop root `[,@path 0])))
+                               (pydisplay "Mark 1")
+                               (let ([res  (s-flatmap (f> loop `[,@path 1])
+                                                      (loop root `[,@path 0]))])
+                                 (pydisplay "Mark 2")
+                                 (if (null? res)  '()
+                                     (force res)))))))))))
 
 ;;; Jobs
 (define b (bleed))
-(do ([i 1 (+ i 1)])
-    [(or (null? b)
-        (> i 1000))]
-  (>> (let ([res  (s-car b)])
-        (set! b (s-cdr b))
-        res)
-      shorten
-      clean
-      pydisplay))
+
+;; (do ([i 1 (+ i 1)])
+;;     [(or (null? b)
+;;         (> i 100))]
+;;   (>> (let ([res  (s-car b)])
+;;         (set! b (s-cdr b))
+;;         res)
+;;       (lambda (x)
+;;         (pydisplay (>> x shorten clean))
+;;         (pydisplay (proof-steps x)))))

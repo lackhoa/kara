@@ -5,6 +5,20 @@
     [(_ item s)
      (delay (cons item s))]))
 
+(define s-append
+  (lambda ss
+    (if (null? ss)  '()
+        (let ([s1   (car ss)]
+              [s23  (cdr ss)])
+          (s-cons (car s1)
+                  (apply s-append (cdr ss) s23))))))
+
+(define stream
+  (lambda ls
+    (if (null? ls)  '()
+        (s-cons (car ls)
+                (apply stream (cdr ls))))))
+
 (define s-car
   (lambda (s)
     (car (force s))))
@@ -12,16 +26,6 @@
 (define s-cdr
   (lambda (s)
     (cdr (force s))))
-
-(define s-append
-  (lambda ss
-    (if (null? ss)  '()
-        (let ([s1   (car ss)]
-              [s23  (cdr ss)])
-          (if (null? s1)  (apply s-append s23)
-              (s-cons (s-car s1)
-                      (apply s-append
-                        (s-cdr s1) s23)))))))
 
 (define s-map
   (lambda (proc s)
@@ -32,20 +36,15 @@
 (define s-flatmap
   (lambda (proc s)
     (if (null? s)  '()
-        (s-append (proc (s-car s))
-                  (s-flatmap proc (s-cdr s))))))
+        (delay
+          (force (s-append (proc (s-car s))
+                           (s-flatmap proc (s-cdr s))))))))
 
-(define (stream->list s)
-  (if (null? s)  '()
-      (cons (s-car s)
-            (stream->list (s-cdr s)))))
-
-(define list->stream
-  (lambda (ls)
-    (list-< ls  '()
-            (lambda (ls-car ls-cdr)
-              (s-cons ls-car
-                      (list->stream ls-cdr))))))
+(define stream->list
+  (lambda (s)
+    (if (null? s)  '()
+        (cons (s-car s)
+              (stream->list (s-cdr s))))))
 
 (define s-filter
   (lambda (pred s)
@@ -60,14 +59,18 @@
     (if (> n 10)  '()
         (s-cons n (next (+ n 1))))))
 
-(define s-add
-  (lambda (s1 s2)
-    (s-cons
-     (+ (s-car s1) (s-car s2))
-     (s-add (s-cdr s1) (s-cdr s2)))))
+;; (define nat
+;;   (let next ([n 0])
+;;     (s-cons n (next (+ n 1)))))
 
-(define even-counters
-  (s-add counters counters))
+;; (define s-add
+;;   (lambda (s1 s2)
+;;     (s-cons
+;;      (+ (s-car s1) (s-car s2))
+;;      (s-add (s-cdr s1) (s-cdr s2)))))
 
-(s-car even-counters)
-(s-car (s-cdr even-counters))
+;; (define even-counters
+;;   (s-add counters counters))
+
+;; (s-car even-counters)
+;; (s-car (s-cdr even-counters))

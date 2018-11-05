@@ -20,7 +20,8 @@
     (mol-< mol/var
            (lambda (_) 0)
            (lambda (_ kids)
-             (add1 (apply max (map height kids)))))))
+             (add1 (if (null? kids) 0
+                       (apply max (map height kids))))))))
 
 (define size
   (lambda (mol/var)
