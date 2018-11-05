@@ -47,7 +47,14 @@
               (s-cons ls-car
                       (list->stream ls-cdr))))))
 
-;;; Teseting
+(define s-filter
+  (lambda (pred s)
+    (cond [(null? s)         '()]
+          [(pred (s-car s))  (s-cons (s-car s)
+                                     (s-filter pred (s-cdr s)))]
+          [else              (s-filter pred (s-cdr s))])))
+
+;;; Testing
 (define counters
   (let next ([n 0])
     (if (> n 10)  '()

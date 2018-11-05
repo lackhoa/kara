@@ -14,7 +14,7 @@
   (length db))
 
 ;;; Parameters (files are preferably strings)
-(define max-size (make-parameter 150))
+(define max-size (make-parameter 130))
 
 
 ;;; Main Routines
@@ -32,7 +32,7 @@
                      [else
                       (let ([new-seen  (cons (conclusion mol)
                                              seen)])
-                        (or (loop (car kids) new-seen  #|First premise|#)
+                        (or (loop (car kids)  new-seen  #|First premise|#)
                            (loop (cadr kids) new-seen  #|Second premise|#)))]))))))
 
 (define get-ungrounded
@@ -79,10 +79,12 @@
                       [else  '()])
                 (>> (map (l> up root path)
                          db)
-                    filter-false
+                    (l> filter (lambda (x)
+                                 (and x (not (cycle? x)))))
                     list->stream  #|Substitute axiom|#)
                 (if (> (size root) (max-size))  '()
                     (>> (up root `[,@path] mp)
+                        (pass (negate cycle?))
                         (f> loop `[,@path 0])
                         (l> s-flatmap
                             (f> loop `[,@path 1]))))))))
@@ -90,9 +92,11 @@
 ;;; Jobs
 (define b (bleed))
 (do ([i 1 (+ i 1)])
-    [(> i 1000)]
-  (>> (begin (set! b (s-cdr b))
-             (s-car b))
+    [(or (null? b)
+        (> i 1000))]
+  (>> (let ([res  (s-car b)])
+        (set! b (s-cdr b))
+        res)
       shorten
       clean
       pydisplay))
