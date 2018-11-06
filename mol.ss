@@ -11,14 +11,12 @@
 
 (define (ref mol/var path)
   ;; Fault-tolerant referencing
-  (list-< path
-          mol/var
-          (lambda (next rest)
-            (mol-< mol/var
-                   (lambda (v)       #f  #|can't go down|#)
-                   (lambda (_ kids)  (and (< next (length kids))
-                                   (ref (list-ref kids next)
-                                        rest)))))))
+  (if (null? path)  mol/var
+      (mol-< mol/var
+             (lambda (v)       #f  #|can't go down|#)
+             (lambda (_ kids)  (and (< (car path) (length kids))
+                             (ref (list-ref kids (car path))
+                                  (cdr path)))))))
 
 (define (has-var? mol/var var)
   (mol-< mol/var
