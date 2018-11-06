@@ -1,6 +1,6 @@
 (import (chezscheme)
-        (kara-lang main)
-        (mol))
+        (kara-lang main))
+(load "mol.ss")
 
 ;;; Utility functions
 (define conclusion

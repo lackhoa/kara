@@ -1,5 +1,6 @@
 (import (chezscheme) (kara-lang main)
-        (mol) (types) (enum))
+        (types) (enum))
+(load "mol.ss")
 
 (define (trivial)
   (assert (not (instance? (up new-var '[] '(a))

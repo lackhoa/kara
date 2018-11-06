@@ -1,7 +1,7 @@
-(import (kara-lang main)
-        (mol))
+(import (kara-lang main))
 
 (load "types.ss")
+(load "mol.ss")
 
 ;;; Assignment syntax
 (define-syntax up!
@@ -14,11 +14,10 @@
   (define root new-var)
   (up! root '[] '(f 0))
   (up! root '[0] '(A))
-  (assert (not (up root '[0] '(NOT-A))))
-  )
+  (assert (not (up root '[0] '(NOT-A)))))
 (intro)
 
-(define (sync)
+(define (sync-test)
   (define root '(f 0 1))
   (up! root '[0] '(f 0 1 2))
   (up! root '[1] '(f 0 1 2))
@@ -33,7 +32,7 @@
                   (ref root '[1 2])))
   (assert (not (up root '[1 2] '(D))))
   )
-(sync)
+(sync-test)
 
 (define (rep)
   (define root '(f 0 (f 6) 2 3 4 5))
@@ -45,7 +44,7 @@
   )
 (rep)
 
-(define (sync)
+(define (sync-more)
   (define root '(f 0 1 2))
   (up! root '[0] '(A))
   (up! root '[] '(f 0 0 1))
@@ -54,7 +53,7 @@
   (up! root '[2] '(B))
   (assert (not (up root '[] '(f 0 1 0))))
   )
-(sync)
+(sync-more)
 
 (define (cyclic)
   (define root '(f 0 1 2))

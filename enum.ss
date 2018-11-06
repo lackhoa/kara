@@ -1,6 +1,6 @@
-(import (chezscheme) (kara-lang main)
-        (mol))
+(import (chezscheme) (kara-lang main))
 (load "types.ss")
+(load "mol.ss")
 
 (define instance-file
   (make-parameter "log/instance.rkt"))

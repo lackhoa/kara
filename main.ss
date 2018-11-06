@@ -1,9 +1,9 @@
 (import (chezscheme)
-        (kara-lang main)
-        (mol))
+        (kara-lang main))
 (load "types.ss")
 (load "enum.ss")
 (load "stream.ss")
+(load "mol.ss")
 
 ;;; State variables
 
@@ -13,7 +13,7 @@
   (map (lambda (x)  `(=> (f) (f) ,x))
        (append equality category)))
 
-(define max-size 50)
+(define max-steps 19  #|19 is the magic number|#)
 
 (define banned-data
   #|data not allowed in the hypotheses|#
@@ -23,8 +23,8 @@
 (define cycle?
   #|Test whether or not we're encountering goal duplication|#
   (lambda (root)
-    (let loop ([mol   root]
-               [seen  '()])
+    (let cloop ([mol   root]
+                [seen  '()])
       (mol-< mol
              (lambda (_)  #f)
              (lambda (data kids)
@@ -34,8 +34,8 @@
                      [else
                       (let ([new-seen  (cons (conclusion mol)
                                              seen)])
-                        (or (loop (car kids)  new-seen  #|First premise|#)
-                           (loop (cadr kids) new-seen  #|Second premise|#)))]))))))
+                        (or (cloop (car kids)  new-seen  #|First premise|#)
+                           (cloop (cadr kids) new-seen  #|Second premise|#)))]))))))
 
 (define proof-steps
   (lambda (proof)
@@ -65,47 +65,43 @@
             `(-> ,(car asmps)
                 ,(builder (cdr asmps))))))))
 
-(define bleed
-  ;; Returns: a stream
-  (lambda ()
-    (let loop ([root  '(=> 0 1 2)]
-               [path  '[]])
-      (s-append (#|Assume conclusion|#
-                 cond [(and (not (equal? (conclusion root)
-                                     (conclusion (ref root path))))
-                          (mol-< (ref root `[,@path 2])
-                                 (lambda (_)       #f)
-                                 (lambda (data _)  (not (memq data banned-data)))))
-                       (s-cons root '())]
-                      [else                '()])
-                (#|Substitute axiom|#
-                 >> (s-map (l> up root path)
-                           (apply stream db))
-                    (l> s-filter
-                        (f>> (negate cycle?))))
-                (#|Grinding with modus ponens|#
-                 let ([root  (up root `[,@path] mp)])
-                  (if (cycle? root)  '()
-                      (delay  #|Crucial delay to avoid infinite loop|#
-                        (begin (pydisplay "Hello")
-                               (pydisplay (s-flatmap (lambda (x) (s-cons x '()))
-                                                     (loop root `[,@path 0])))
-                               (pydisplay "Mark 1")
-                               (let ([res  (s-flatmap (f> loop `[,@path 1])
-                                                      (loop root `[,@path 0]))])
-                                 (pydisplay "Mark 2")
-                                 (if (null? res)  '()
-                                     (force res)))))))))))
+(define b
+  ;; The main stream
+  (let loop ([root  '(=> 0 1 2)]
+             [path  '[]])
+    (s-append
+     (#|Just assume (base case #1)|#
+      cond [(mol-< (conclusion (ref root path))
+                   (lambda (_)       #f  #|Don't assume random propositions|#)
+                   (lambda (data _)  (not (memq data banned-data))))
+            (stream root)]
+           [else            s-null])
+
+     (#|Try an axiom (base case #2)|#
+      >> (s-map (l> up root path)
+                (apply stream db))
+         (l> s-filter
+             (f>> (negate cycle?))))
+
+     (delay
+       #|Grinding with modus ponens (recursive case)|#
+       (#|Must limit size for complete search|#
+        if (>= (proof-steps root) max-steps)  '()
+           (let ([root  (up root  `[,@path]  mp)])
+             (if (cycle? root)  '()
+                 (force (s-flatmap (f> loop   `[,@path 1])
+                                   (loop root `[,@path 0]))))))))))
+
+;;; Tracing Business
+
 
 ;;; Jobs
-(define b (bleed))
-
-;; (do ([i 1 (+ i 1)])
-;;     [(or (null? b)
-;;         (> i 100))]
-;;   (>> (let ([res  (s-car b)])
-;;         (set! b (s-cdr b))
-;;         res)
-;;       (lambda (x)
-;;         (pydisplay (>> x shorten clean))
-;;         (pydisplay (proof-steps x)))))
+(do ([i 1 (+ i 1)])
+    [(or (null? b)
+        (> i 100))]
+  (>> (let ([res  (s-car b)])
+        (set! b (s-cdr b))
+        res)
+      (lambda (x)
+        (pydisplay (>> x shorten clean))
+        (pydisplay (proof-steps x)))))
