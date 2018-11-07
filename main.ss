@@ -70,18 +70,20 @@
   (let loop ([root  '(=> 0 1 2)]
              [path  '[]])
     (s-append
-     (#|Just assume (base case #1)|#
-      cond [(mol-< (conclusion (ref root path))
-                   (lambda (_)       #f  #|Don't assume random propositions|#)
-                   (lambda (data _)  (not (memq data banned-data))))
-            (stream root)]
-           [else            s-null])
+     (delay
+       (#|Just assume (base case #1)|#
+        cond [(mol-< (conclusion (ref root path))
+                     (lambda (_)       #f  #|Don't assume random propositions|#)
+                     (lambda (data _)  (not (memq data banned-data))))
+              (cons root s-null)]
+             [else                 (list)]))
 
-     (#|Try an axiom (base case #2)|#
-      >> (s-map (l> up root path)
-                (apply stream db))
-         (l> s-filter
-             (f>> (negate cycle?))))
+     (delay
+       (force (#|Try an axiom (base case #2)|#
+               >> (s-map (l> up root path)
+                         (apply stream db))
+                  (l> s-filter
+                      (f>> (negate cycle?))))))
 
      (delay
        #|Grinding with modus ponens (recursive case)|#
@@ -97,11 +99,11 @@
 
 ;;; Jobs
 (do ([i 1 (+ i 1)])
-    [(or (null? b)
+    [(or (s-null? b)
         (> i 100))]
   (>> (let ([res  (s-car b)])
         (set! b (s-cdr b))
         res)
       (lambda (x)
         (pydisplay (>> x shorten clean))
-        (pydisplay (proof-steps x)))))
+        (pydisplay (proof-steps x) "steps"))))
