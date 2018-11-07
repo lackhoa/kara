@@ -13,7 +13,7 @@
   (map (lambda (x)  `(=> (f) (f) ,x))
        (append equality category)))
 
-(define max-steps 19  #|19 is the magic number|#)
+(define max-steps 5)
 
 (define banned-data
   #|data not allowed in the hypotheses|#

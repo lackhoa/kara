@@ -5,6 +5,7 @@
   (delay '()))
 
 (define s-null?
+  ;; To ask whether a stream is null is to evaluate it.
   (lambda (s)
     (null? (force s))))
 
@@ -13,16 +14,18 @@
     (if (null? ss)  s-null
         (let ([s1   (car ss)]
               [s23  (cdr ss)])
-          (if (s-null? s1)  (apply s-append s23)
-              (delay (cons (s-car s1)
-                           (apply s-append
-                             (s-cdr s1) s23))))))))
+          (delay
+            (if (s-null? s1)  (force (apply s-append s23))
+                (cons (s-car s1)
+                      (apply s-append
+                        (s-cdr s1) s23))))))))
 
 (define stream
   (lambda ls
-    (if (null? ls)  s-null
-        (delay (cons (car ls)
-                     (apply stream (cdr ls)))))))
+    (delay
+      (if (null? ls)  '()
+          (cons (car ls)
+                (apply stream (cdr ls)))))))
 
 (define s-car
   (lambda (s)
@@ -39,15 +42,17 @@
 
 (define s-map
   (lambda (proc s)
-    (if (s-null? s)  s-null
-        (delay (cons (proc (s-car s))
-                     (s-map proc (s-cdr s)))))))
+    (delay
+      (if (s-null? s)  '()
+          (cons (proc (s-car s))
+                (s-map proc (s-cdr s)))))))
 
 (define s-flatmap
   (lambda (proc s)
-    (if (s-null? s)  s-null
-        (delay (force (s-append (proc (s-car s))
-                                (s-flatmap proc (s-cdr s))))))))
+    (delay
+      (if (s-null? s)  '()
+          (force (s-append (proc (s-car s))
+                           (s-flatmap proc (s-cdr s))))))))
 
 (define stream->list
   (lambda (s)
