@@ -13,7 +13,12 @@
   (map (lambda (x)  `(=> (f) (f) ,x))
        (append equality category)))
 
-(define max-steps 5)
+(define db-no-sym
+  (filter (negate (f> member '((=> (f) (f) (-> (= 1 0) (= 0 1))))))
+          db))
+
+(define max-steps 10)
+(define trim?     #f)
 
 (define banned-data
   #|data not allowed in the hypotheses|#
@@ -24,7 +29,7 @@
   #|Test whether or not we're encountering goal duplication|#
   (lambda (root)
     (let cloop ([mol   root]
-                [seen  '()])
+                [seen  (list)])
       (mol-< mol
              (lambda (_)  #f)
              (lambda (data kids)
@@ -38,25 +43,41 @@
                            (cloop (cadr kids) new-seen  #|Second premise|#)))]))))))
 
 (define proof-steps
+  #|Counts how many => signs there are|#
   (lambda (proof)
-    (mol-< (ref proof '[0])
+    (mol-< proof
            (lambda (_) 0)
            (lambda (data _)
-             (if (eq? data 'f)  0
-                 (+ 1
-                    (proof-steps (ref proof '[0]))
-                    (proof-steps (ref proof '[1]))))))))
+             (case data
+               [f  0]
+               [=>  (+ 1
+                      (proof-steps (ref proof '[0]))
+                      (proof-steps (ref proof '[1])))])))))
 
 (define get-ungrounded
   (lambda (proof)
     (mol-< (ref proof '[0])
            (lambda (_)  (list (conclusion proof)))
            (lambda (data _)
-             (if (eq? data 'f)  '()
-                 (append (get-ungrounded (ref proof '[0]))
-                         (get-ungrounded (ref proof '[1]))))))))
+             (case data
+               [f  (list)]
+               [=>  (append (get-ungrounded (ref proof '[1]))
+                           (get-ungrounded (ref proof '[0])))])))))
 
-(define shorten
+(define get-antes
+  (lambda (formula)
+    (let loop ([formulae formulae]
+               [res      (list)])
+      (mol-< formulae
+             (lambda (_)  res)
+             (lambda (data _)
+               (case data
+                 [->     (loop (ref formulae '[1])
+                              (cons (ref formulae '[0])
+                                    res))]
+                 [else  res]))))))
+
+(define trim
   (lambda (proof)
     (let ([assumptions  (>> (get-ungrounded proof)
                             strip-duplicates)])
@@ -67,32 +88,38 @@
 
 (define b
   ;; The main stream
-  (let loop ([root  '(=> 0 1 2)]
+  (let loop ([proof  '(=> 0 1 2)]
              [path  '[]])
     (s-append
      (delay
        (#|Just assume (base case #1)|#
-        cond [(mol-< (conclusion (ref root path))
+        cond [(mol-< (conclusion (ref proof path))
                      (lambda (_)       #f  #|Don't assume random propositions|#)
-                     (lambda (data _)  (not (memq data banned-data))))
-              (cons root s-null)]
+                     (lambda (data _)  (not (memq data banned-data)
+                                     #|Don't assume dumb things|#)))
+              (cons proof s-null)]
              [else                 (list)]))
 
-     (delay
-       (force (#|Try an axiom (base case #2)|#
-               >> (s-map (l> up root path)
-                         (apply stream db))
-                  (l> s-filter
-                      (f>> (negate cycle?))))))
+     (#|Try an axiom (base case #2)|#
+      delay
+       (let ([candidates  (case path
+                            [([])   (list)]
+                            [([0])  db-no-sym]
+                            [else   db])])
+         (force (>> (s-map (l> up proof path)
+                           (apply stream candidates))
+                    (l> s-filter
+                        (f>> (negate cycle?)))))))
 
      (delay
        #|Grinding with modus ponens (recursive case)|#
        (#|Must limit size for complete search|#
-        if (>= (proof-steps root) max-steps)  '()
-           (let ([root  (up root  `[,@path]  mp)])
-             (if (cycle? root)  '()
+        if (>= (proof-steps proof) max-steps)  (list)
+           (let ([proof  (up proof  `[,@path]  mp)])
+             (if (cycle? proof)  (list)
                  (force (s-flatmap (f> loop   `[,@path 1])
-                                   (loop root `[,@path 0]))))))))))
+                                   (loop proof `[,@path 0]))))))))))
+
 
 ;;; Tracing Business
 
@@ -105,5 +132,5 @@
         (set! b (s-cdr b))
         res)
       (lambda (x)
-        (pydisplay (>> x shorten clean))
+        (pydisplay (>> x (if trim? trim identity) clean))
         (pydisplay (proof-steps x) "steps"))))
