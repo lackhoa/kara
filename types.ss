@@ -3,8 +3,28 @@
 (load "mol.ss")
 
 ;;; Utility functions
-(define conclusion
-  (f> ref '[2]))
+(define get-ccs
+  (f> ref '[1]))
+
+(define get-prem
+  (lambda (proof)
+    (let loop ([prem-list  (ref proof '[0])])
+      (mol-<  prem-list
+              (lambda (_)  (list)  #|premise is not yet constructed|#)
+              (lambda (data _)
+                (case data
+                  [null  (list)]
+                  [::    (cons (ref prem-list '[0]  #|car|#)
+                               (loop (ref prem-list '[1]  #|cdr|#)))]))))))
+
+(define mk-proof
+  (lambda (premise conclusion)
+    `(=> ,(let loop ([premise  premise]
+                    [i        100  #|count new variables|#])
+           (if (null? premise)  '(null)
+               `(:: (=> ,i ,(car premise))
+                    ,(loop (cdr premise) (+ i 1)))))
+        ,conclusion)))
 
 ;;; Combinators
 (define i '(-> 0 0))
@@ -38,23 +58,25 @@
          (-> 0 2))))
 
 (define equality
-  (list '(= 0 0)
-        '(-> (= 1 0) (= 0 1))
-        '(-> (= 0 1)
-            (-> (= 1 2) (= 0 2)))))
+  (list (mk-proof '((= 0 1) (= 1 2))
+                  '(= 0 2))
 
-(define and-rules
-  (list '(-> 0 (-> 1 (and 0 1)))
-        '(-> (and 0 1) 0)
-        '(-> (and 0 1) 1)))
+        (mk-proof '((= 1 0))
+                  '(= 0 1))
+
+        (mk-proof '()
+                  '(= 0 0))))
 
 (define category
-  (list '(-> (im 0)
-            (= (compose 0 1) 0)  #|Left identity|#)
-        '(-> (im 0)
-            (= (compose 1 0) 0)  #|Right identity|#)
+  (list (#|Left identity|#
+         mk-proof '((im 0))
+                  '(= (compose 0 1) 0))
 
-        '(-> (= (compose 0 (f)) 0)
-            (-> (= (compose (f) 0) 0)
-               (im 0))
-            #|The demand for identity morphism|#)))
+        (#|Right identity|#
+         mk-proof '((im 0))
+                  '(= (compose 1 0) 0))
+
+        (#|The demand for identity morphism|#
+         mk-proof '((= (compose 0 (f)) 0)
+                    (= (compose (f) 0) 0))
+                  '(im 0))))
