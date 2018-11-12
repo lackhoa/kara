@@ -19,7 +19,7 @@
                   '(= 0 1))))
 
 (define max-steps 6)
-(define trim?     #t)
+(define trim?     #f)
 (define show-num  100)
 
 (define banned-data
@@ -33,12 +33,12 @@
     (let loop ([mol   proof]
                [seen  (list)])
       (mol-< mol
-             (lambda (_)  #f)
-             (lambda _    (or (bool (member (get-ccs mol)
-                                      seen))
-                        (ormap (f> loop (cons (get-ccs mol)
-                                              seen))
-                               (get-prem mol))))))))
+             (lambda _  #f)
+             (lambda _  (or (bool (member (get-ccs mol)
+                                    seen))
+                      (ormap (f> loop (cons (get-ccs mol)
+                                            seen))
+                             (get-prem mol))))))))
 
 (define proof-steps
   #|Counts how many => signs there are|#
@@ -63,10 +63,10 @@
       `(,@assumptions :- ,(get-ccs proof)))))
 
 (define main
-  (lambda (proof rel)
-    #|`rel` points to the focused premise list|#
+  (lambda (proof rel index)
+    #|`rel` points to the focused premise list, `index` is that list's index|#
     (let ([#|points to the first premise|#
-           path  `[,@rel 0]])
+           path  `[,@rel ,index]])
       (#|If path is invalid then the list is empty -> nothing to do|#
        if (not (ref proof path))  (stream proof)
           (s-append
@@ -76,7 +76,7 @@
                            (lambda (_)       #f  #|Don't assume random propositions|#)
                            (lambda (data _)  (not (memq data banned-data)
                                            #|Don't assume dumb things|#)))
-                    (cons proof s-null  #|be careful!|#)]
+                    (cons proof s-null  #|careful with this!|#)]
                    [else                 (list)]))
 
            (#|Substitute an axiom (recursive case)|#
@@ -85,21 +85,22 @@
                      cond [(>= (proof-steps proof)
                               max-steps)  s-null]
                           [else
-                           (s-flatmap  (#|continue onto the other premise ...|#
-                                        f> main `[,@rel 1])
+                           (s-flatmap  (#|continue on to the other premise ...|#
+                                        f> main rel (+ index 1))
                                        (#|... after enumerating down|#
                                         >> (s-map (l> up proof path)
                                                   (apply stream db))
                                            (l> s-filter
                                                (f>> (negate cycle?)))
                                            (l> s-flatmap
-                                               (f> main `[,@path 0]))))]))))))))
+                                               (f> main `[,@path 0] 0))))]))))))))
 
 (define b
   ;; The main stream
-  (s-flatmap (f> main '[0])
-             (apply stream (filter (negate (f> member boring))
-                                   db))))
+  (s-flatmap (f> main '[0] 0)
+             (apply stream
+               (filter (negate (f> member boring))
+                       db))))
 
 ;;; Tracing Business
 

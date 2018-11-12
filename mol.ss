@@ -1,3 +1,5 @@
+(import (kara-lang main))
+
 ;; Molcules:
 ;; var% =  int
 ;; mol% =  ctor: symbol, kids: [var% | mol%]
@@ -41,13 +43,14 @@
                         (and (not (has-var? m/v1 v2)  #|No Incest|#)
                            (substq m/v1 v2 m)))
                       (lambda (ctor2 kids2)
-                        (and (eq? ctor1 ctor2)
-                             (let ([new-paths  (map (lambda (i) `(,@p ,i))
-                                                    (enumerate kids1))])
-                               (do ([ps new-paths (cdr ps)]
-                                    [m  m         (inner m (car ps))])
+                        (and (eq? ctor1 ctor2  #|constructor|#)
+                           (= (length kids1) (length kids2)  #|arity|#)
+                           (let ([new-paths  (map (lambda (i) `[,@p ,i])
+                                                  (enumerate kids1))])
+                             (do ([ps new-paths (cdr ps)]
+                                  [m  m         (inner m (car ps))])
 
-                                   ((or (not m) (null? ps))  m)))))))))))
+                                 ((or (not m) (null? ps))  m)))))))))))
 
 (define last-var
   (f> mol-<

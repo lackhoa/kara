@@ -7,23 +7,19 @@
   (f> ref '[1]))
 
 (define get-prem
-  (lambda (proof)
-    (let loop ([prem-list  (ref proof '[0])])
-      (mol-<  prem-list
-              (lambda (_)  (list)  #|premise is not yet constructed|#)
-              (lambda (data _)
-                (case data
-                  [null  (list)]
-                  [::    (cons (ref prem-list '[0]  #|car|#)
-                               (loop (ref prem-list '[1]  #|cdr|#)))]))))))
+  (f>> (f> ref '[0])
+       (f> mol-<
+           (lambda _         (list))
+           (lambda (_ kids)  kids))))
 
 (define mk-proof
   (lambda (premise conclusion)
-    `(=> ,(let loop ([premise  premise]
-                    [i        100  #|count new variables|#])
-           (if (null? premise)  '(null)
-               `(:: (=> ,i ,(car premise))
-                    ,(loop (cdr premise) (+ i 1)))))
+    `(=> (list ,@(let loop ([premise  premise]
+                           [i        100])
+                  (if (null? premise)  (list)
+                      (cons `(=> ,i ,(car premise))
+                            (loop (cdr premise)
+                                  (+ i 1))))))
         ,conclusion)))
 
 ;;; Combinators

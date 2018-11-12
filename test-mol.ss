@@ -80,7 +80,6 @@
 (define (inter-cycle)
   (define r1 '(f 0 0))
   (define r2 '(f 0 1))
-  (up! r2 '[0] '(f 0))
   (up! r2 '[] '(f (f 0 1) 0))
   (assert (not (up r2 '[] r1)))
   (assert (not (up r1 '[] r2)))
@@ -89,8 +88,7 @@
 
 (define (inter-no-cycle)
   (define r1 '(f 0 0 1))
-  (define r2 '(f 0 1 (f 0)))
-  (up! r2 '[] '(f 0 1 (f 2 1)))
+  (define r2 '(f 0 1 (f 1 2)))
   (newline) (pydisplay "0 = 1 = 2-0")
   (pydisplay (up r2 '[] r1))
   )
