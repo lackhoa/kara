@@ -10,16 +10,20 @@
 
 ;;; Parameters (files are preferably strings)
 (define db
-  (append category equality))
+  (append equality category))
 
 (define boring
   (list (mk-proof '()
                   '(= 0 0))
         (mk-proof '((= 1 0))
-                  '(= 0 1))))
+                  '(= 0 1))
+        (mk-proof '((and 0 1))
+                  '0)
+        (mk-proof '((and 0 1))
+                  '1)))
 
 (define max-steps 6)
-(define trim?     #f)
+(define trim?     #t)
 (define show-num  100)
 
 (define banned-data
@@ -60,7 +64,7 @@
   (lambda (proof)
     (let ([assumptions  (>> (get-ungrounded proof)
                             strip-duplicates)])
-      `(,@assumptions :- ,(get-ccs proof)))))
+      `(:- (list ,@assumptions) ,(get-ccs proof)))))
 
 (define main
   (lambda (proof rel index)
@@ -113,5 +117,5 @@
         (set! b (s-cdr b))
         res)
       (lambda (x)
-        (pydisplay (>> x clean (if trim? trim identity)))
+        (pydisplay (>> x (if trim? trim identity) clean))
         (pydisplay (proof-steps x) "steps"))))

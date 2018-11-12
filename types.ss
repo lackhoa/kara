@@ -53,6 +53,12 @@
       (-> (-> 0 1)
          (-> 0 2))))
 
+(define and-elims
+  (list (mk-proof '((and 0 1))
+                  '0)
+        (mk-proof '((and 0 1))
+                  '1)))
+
 (define equality
   (list (mk-proof '((= 0 1) (= 1 2))
                   '(= 0 2))
@@ -70,9 +76,4 @@
 
         (#|Right identity|#
          mk-proof '((im 0))
-                  '(= (compose 1 0) 0))
-
-        (#|The demand for identity morphism|#
-         mk-proof '((= (compose 0 (f)) 0)
-                    (= (compose (f) 0) 0))
-                  '(im 0))))
+                  '(= (compose 1 0) 0))))
