@@ -34,6 +34,8 @@
 
 (define p '(=> (-> 0 1) 0 1))
 
+
+
 (define mp
   '(=> (=> 11 22 (-> 0 1))
       (=> 33 44 0)
@@ -60,20 +62,20 @@
                   '1)))
 
 (define equality
-  (list (mk-proof '((= 0 1) (= 1 2))
+  (list (mk-proof '(0 1 2 (= 0 1) (= 1 2))
                   '(= 0 2))
 
-        (mk-proof '((= 1 0))
+        (mk-proof '(0 1 (= 1 0))
                   '(= 0 1))
 
-        (mk-proof '()
+        (mk-proof '(0)
                   '(= 0 0))))
 
 (define category
   (list (#|Left identity|#
-         mk-proof '((im 0))
-                  '(= (compose 0 1) 0))
+         mk-proof '(0 (im 0))
+                  (mk-proof '(1) '(= (compose 0 1) 0)))
 
         (#|Right identity|#
-         mk-proof '((im 0))
-                  '(= (compose 1 0) 0))))
+         mk-proof '(0 (im 0))
+                  (mk-proof '(1) '(= (compose 1 0) 0)))))

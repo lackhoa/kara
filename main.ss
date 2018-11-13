@@ -10,7 +10,7 @@
 
 ;;; Parameters (files are preferably strings)
 (define db
-  (append equality category))
+  (append evaluation))
 
 (define boring
   (list (mk-proof '()
