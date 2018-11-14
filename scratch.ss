@@ -78,23 +78,3 @@
         (#|Cartesian product exists|#
          mk-proof '()
                   '(prod? (prod 0 1 (pr1 0 1) (pr2 0 1))))))
-
-(define evaluation
-  (list (mk-proof '()
-                  '(eval (apply (i) 0) 0))
-
-        (mk-proof '((eval (apply 0 2) 3)
-                    (eval (apply 1 2) 4)
-                    (eval (apply 3 4) 5))
-                  '(eval (apply (apply (apply (s) 0) 1) 2)
-                         5))
-
-        (mk-proof '((eval (apply 1 2) 3)
-                    (eval (apply 0 3) 4))
-                  '(eval (apply (apply (apply (b) 0) 1) 2)
-                         4))
-
-        (mk-proof '((eval (apply 0 2) 3)
-                    (eval (apply 3 1) 4))
-                  '(eval (apply (apply (apply (c) 0) 1) 2)
-                         4))))

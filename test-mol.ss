@@ -12,21 +12,21 @@
 ;;; Test zone
 (define (intro)
   (define root new-var)
-  (up! root '[] '(f 0))
+  (up! root '[] '(0))
   (up! root '[0] '(A))
   (assert (not (up root '[0] '(NOT-A)))))
 (intro)
 
 (define (sync-test)
-  (define root '(f 0 1))
-  (up! root '[0] '(f 0 1 2))
-  (up! root '[1] '(f 0 1 2))
-  (up! root '[] '(f 0 0))
+  (define root '(0 1))
+  (up! root '[0] '(0 1 2))
+  (up! root '[1] '(0 1 2))
+  (up! root '[] '(0 0))
   (assert (equal? (ref root '[0])
                   (ref root '[1])))
-  (up! root '[0 0] '(B))
+  (up! root '[0 0] 'B)
   (assert (equal? (ref root '[1 0])
-                  '(B)))
+                  'B))
   (up! root '[1 2] '(C))
   (assert (equal? (ref root '[0 2])
                   (ref root '[1 2])))
@@ -35,69 +35,69 @@
 (sync-test)
 
 (define (rep)
-  (define root '(f 0 (f 6) 2 3 4 5))
-  (up! root '[] '(f 0 (f 0) 2 3 4 5))
-  (up! root '[2] '(->))
-  (up! root '[] '(f 0 1 2 3 3 4))
+  (define root '(0 (6) 2 3 4 5))
+  (up! root '[] '(0 (0) 2 3 4 5))
+  (up! root '[2] '->)
+  (up! root '[] '(0 1 2 3 3 4))
   (pydisplay "0 = 1-0; 3 = 4")
   (pydisplay root)
   )
 (rep)
 
 (define (sync-more)
-  (define root '(f 0 1 2))
-  (up! root '[0] '(A))
-  (up! root '[] '(f 0 0 1))
+  (define root '(0 1 2))
+  (up! root '[0] 'A)
+  (up! root '[] '(0 0 1))
   (assert (equal? (ref root '[1])
-                  '(A)))
-  (up! root '[2] '(B))
-  (assert (not (up root '[] '(f 0 1 0))))
+                  'A))
+  (up! root '[2] 'B)
+  (assert (not (up root '[] '(0 1 0))))
   )
 (sync-more)
 
 (define (cyclic)
-  (define root '(f 0 1 2))
-  (up! root '[0] '(f 0))
-  (up! root '[2] '(f 0))
-  (up! root '[] '(f (f 0) 0 1))
-  (assert (not (up root '[] '(f 0 0 1))))
+  (define root '(0 1 2))
+  (up! root '[0] '(0))
+  (up! root '[2] '(0))
+  (up! root '[] '((0) 0 1))
+  (assert (not (up root '[] '(0 0 1))))
   )
 (cyclic)
 
 (define (inter-root)
   (newline)
-  (let ([get-modelel1  '(f 0 0 1 2)]
-        [get-modelel2  '(f 0 1 1 2)]
+  (let ([get-modelel1  '(0 0 1 2)]
+        [get-modelel2  '(0 1 1 2)]
         [root          new-var])
     (up! root '[] get-modelel1)
     (up! root '[] get-modelel2)
-    (up! root '[] '(f 0 1 2 2))
+    (up! root '[] '(0 1 2 2))
     (pydisplay "0 = 1 = 2 = 3")
     (pydisplay root))
   )
 (inter-root)
 
 (define (inter-cycle)
-  (define r1 '(f 0 0))
-  (define r2 '(f 0 1))
-  (up! r2 '[] '(f (f 0 1) 0))
+  (define r1 '(0 0))
+  (define r2 '(0 1))
+  (up! r2 '[] '((0 1) 0))
   (assert (not (up r2 '[] r1)))
   (assert (not (up r1 '[] r2)))
   )
 (inter-cycle)
 
 (define (inter-no-cycle)
-  (define r1 '(f 0 0 1))
-  (define r2 '(f 0 1 (f 1 2)))
+  (define r1 '(0 0 1))
+  (define r2 '(0 1 (1 2)))
   (newline) (pydisplay "0 = 1 = 2-0")
   (pydisplay (up r2 '[] r1))
   )
 (inter-no-cycle)
 
 (define (inter-advanced)
-  (let* ([mod (up '(f 0 1) '[1] '(f 0))]
-         [mod (up mod '[] '(f 0 (f 0)))]
-         [root '(f 0 1)])
+  (let* ([mod (up '(0 1) '[1] '(0))]
+         [mod (up mod '[] '(0 (0)))]
+         [root '(0 1)])
     (up! root '[0] '(N))
     (up! root '[] mod)
     (assert (equal? (ref root '[1 0])
@@ -108,31 +108,31 @@
 (define (advanced-stuff)
   (newline)
   (let* ([rt p]
-         [rt (up rt '[0] i)]
-         [rt (up rt '[1] k)])
+         [rt (up rt '[1] i)]
+         [rt (up rt '[2] k)])
     (pydisplay "Conclusion says (-> A (-> B A))")
-    (pydisplay (ref rt '[2])))
+    (pydisplay (ref rt '[3])))
 
   (let* ([rt2 p]
-         [rt2 (up rt2 '[0] k)]
-         [rt2 (up rt2 '[1] i)])
+         [rt2 (up rt2 '[1] k)]
+         [rt2 (up rt2 '[2] i)])
     (newline)
     (pydisplay "Conclusion says (-> A (-> B B))")
-    (pydisplay (ref rt2 '[2])))
+    (pydisplay (ref rt2 '[3])))
   )
 (advanced-stuff)
 
 (define (tricky-topology)
-  (let* ([root '(f 0 1 2)]
-         [root (up root '[0] '(f 0 1))]
-         [root (up root '[0 0] '(f 0))]
-         [root (up root '[1] '(f 0 1))]
-         [root (up root '[] '(f (f (f 0) 2) 1 0))])
+  (let* ([root '(0 1 2)]
+         [root (up root '[0] '(0 1))]
+         [root (up root '[0 0] '(0))]
+         [root (up root '[1] '(0 1))]
+         [root (up root '[] '(((0) 2) 1 0))])
     (assert (equal? (ref root '[0 0 0])
                     (ref root '[2])))
 
-    (up! root '[] '(f 0 (f 1 1) 2))
-    (up! root '[] '(f 0 0 1))
+    (up! root '[] '(0 (1 1) 2))
+    (up! root '[] '(0 0 1))
     (assert (equal? (ref root '[0 0 0])
                     (ref root '[2]))))
   )

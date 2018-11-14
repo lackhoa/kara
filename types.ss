@@ -3,24 +3,7 @@
 (load "mol.ss")
 
 ;;; Utility functions
-(define get-ccs
-  (f> ref '[1]))
 
-(define get-prem
-  (f>> (f> ref '[0])
-       (f> mol-<
-           (lambda _         (list))
-           (lambda (_ kids)  kids))))
-
-(define mk-proof
-  (lambda (premise conclusion)
-    `(=> (list ,@(let loop ([premise  premise]
-                           [i        100])
-                  (if (null? premise)  (list)
-                      (cons `(=> ,i ,(car premise))
-                            (loop (cdr premise)
-                                  (+ i 1))))))
-        ,conclusion)))
 
 ;;; Combinators
 (define i '(-> 0 0))
@@ -33,8 +16,6 @@
          (-> 0 2))))
 
 (define p '(=> (-> 0 1) 0 1))
-
-
 
 (define mp
   '(=> (=> 11 22 (-> 0 1))
@@ -62,20 +43,68 @@
                   '1)))
 
 (define equality
-  (list (mk-proof '(0 1 2 (= 0 1) (= 1 2))
-                  '(= 0 2))
+  (list '(: eq-trans
+            (-> (: 0 11)
+               (-> (: 1 22)
+                  (-> (: 2 33)
+                     (-> (= 0 1) (-> (= 1 2) (= 0 2)))))))
 
-        (mk-proof '(0 1 (= 1 0))
-                  '(= 0 1))
+        '(: eq-sym
+            (-> (: 0 11)
+               (-> (: 1 22)
+                  (-> (= 1 0) (= 0 1)))))
 
-        (mk-proof '(0)
-                  '(= 0 0))))
+        '(: eq-refl
+            (-> 0 (= 0 0)))
 
-(define category
-  (list (#|Left identity|#
-         mk-proof '(0 (im 0))
-                  (mk-proof '(1) '(= (compose 0 1) 0)))
+        '(: eq-func
+            (-> (: 0 11)
+               (-> (: 1 11)
+                  (-> (: 2 prop)
+                     (-> (: 3 prop)
+                        (-> (: 4 (-> 11 prop))
+                           (-> (= 0 1)
+                              (-> (eval (4 0) 2)
+                                 (-> (true 2)
+                                    (-> (eval (4 1) 3)
+                                       (true 3)))))))))))))
 
-        (#|Right identity|#
-         mk-proof '(0 (im 0))
-                  (mk-proof '(1) '(= (compose 1 0) 0)))))
+(define peano
+  (list '(: zero nat)
+        '(: succ
+            (-> 0
+               (-> (: 0 nat)
+                  (: (++ 0) nat))))
+
+        '(: succ-injection
+            (-> (: 0 nat)
+               (-> (: 1 nat)
+                  (-> (= 0 1)
+                     (= (++ 0) (++ 1))))))
+
+        '(: succ-not-zero
+            (-> (: 0 nat)
+               (-> (not (= zero (++ 0))))))))
+
+(define evaluation
+  (list (mk-proof '((: 0 (-> 11 22))
+                    (: 1 11)
+                    (eval (0 1) 2))
+                  (: 2 22))
+
+        (mk-proof '()
+                  '(: i (-> 0 0)))
+
+        (mk-proof '()
+                  '(: s (-> (-> 0 (-> 1 2))
+                           (-> (-> 0 1)
+                              (-> 0 2)))))
+
+        (mk-proof '()
+                  '(: b (-> (-> 1 2)
+                           (-> (-> 0 1)
+                              (-> 0 2)))))
+
+        (mk-proof '()
+                  '(: c (-> (-> 0 (-> 1 2))
+                           (-> 1 (-> 0 2)))))))

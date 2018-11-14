@@ -1,98 +1,110 @@
 (import (kara-lang main))
 
 ;; Molcules:
-;; var% =  int
-;; mol% =  ctor: symbol, kids: [var% | mol%]
 (define new-var 0)
 
-(define (mol-< mol/var fv fm)
+(define mol-<
   ;; Dispatch function for molecule
-  (if (number? mol/var)
-      (fv mol/var)
-      (fm (car mol/var) (cdr mol/var))))
+  (lambda (mol fv fc fl)
+    ((cond [(number? mol)  fv]
+           [(atom? mol)    fc]
+           [(list? mol)    fl]) mol)))
 
-(define (ref mol/var path)
+(define ref
   ;; Fault-tolerant referencing
-  (if (null? path)  mol/var
-      (mol-< mol/var
-             (lambda (v)       #f  #|can't go down|#)
-             (lambda (_ kids)  (and (< (car path) (length kids))
-                             (ref (list-ref kids (car path))
-                                  (cdr path)))))))
+  (lambda (mol path)
+    (if (null? path)  mol
+        (and (list? mol)
+           (and (< (car path) (length mol))
+              (ref (list-ref mol (car path))
+                   (cdr path)))))))
 
-(define (has-var? mol/var var)
-  (mol-< mol/var
-         (f> eq? var)
-         (lambda (_ kids)
-           (exists (f> has-var? var) kids))))
+(define has-var?
+  (lambda (mol var)
+    (mol-< mol
+           (lambda (v) (eq? v var))
+           (lambda (c) #f)
+           (lambda (ls)
+             (exists (f> has-var? var) ls)))))
 
-(define (sync mol path1 path2)
-  (let inner ([m  mol]
-              [p  '[]])
-    (let ([m/v1  (ref m `[,@path1 ,@p])]
-          [m/v2  (ref m `[,@path2 ,@p])])
-      (mol-< m/v1
-             (lambda (v1)
-               (and (mol-< m/v2
-                         (lambda _ #t)
-                         (lambda _ (not (has-var? m/v2 v1)  #|No Incest!|#)))
-                  (substq m/v2 v1 m  #|v1 to be replaced by m/v2|#)))
-             (lambda (ctor1 kids1)
-               (mol-< m/v2
-                      (lambda (v2)
-                        (and (not (has-var? m/v1 v2)  #|No Incest|#)
-                           (substq m/v1 v2 m)))
-                      (lambda (ctor2 kids2)
-                        (and (eq? ctor1 ctor2  #|constructor|#)
-                           (= (length kids1) (length kids2)  #|arity|#)
-                           (let ([new-paths  (map (lambda (i) `[,@p ,i])
-                                                  (enumerate kids1))])
-                             (do ([ps new-paths (cdr ps)]
-                                  [m  m         (inner m (car ps))])
-
-                                 ((or (not m) (null? ps))  m)))))))))))
+(define sync
+  (lambda (mol path1 path2)
+    (let loop ([m  mol]
+               [p  '[]])
+      (let ([m1  (ref m `[,@path1 ,@p])]
+            [m2  (ref m `[,@path2 ,@p])])
+        (mol-< m1
+               (#|m1 is a variable|#
+                lambda (v1)
+                 (mol-< m2
+                        (lambda (v2)  (substq v2 v1 m))
+                        (lambda (c2)  (substq c2 v1 m))
+                        (lambda (l2)  (and (not (has-var? l2 v1)  #|No Incest!|#)
+                                    (substq l2 v1 m)))))
+               (#|m1 is a constant|#
+                lambda (c1)
+                 (mol-< m2
+                        (lambda (v2)  (substq c1 v2 m))
+                        (lambda (c2)  (and (eq? c1 c2) m))
+                        (lambda (l2)  #f)))
+               (#|m1 is a list|#
+                lambda (l1)
+                 (mol-< m2
+                        (lambda (v2)  (and (not (has-var? l1 v2)  #|No Incest!|#)
+                                    (substq l1 v2 m)))
+                        (lambda (c2)  #f)
+                        (lambda (l2)  (and (= (length l1) (length l2))
+                                    (let loop2 ([m   m]
+                                                [ps  (#|New paths|#
+                                                      map (lambda (i) `[,@p ,i])
+                                                          (enumerate l1))])
+                                      (cond [(not m)       #f]
+                                            [(null? ps)  m]
+                                            [else        (loop2 (loop m (car ps))
+                                                                (cdr ps))])))))))))))
 
 (define last-var
   (f> mol-<
-      (lambda (v) v)
-      (lambda (_ kids)
-        (cond [(null? kids)  0]
-              [else          (apply max (map last-var kids))]))))
+      (lambda (v) v) (lambda (c) 0)
+      (lambda (ls)
+        (cond [(null? ls)  0]
+              [else        (apply max (map last-var ls))]))))
 
 (define translate
   (lambda (mol n)
     (mol-< mol
-           (l> + n)
-           (lambda (ctor kids)
-             (cons ctor
-                   (map (f> translate n) kids))))))
+           (lambda (v) (+ v n))  (lambda (c) c)
+           (lambda (ls)
+             (map (f> translate n) ls)))))
 
-(define (up host to guest)
-  (let ([unifier  `(f  #|Dummy constructor|#
-                    ,host
-                    ,(translate guest
-                                (add1 (last-var host))))
-                  #|Host as 1st kid|#
-                  #|Guest as 2nd kid|#])
-    (>> (sync unifier
-              `[0 ,@to]
-              '[1])
-        (f> ref '[0]  #|That's the new host|#))))
+(define up
+  (lambda (host to guest)
+    (let ([unifier  `(,host  #|Host as first item|#
+                      ,(translate guest
+                                  (add1 (last-var host))))
+                    #|Guest as second item|#])
+      (>> (sync unifier
+                `[0 ,@to]
+                '[1])
+          (f> ref '[0]  #|returns the new host|#)
+          clean))))
 
-(define (clean mol/var)
-  (let ([dic      (make-eq-hashtable)]
-        [counter  -1]  #|State variables|#)
-    (let inner ([m/v  mol/var])
-      (mol-< m/v
+(define clean
+  (lambda (mol)
+    (let ([var-handler  #|The variable generator and bookkeepers|#
+           (let ([dic      (make-eq-hashtable)]
+                 [counter  -1])
              (lambda (v)
                (let ([lookup  (eq-hashtable-ref dic v #f)])
                  (case lookup
                    [#f    (set! counter (+ counter 1))
                           (eq-hashtable-set! dic v counter)
                           counter]
-                   [else  lookup])))
-             (lambda (ctor kids)
-               `(,ctor
-                 ,@(map (lambda (kid)
-                          (inner kid  #|Influenced by `dic` and `counter`|#))
-                        kids)))))))
+                   [else  lookup]))))])
+
+      (#|This loop is influenced by var-handout|#
+       let loop ([m  mol])
+        (mol-< m
+               (lambda (v)  (var-handler v))
+               (lambda (c)  c)
+               (lambda (ls) (map loop ls)))))))
