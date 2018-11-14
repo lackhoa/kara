@@ -1,2 +1,2 @@
 # kara
-Used to be a language, but now just a macro package for Racket.
+This is kind of like a logic programming language, but there's no specification of control flow. 
