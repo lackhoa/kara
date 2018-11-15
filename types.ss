@@ -45,14 +45,14 @@
 (define equality
   (list '(: eq-trans
             (-> (: 0 11)
-               (-> (: 1 22)
-                  (-> (: 2 33)
-                     (-> (= 0 1) (-> (= 1 2) (= 0 2)))))))
+                (-> (: 1 22)
+                    (-> (: 2 33)
+                        (-> (= 0 1) (-> (= 1 2) (= 0 2)))))))
 
         '(: eq-sym
             (-> (: 0 11)
-               (-> (: 1 22)
-                  (-> (= 1 0) (= 0 1)))))
+                (-> (: 1 22)
+                    (-> (= 1 0) (= 0 1)))))
 
         '(: eq-refl
             (-> 0 (= 0 0)))
@@ -69,22 +69,42 @@
                                     (-> (eval (4 1) 3)
                                        (true 3)))))))))))))
 
+(define misc
+  (list '(: be-true
+            (-> (: 11 *)
+               (-> (: 0 11)
+                  (true 11))))))
+
 (define peano
   (list '(: zero nat)
         '(: succ
-            (-> 0
-               (-> (: 0 nat)
-                  (: (++ 0) nat))))
-
-        '(: succ-injection
             (-> (: 0 nat)
-               (-> (: 1 nat)
-                  (-> (= 0 1)
-                     (= (++ 0) (++ 1))))))
+               (: (++ 0) nat)))
 
-        '(: succ-not-zero
-            (-> (: 0 nat)
-               (-> (not (= zero (++ 0))))))))
+        `(: succ-injection
+            ,(chain (: 0 nat)
+                    (: 1 nat)
+                    (true (= 0 1))
+                    (= (++ 0) (++ 1))))
+
+        `(: succ-not-zero
+            ,(chain (: 0 nat)
+                    (= (++ 0) zero)
+                    f))
+
+        `(: nat-induc
+            ,(chain '(: 3 (-> nat 5  #|This doesn't look good...|#))
+                    '(: (3 zero) 11)
+                    '(true 11)
+
+                    (chain '(: (3 1) 22)
+                           '(true 22)
+                           '(: (3 (++ 1)) 33)
+                           '(true 33))
+
+                    (chain '(: 0 nat)
+                           '(: (3 0) 5)
+                           '(true ))))))
 
 (define evaluation
   (list (mk-proof '((: 0 (-> 11 22))
