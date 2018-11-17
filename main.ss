@@ -10,25 +10,19 @@
 
 ;;; Parameters (files are preferably strings)
 (define db
-  (append evaluation))
+  (append and-elims equality category))
 
 (define boring
-  (list (mk-proof '()
-                  '(= 0 0))
-        (mk-proof '((= 1 0))
-                  '(= 0 1))
-        (mk-proof '((and 0 1))
-                  '0)
-        (mk-proof '((and 0 1))
-                  '1)))
+  (append (list-ref equality 2)
+          and-elims))
 
 (define max-steps 6)
 (define trim?     #t)
 (define show-num  100)
 
-(define banned-data
-  #|data not allowed in the hypotheses|#
-  '(=))
+(define banned-ctor
+  #|constructors not allowed in the hypotheses|#
+  '(= and))
 
 ;;; Main Routines
 (define cycle?
@@ -37,7 +31,7 @@
     (let loop ([mol   proof]
                [seen  (list)])
       (mol-< mol
-             (lambda _  #f)
+             (lambda _  #f) (lambda _  #f)
              (lambda _  (or (bool (member (get-ccs mol)
                                     seen))
                       (ormap (f> loop (cons (get-ccs mol)
@@ -48,23 +42,23 @@
   #|Counts how many => signs there are|#
   (lambda (proof)
     (mol-< proof
-           (lambda _ 0)
+           (lambda _ 0)  (lambda _ #f)
            (lambda _
              (fold-left + 1 (map proof-steps (get-prem proof)))))))
 
 (define get-ungrounded
   (lambda (proof)
-    (mol-< (ref proof '[0])
-           (lambda (_)  (list (get-ccs proof)))
-           (lambda (data _)
-             (flatmap get-ungrounded
-                      (get-prem proof))))))
+    (mol-< (ref proof '[1])
+           (lambda _  (list (get-ccs proof)))
+           (lambda _  #f)
+           (lambda _  (flatmap get-ungrounded
+                          (get-prem proof))))))
 
 (define trim
   (lambda (proof)
     (let ([assumptions  (>> (get-ungrounded proof)
                             strip-duplicates)])
-      `(:- (list ,@assumptions) ,(get-ccs proof)))))
+      `(:- ,@assumptions ,(get-ccs proof)))))
 
 (define main
   (lambda (proof rel index)
@@ -77,31 +71,35 @@
            (delay
              (#|Just assume it (base case)|#
               cond [(mol-< (get-ccs (ref proof path))
-                           (lambda (_)       #f  #|Don't assume random propositions|#)
-                           (lambda (data _)  (not (memq data banned-data)
-                                           #|Don't assume dumb things|#)))
+                           (lambda _     #f  #|Don't assume random propositions|#)
+                           (lambda _     #f  #|Don't assume constants|#)
+                           (lambda (ls)  (or (null? ls)
+                                       (not (memq (car ls) banned-ctor)
+                                          #|Don't assume dumb things|#))))
                     (cons proof s-null  #|careful with this!|#)]
                    [else                 (list)]))
 
            (#|Substitute an axiom (recursive case)|#
             delay
-             (force (#|limit size for complete search|#
-                     cond [(>= (proof-steps proof)
-                              max-steps)  s-null]
-                          [else
-                           (s-flatmap  (#|continue on to the other premise ...|#
-                                        f> main rel (+ index 1))
-                                       (#|... after enumerating down|#
-                                        >> (s-map (l> up proof path)
-                                                  (apply stream db))
-                                           (l> s-filter
-                                               (f>> (negate cycle?)))
-                                           (l> s-flatmap
-                                               (f> main `[,@path 0] 0))))]))))))))
+             (force
+              (#|limit size for complete search|#
+               cond [(>= (proof-steps proof)
+                        max-steps)  s-null]
+
+                    [else  (s-flatmap
+                            (#|continue on to the other premise ...|#
+                             f> main rel (+ index 1))
+                            (#|... after enumerating down|#
+                             >> (s-map (l> up proof path)
+                                       (apply stream db))
+                                (l> s-filter
+                                    (f>> (negate cycle?)))
+                                (l> s-flatmap
+                                    (f> main `[,@path 1] 0))))]))))))))
 
 (define b
   ;; The main stream
-  (s-flatmap (f> main '[0] 0)
+  (s-flatmap (f> main '[1] 0)
              (apply stream
                (filter (negate (f> member boring))
                        db))))

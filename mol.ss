@@ -7,8 +7,11 @@
   ;; Dispatch function for molecule
   (lambda (mol fv fc fl)
     ((cond [(number? mol)  fv]
-           [(atom? mol)    fc]
-           [(list? mol)    fl]) mol)))
+           [(symbol? mol)  fc]
+           [(list? mol)    fl]
+           [else
+            (error "mol-<" "Not a molecule" mol)])
+     mol)))
 
 (define ref
   ;; Fault-tolerant referencing
@@ -102,9 +105,16 @@
                           counter]
                    [else  lookup]))))])
 
-      (#|This loop is influenced by var-handout|#
+      (#|This loop is influenced by var-handler|#
        let loop ([m  mol])
         (mol-< m
                (lambda (v)  (var-handler v))
                (lambda (c)  c)
                (lambda (ls) (map loop ls)))))))
+
+(define-syntax bind
+  (syntax-rules ()
+    [(bind (id ...) exp ...)
+     (let-values ([(id ...)
+                   (apply values (iota (length '(id ...))))])
+       exp ...)]))
