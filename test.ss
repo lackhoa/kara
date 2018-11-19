@@ -1,39 +1,37 @@
 (import (kara-lang main))
 
-(define ev
-  (lambda (e)
-    (cond [(and (eq? (car e) '::)
-              (eq? (cadr e) 'quote))
-           (cadr e)]
-          [(and (eq? (car e) '::)
-              (eq? (cadr e) 'call))
-           (ap (ev (caddr e))
-               (ev (cadddr e)))]
-          [else
-           (error "Eval" "Invalid expression" e)])))
-
 (define ap
-  (lambda (proc arg)
-    (define loop
-      (trace-lambda loop (x)
-        (cond [(eq? (car x)
-                    'var)    (if (zero? (cadr x))  arg
-                                 `(var ,(1- (cadr x))))]
-              [(eq? (car x)
-                    'atom)   x]
-              [(eq? (car x)
-                    '::)     `(:: ,(loop (cadr x))
-                                  ,(loop (caddr x)))]
-              [else
-               (error "Apply" "OMG what is this?" proc)])))
+  (lambda (exp arg)
+    (define ap-core
+      (lambda (exp)
+        (case (car exp)
+          [bind   `(bind ,(ap-core (cadr exp)))]
+          [var    (if (zero? (cadr exp))  `(atom ,arg)
+                      `(var ,(1- (cadr exp))))]
+          [atom   exp]
+          [::     `(:: ,(ap-core (cadr exp))
+                       ,(ap-core (caddr exp)))]
+          [else   (error "ap" "Invalid expression" exp)])))
 
-    (ev (loop (cadr proc  #|function body|#)))))
+    (ap-core (cadr exp  #|Predicate body|#))))
 
-(trace ev)
-(trace ap)
+(define print
+  (lambda (exp)
+    (let loop ([exp  exp])
+      (case (car exp)
+        [atom  (cadr exp)]
+        [::    (cons (loop (cadr exp))
+                     (loop (caddr exp)))]
+        [else  (error "print" "Can't print") exp]))))
 
-(define p1
-  '(:: call
-       (:: '(lambda (:: (atom quote) (var 0)))
-           '(:: (atom c) (atom ())))))
-(ev p1)
+(define e
+  '(bind (bind (var 0))))
+(define e2
+  '(bind (bind (:: (var 1) (var 0)))))
+(define e3
+  '(bind (bind (bind (:: (:: (atom K) (var 2))
+                         (:: (var 2) (:: (var 1) (:: (var 0) (atom ())))))))))
+
+(pydisplay (print (ap (ap e 'x) 'y)))
+(pydisplay (print (ap (ap e2 'x) 'y)))
+(pydisplay (print (ap (ap (ap e3 'x) 'y) 'z)))

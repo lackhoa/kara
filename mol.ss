@@ -7,7 +7,7 @@
   ;; Dispatch function for molecule
   (lambda (mol fv fc fp)
     ((cond [(number? mol)  fv  #|variable|#]
-           [(atom? mol)    fc  #|constant|#]
+           [(atom? mol)    fc  #|constant (including null)|#]
            [(pair? mol)    fp  #|pair|#]
            [else
             (error "mol-<" "Not a molecule" mol)])
