@@ -13,31 +13,31 @@
 (define (intro)
   (define root new-var)
   (up! root '[] '(0))
-  (up! root '[0] '(A))
-  (assert (not (up root '[0] '(NOT-A)))))
+  (up! root '[car] 'A)
+  (assert (not (up root '[car] 'NOT-A))))
 (intro)
 
 (define (sync-test)
   (define root '(0 1))
-  (up! root '[0] '(0 1 2))
-  (up! root '[1] '(0 1 2))
+  (up! root '[car] '(0 1 2))
+  (up! root '[cdr car] '(0 1 2))
   (up! root '[] '(0 0))
-  (assert (equal? (ref root '[0])
-                  (ref root '[1])))
-  (up! root '[0 0] 'B)
-  (assert (equal? (ref root '[1 0])
+  (assert (equal? (ref root '[car])
+                  (ref root '[cdr car])))
+  (up! root '[car car] 'B)
+  (assert (equal? (ref root '[cdr car car])
                   'B))
-  (up! root '[1 2] '(C))
-  (assert (equal? (ref root '[0 2])
-                  (ref root '[1 2])))
-  (assert (not (up root '[1 2] '(D))))
+  (up! root '[cdr car cdr cdr car] '(C))
+  (assert (equal? (ref root '[car cdr cdr car])
+                  (ref root '[cdr car cdr cdr car])))
+  (assert (not (up root '[cdr car cdr cdr car] '(D))))
   )
 (sync-test)
 
 (define (rep)
   (define root '(0 (6) 2 3 4 5))
   (up! root '[] '(0 (0) 2 3 4 5))
-  (up! root '[2] '->)
+  (up! root '[cdr cdr car] '->)
   (up! root '[] '(0 1 2 3 3 4))
   (pydisplay "0 = 1-0; 3 = 4")
   (pydisplay root)
@@ -46,19 +46,19 @@
 
 (define (sync-more)
   (define root '(0 1 2))
-  (up! root '[0] 'A)
+  (up! root '[car] 'A)
   (up! root '[] '(0 0 1))
-  (assert (equal? (ref root '[1])
+  (assert (equal? (ref root '[cdr car])
                   'A))
-  (up! root '[2] 'B)
+  (up! root '[cdr cdr car] 'B)
   (assert (not (up root '[] '(0 1 0))))
   )
 (sync-more)
 
 (define (cyclic)
   (define root '(0 1 2))
-  (up! root '[0] '(0))
-  (up! root '[2] '(0))
+  (up! root '[car] '(0))
+  (up! root '[cdr cdr car] '(0))
   (up! root '[] '((0) 0 1))
   (assert (not (up root '[] '(0 0 1))))
   )
@@ -95,12 +95,12 @@
 (inter-no-cycle)
 
 (define (inter-advanced)
-  (let* ([mod (up '(0 1) '[1] '(0))]
+  (let* ([mod (up '(0 1) '[cdr car] '(0))]
          [mod (up mod '[] '(0 (0)))]
          [root '(0 1)])
-    (up! root '[0] '(N))
+    (up! root '[car] '(N))
     (up! root '[] mod)
-    (assert (equal? (ref root '[1 0])
+    (assert (equal? (ref root '[cdr car car])
                     '(N))))
   )
 (inter-advanced)
@@ -108,33 +108,33 @@
 (define (advanced-stuff)
   (newline)
   (let* ([rt p]
-         [rt (up rt '[1] i)]
-         [rt (up rt '[2] k)])
+         [rt (up rt '[cdr car] i)]
+         [rt (up rt '[cdr cdr car] k)])
     (pydisplay "Conclusion says (-> A (-> B A))")
-    (pydisplay (ref rt '[3])))
+    (pydisplay (ref rt '[cdr cdr cdr car])))
 
   (let* ([rt2 p]
-         [rt2 (up rt2 '[1] k)]
-         [rt2 (up rt2 '[2] i)])
+         [rt2 (up rt2 '[cdr car] k)]
+         [rt2 (up rt2 '[cdr cdr car] i)])
     (newline)
     (pydisplay "Conclusion says (-> A (-> B B))")
-    (pydisplay (ref rt2 '[3])))
+    (pydisplay (ref rt2 '[cdr cdr cdr car])))
   )
 (advanced-stuff)
 
 (define (tricky-topology)
   (let* ([root '(0 1 2)]
-         [root (up root '[0] '(0 1))]
-         [root (up root '[0 0] '(0))]
-         [root (up root '[1] '(0 1))]
+         [root (up root '[car] '(0 1))]
+         [root (up root '[car car] '(0))]
+         [root (up root '[cdr car] '(0 1))]
          [root (up root '[] '(((0) 2) 1 0))])
-    (assert (equal? (ref root '[0 0 0])
-                    (ref root '[2])))
+    (assert (equal? (ref root '[car car car])
+                    (ref root '[cdr cdr car])))
 
     (up! root '[] '(0 (1 1) 2))
     (up! root '[] '(0 0 1))
-    (assert (equal? (ref root '[0 0 0])
-                    (ref root '[2]))))
+    (assert (equal? (ref root '[car car car])
+                    (ref root '[cdr cdr car]))))
   )
 (tricky-topology)
 
