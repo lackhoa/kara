@@ -13,12 +13,12 @@
   (append and-elims equality category))
 
 (define boring
-  (append (list-ref equality 2)
+  (append (list-head equality 2)
           and-elims))
 
-(define max-steps 6)
+(define max-steps 20)
 (define trim?     #t)
-(define show-num  100)
+(define show-num  10)
 
 (define banned-ctor
   #|constructors not allowed in the hypotheses|#
@@ -48,7 +48,7 @@
 
 (define get-ungrounded
   (lambda (proof)
-    (mol-< (ref proof '[1])
+    (mol-< (ref proof '[cdr car])
            (lambda _  (list (get-ccs proof)))
            (lambda _  #f)
            (lambda _  (flatmap get-ungrounded
@@ -61,10 +61,10 @@
       `(:- ,@assumptions ,(get-ccs proof)))))
 
 (define main
-  (lambda (proof rel index)
-    #|`rel` points to the focused premise list, `index` is that list's index|#
-    (let ([#|points to the first premise|#
-           path  `[,@rel ,index]])
+  (lambda (proof lpath)
+    (display "x")
+    #|`lpath points to the list of remaining premises`|#
+    (let ([path  `[,@lpath car  #|points to the current premise|#]])
       (#|If path is invalid then the list is empty -> nothing to do|#
        if (not (ref proof path))  (stream proof)
           (s-append
@@ -73,9 +73,8 @@
               cond [(mol-< (get-ccs (ref proof path))
                            (lambda _     #f  #|Don't assume random propositions|#)
                            (lambda _     #f  #|Don't assume constants|#)
-                           (lambda (ls)  (or (null? ls)
-                                       (not (memq (car ls) banned-ctor)
-                                          #|Don't assume dumb things|#))))
+                           (lambda (pr)  (not (memq (car pr) banned-ctor)
+                                       #|Don't assume dumb things|#)))
                     (cons proof s-null  #|careful with this!|#)]
                    [else                 (list)]))
 
@@ -88,18 +87,18 @@
 
                     [else  (s-flatmap
                             (#|continue on to the other premise ...|#
-                             f> main rel (+ index 1))
+                             f> main `[,@lpath cdr])
                             (#|... after enumerating down|#
                              >> (s-map (l> up proof path)
                                        (apply stream db))
                                 (l> s-filter
                                     (f>> (negate cycle?)))
                                 (l> s-flatmap
-                                    (f> main `[,@path 1] 0))))]))))))))
+                                    (f> main `[,@path cdr car]))))]))))))))
 
 (define b
   ;; The main stream
-  (s-flatmap (f> main '[1] 0)
+  (s-flatmap (f> main '[cdr car  #|First premise list|#])
              (apply stream
                (filter (negate (f> member boring))
                        db))))
@@ -108,12 +107,12 @@
 
 
 ;;; Jobs
-(do ([i 1 (+ i 1)])
-    [(or (s-null? b)
-        (> i show-num))]
-  (>> (let ([res  (s-car b)])
-        (set! b (s-cdr b))
-        res)
-      (lambda (x)
-        (pydisplay (>> x (if trim? trim identity) clean))
-        (pydisplay (proof-steps x) "steps"))))
+;; (do ([i 1 (+ i 1)])
+;;     [(or (s-null? b)
+;;         (> i show-num))]
+;;   (>> (let ([res  (s-car b)])
+;;         (set! b (s-cdr b))
+;;         res)
+;;       (lambda (x)
+;;         (pydisplay (>> x (if trim? trim identity) clean))
+;;         (pydisplay (proof-steps x) "steps"))))

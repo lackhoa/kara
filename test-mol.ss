@@ -141,3 +141,13 @@
 (define (obvious)
   (assert (up '(-> 0 0) '[] '(-> 0 0))))
 (obvious)
+
+(define (pair)
+  (newline)
+  (pydisplay "Symmetric!")
+  (pydisplay (up '(0 1 . (0 . 1)) '[cdr car] '()))
+  (pydisplay "This says (a b c d)")
+  (pydisplay (up '(0 1 . 2) '[] '(a b c d)))
+  (assert (not (up '(0 1 2 . 3) '[] '(a b))))
+  )
+(pair)

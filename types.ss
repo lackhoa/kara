@@ -4,13 +4,12 @@
 
 ;;; Utility functions
 (define get-ccs
-  (f> ref '[2]))
+  (f> ref '[cdr cdr car]))
 
 (define get-prem
-  (f>> (f> ref '[1])
+  (f>> (f> ref '[cdr car])
        (f> mol-<
-           (lambda _  (list))
-           (lambda _  #f)
+           (lambda _  (list))  (lambda _  (list))
            identity)))
 
 
@@ -63,14 +62,14 @@
                   '1)))
 
 (define equality
-  (list(mk-proof '((= 1 0))
-                 '(= 0 1))
+  (list (mk-proof '((= 1 0))
+                  '(= 0 1))
 
-       (mk-proof '()
-                 '(= 0 0))
+        (mk-proof '()
+                  '(= 0 0))
 
-       (mk-proof '((= 0 1) (= 1 2))
-                 '(= 0 2))))
+        (mk-proof '((= 0 1) (= 1 2))
+                  '(= 0 2))))
 
 (define category
   (list (#|Left identity|#
