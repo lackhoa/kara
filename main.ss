@@ -10,15 +10,14 @@
 
 ;;; Parameters (files are preferably strings)
 (define db
-  (append and-elims equality category))
+  (append category equality))
 
 (define boring
-  (append (list-head equality 2)
-          and-elims))
+  (append (list-head equality 2)))
 
-(define max-steps 20)
-(define trim?     #t)
-(define show-num  10)
+(define max-steps  6)
+(define trim?      #t)
+(define show-num   100)
 
 (define banned-ctor
   #|constructors not allowed in the hypotheses|#
@@ -48,7 +47,7 @@
 
 (define get-ungrounded
   (lambda (proof)
-    (mol-< (ref proof '[cdr car])
+    (mol-< (ref proof '[cdr cdr]  #|Get premises list|#)
            (lambda _  (list (get-ccs proof)))
            (lambda _  #f)
            (lambda _  (flatmap get-ungrounded
@@ -58,11 +57,10 @@
   (lambda (proof)
     (let ([assumptions  (>> (get-ungrounded proof)
                             strip-duplicates)])
-      `(:- ,@assumptions ,(get-ccs proof)))))
+      `(=> ,(get-ccs proof) ,@assumptions))))
 
 (define main
   (lambda (proof lpath)
-    (display "x")
     #|`lpath points to the list of remaining premises`|#
     (let ([path  `[,@lpath car  #|points to the current premise|#]])
       (#|If path is invalid then the list is empty -> nothing to do|#
@@ -94,11 +92,12 @@
                                 (l> s-filter
                                     (f>> (negate cycle?)))
                                 (l> s-flatmap
-                                    (f> main `[,@path cdr car]))))]))))))))
+                                    (f> main `[#|premise of this proof|#
+                                               ,@path cdr cdr]))))]))))))))
 
 (define b
   ;; The main stream
-  (s-flatmap (f> main '[cdr car  #|First premise list|#])
+  (s-flatmap (f> main '[cdr cdr  #|Top-level premise list|#])
              (apply stream
                (filter (negate (f> member boring))
                        db))))
@@ -107,12 +106,12 @@
 
 
 ;;; Jobs
-;; (do ([i 1 (+ i 1)])
-;;     [(or (s-null? b)
-;;         (> i show-num))]
-;;   (>> (let ([res  (s-car b)])
-;;         (set! b (s-cdr b))
-;;         res)
-;;       (lambda (x)
-;;         (pydisplay (>> x (if trim? trim identity) clean))
-;;         (pydisplay (proof-steps x) "steps"))))
+(do ([i 1 (+ i 1)])
+    [(or (s-null? b)
+        (> i show-num))]
+  (>> (let ([res  (s-car b)])
+        (set! b (s-cdr b))
+        res)
+      (lambda (x)
+        (pydisplay (>> x (if trim? trim identity) clean))
+        (pydisplay (proof-steps x) "steps"))))
