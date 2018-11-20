@@ -148,6 +148,8 @@
   (pydisplay (up '(0 1 . (0 . 1)) '[cdr car] '()))
   (pydisplay "This says (a b c d)")
   (pydisplay (up '(0 1 . 2) '[] '(a b c d)))
+  (assert (equal? '(a ())
+                  (up '(0 1 . 1) '[] '(a 1))))
   (assert (not (up '(0 1 2 . 3) '[] '(a b))))
   )
 (pair)

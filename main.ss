@@ -15,9 +15,10 @@
 (define boring
   (append (list-head equality 2)))
 
-(define max-steps  6)
-(define trim?      #t)
-(define show-num   100)
+(define max-steps    20)
+(define trim?        #t)
+(define show-num     500)
+(define max-assum    5)
 
 (define banned-ctor
   #|constructors not allowed in the hypotheses|#
@@ -47,17 +48,29 @@
 
 (define get-ungrounded
   (lambda (proof)
-    (mol-< (ref proof '[cdr cdr]  #|Get premises list|#)
-           (lambda _  (list (get-ccs proof)))
-           (lambda _  #f)
-           (lambda _  (flatmap get-ungrounded
-                          (get-prem proof))))))
+    (define get-ungrounded-core
+      (lambda (proof)
+        (mol-< (ref proof '[cdr cdr]  #|Get premises list|#)
+               (lambda _  (list (get-ccs proof)))
+               (lambda _  #f)
+               (lambda _  (flatmap get-ungrounded-core
+                              (get-prem proof))))))
+
+    (>> (get-ungrounded-core proof)
+        strip-duplicates)))
 
 (define trim
   (lambda (proof)
-    (let ([assumptions  (>> (get-ungrounded proof)
-                            strip-duplicates)])
-      `(=> ,(get-ccs proof) ,@assumptions))))
+    `(=> ,(get-ccs proof)
+        ,@(get-ungrounded proof))))
+
+(define shuffle
+  ;; Warning: very sloppy style!
+  (lambda (ls)
+    (if (< (length ls) 2)  ls
+        (let ([item  (list-ref ls (random (length ls)))])
+          (cons item
+                (shuffle (remove item ls)))))))
 
 (define main
   (lambda (proof lpath)
@@ -68,11 +81,13 @@
           (s-append
            (delay
              (#|Just assume it (base case)|#
-              cond [(mol-< (get-ccs (ref proof path))
-                           (lambda _     #f  #|Don't assume random propositions|#)
-                           (lambda _     #f  #|Don't assume constants|#)
-                           (lambda (pr)  (not (memq (car pr) banned-ctor)
-                                       #|Don't assume dumb things|#)))
+              cond [(and (<= (length (get-ungrounded proof))
+                          max-assum)
+                       (mol-< (get-ccs (ref proof path))
+                              (lambda _     #f  #|Don't assume random propositions|#)
+                              (lambda _     #f  #|Don't assume constants|#)
+                              (lambda (pr)  (not (memq (car pr) banned-ctor)
+                                          #|Don't assume dumb things|#))))
                     (cons proof s-null  #|careful with this!|#)]
                    [else                 (list)]))
 
