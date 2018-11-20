@@ -22,7 +22,6 @@
                       (loop (cdr premises)
                             (+ i 1))))))))
 
-
 ;;; Combinators
 (define i '(-> 0 0))
 
@@ -71,3 +70,63 @@
         (#|Right identity|#
          mk-proof '(= (compose 1 0) 0)
                   '(im 0))))
+
+(define substitution
+  (list (#|ap-core: ignore binders|#
+         bind (exp arg res)
+          (mk-proof `(ap-core (bind ,exp) ,arg
+                              (bind ,res))
+                    `(ap-core ,exp ,arg
+                              ,res)))
+
+        (;; ap-core: substitute argument for one star
+         mk-proof `(ap-core (*) 0
+                            (const 0  #|note the tag|#)))
+
+        (;; ap-core: decrement for two or more stars
+         bind (arg stars)
+          (mk-proof `(ap-core (* * . ,stars) ,arg
+                              (* . ,stars))))
+
+        (;; ap-core: ignore constants
+         bind (arg exp)
+          (mk-proof `(ap-core (const ,exp) ,arg
+                              (const ,exp))))
+
+        (;; ap-core: recursively substitute in lists
+         bind (arg ecar ecdr ap-car ap-cdr)
+          (mk-proof `(ap-core (:: ,ecar ,ecdr) ,arg
+                              (:: ,ap-car ,ap-cdr))
+
+                    `(ap-core ,ecar ,arg
+                              ,ap-car)
+
+                    `(ap-core ,ecdr ,arg
+                              ,ap-cdr)))
+
+        (;; Starting: remove the first binder
+         bind (exp arg res)
+          (mk-proof `(apply (bind ,exp) ,arg
+                            ,res)
+                    `(ap-core ,exp ,arg
+                              ,res)))
+
+        (;; Decode constants
+         mk-proof `(decode (const 0)
+                           0))
+
+        (;; Decode pairs
+         bind (ecar ecdr dcar dcdr)
+          (mk-proof `(decode (:: ,ecar ,ecdr)
+                             (,dcar . ,dcdr))
+                    `(decode ,ecar ,dcar)
+                    `(decode ,ecdr ,dcdr)))
+
+        (;; Eliminate binders by applying a new varirable
+         bind (exp res new-var tmp)
+          (mk-proof `(decode (bind ,exp)
+                             ,res)
+                    `(ap-core ,exp ,new-var
+                              ,tmp)
+                    `(decode ,tmp ,res)))
+        ))

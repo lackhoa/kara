@@ -10,19 +10,19 @@
 
 ;;; Parameters (files are preferably strings)
 (define db
-  (append category equality))
+  (append substitution))
 
 (define boring
   (append (list-head equality 2)))
 
-(define max-steps    20)
+(define max-steps    100)
 (define trim?        #t)
 (define show-num     500)
 (define max-assum    5)
 
 (define banned-ctor
   #|constructors not allowed in the hypotheses|#
-  '(= and))
+  '(= and apply ap-core decode))
 
 ;;; Main Routines
 (define cycle?
@@ -51,10 +51,10 @@
     (define get-ungrounded-core
       (lambda (proof)
         (mol-< (ref proof '[cdr cdr]  #|Get premises list|#)
-               (lambda _  (list (get-ccs proof)))
-               (lambda _  #f)
-               (lambda _  (flatmap get-ungrounded-core
-                              (get-prem proof))))))
+               (lambda _    (list (get-ccs proof)))
+               (lambda (c)  (assert (null? c))  c)
+               (lambda _    (flatmap get-ungrounded-core
+                                (get-prem proof))))))
 
     (>> (get-ungrounded-core proof)
         strip-duplicates)))
@@ -110,12 +110,19 @@
                                     (f> main `[#|premise of this proof|#
                                                ,@path cdr cdr]))))]))))))))
 
+(define query
+  '(decode (bind (:: (const =)
+                     (:: (*) (:: (*) (const ()))))) 0))
+
 (define b
   ;; The main stream
   (s-flatmap (f> main '[cdr cdr  #|Top-level premise list|#])
              (apply stream
-               (filter (negate (f> member boring))
-                       db))))
+               (>> (filter (negate (f> member boring))
+                           db)
+                   (l> map (;; unify query with the conclusion
+                            f> up '[cdr car] query))
+                   (l> filter identity)))))
 
 ;;; Tracing Business
 

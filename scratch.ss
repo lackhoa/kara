@@ -45,7 +45,7 @@
         (#|Definition of elements|#
          mk-proof '((elem 0 2))
                   '(and (= (dom 0) (1))
-                        (= (codom 0) 2)))
+                      (= (codom 0) 2)))
 
         (#|Definition of an empty object|#
          mk-proof '((elem 0 (empty)))
@@ -78,3 +78,62 @@
         (#|Cartesian product exists|#
          mk-proof '()
                   '(prod? (prod 0 1 (pr1 0 1) (pr2 0 1))))))
+
+(=> (ap-core (bind (bind (*))) 0 (bind (bind (const 0)))))
+3 steps
+
+(=> (ap-core (bind (bind (* * . 0))) 1 (bind (bind (* . 0)))))
+3 steps
+
+(=> (ap-core (bind (bind (const 0))) 1 (bind (bind (const 0)))))
+3 steps
+(=> (ap-core (bind (*)) 0 (bind (const 0))))
+2 steps
+(=> (ap-core (bind (* * . 0)) 1 (bind (* . 0))))
+2 steps
+(=> (ap-core (bind (const 0)) 1 (bind (const 0))))
+2 steps
+(=> (ap-core (*) 0 (const 0)))
+1 steps
+(=> (ap-core (* * . 0) 1 (* . 0)))
+1 steps
+(=> (ap-core (const 0) 1 (const 0)))
+1 steps
+(=> (ap-core (:: (*) (*)) 0 (:: (const 0) (const 0))))
+3 steps
+(=> (ap-core (:: (*) (* * . 0)) 1 (:: (const 1) (* . 0))))
+3 steps
+(=> (ap-core (:: (*) (const 0)) 1 (:: (const 1) (const 0))))
+3 steps
+(=> (ap-core (:: (* * . 0) (*)) 1 (:: (* . 0) (const 1))))
+3 steps
+(=> (ap-core (:: (* * . 0) (* * . 1)) 2 (:: (* . 0) (* . 1))))
+3 steps
+(=> (ap-core (:: (* * . 0) (const 1)) 2 (:: (* . 0) (const 1))))
+3 steps
+(=> (ap-core (:: (const 0) (*)) 1 (:: (const 0) (const 1))))
+3 steps
+(=> (ap-core (:: (const 0) (* * . 1)) 2 (:: (const 0) (* . 1))))
+3 steps
+(=> (ap-core (:: (const 0) (const 1)) 2 (:: (const 0) (const 1))))
+3 steps
+(=> (apply (bind (bind (*))) 0 (bind (const 0))))
+3 steps
+(=> (apply (bind (bind (* * . 0))) 1 (bind (* . 0))))
+3 steps
+(=> (apply (bind (bind (const 0))) 1 (bind (const 0))))
+3 steps
+(=> (apply (bind (*)) 0 (const 0)))
+2 steps
+(=> (apply (bind (* * . 0)) 1 (* . 0)))
+2 steps
+(=> (apply (bind (const 0)) 1 (const 0)))
+2 steps
+(=> (decode (const 0) 0))
+1 steps
+(=> (decode (:: (const 0) (const 1)) (0 . 1)))
+3 steps
+(=> (decode (bind (*)) 0))
+3 steps
+(=> (decode (bind (const 0)) 0))
+3 steps
