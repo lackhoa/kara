@@ -60,7 +60,15 @@
         (mk-proof '(= 0 0))
 
         (mk-proof '(= 0 2)
-                  '(= 0 1) '(= 1 2))))
+                  '(= 0 1) '(= 1 2))
+
+        (;; Second-order rule
+         bind (n1 n2 pred p1 p2)
+          (mk-proof p2
+                    `(= ,n1 ,n2)
+                    `(subs ,pred ,n1  ,p1)
+                    p1
+                    `(subs ,pred ,n2  ,p2)))))
 
 (define category
   (list (#|Left identity|#
@@ -72,61 +80,13 @@
                   '(im 0))))
 
 (define substitution
-  (list (#|ap-core: ignore binders|#
-         bind (exp arg res)
-          (mk-proof `(ap-core (bind ,exp) ,arg
-                              (bind ,res))
-                    `(ap-core ,exp ,arg
-                              ,res)))
+  (list (;; subs: substitute argument for star
+         mk-proof '(subs (*) 0  0))
 
-        (;; ap-core: substitute argument for one star
-         mk-proof `(ap-core (*) 0
-                            (const 0  #|note the tag|#)))
+        (;; subs: ignore constants
+         mk-proof '(subs (const 0) 1  0))
 
-        (;; ap-core: decrement for two or more stars
-         bind (arg stars)
-          (mk-proof `(ap-core (* * . ,stars) ,arg
-                              (* . ,stars))))
-
-        (;; ap-core: ignore constants
-         bind (arg exp)
-          (mk-proof `(ap-core (const ,exp) ,arg
-                              (const ,exp))))
-
-        (;; ap-core: recursively substitute in lists
-         bind (arg ecar ecdr ap-car ap-cdr)
-          (mk-proof `(ap-core (:: ,ecar ,ecdr) ,arg
-                              (:: ,ap-car ,ap-cdr))
-
-                    `(ap-core ,ecar ,arg
-                              ,ap-car)
-
-                    `(ap-core ,ecdr ,arg
-                              ,ap-cdr)))
-
-        (;; Starting: remove the first binder
-         bind (exp arg res)
-          (mk-proof `(apply (bind ,exp) ,arg
-                            ,res)
-                    `(ap-core ,exp ,arg
-                              ,res)))
-
-        (;; Decode constants
-         mk-proof `(decode (const 0)
-                           0))
-
-        (;; Decode pairs
-         bind (ecar ecdr dcar dcdr)
-          (mk-proof `(decode (:: ,ecar ,ecdr)
-                             (,dcar . ,dcdr))
-                    `(decode ,ecar ,dcar)
-                    `(decode ,ecdr ,dcdr)))
-
-        (;; Eliminate binders by applying a new varirable
-         bind (exp res new-var tmp)
-          (mk-proof `(decode (bind ,exp)
-                             ,res)
-                    `(ap-core ,exp ,new-var
-                              ,tmp)
-                    `(decode ,tmp ,res)))
-        ))
+        (;; subs: recursively substitute for lists
+         mk-proof '(subs (:: 0 1) 2  (3 . 4))
+                  '(subs 0        2  3)
+                  '(subs 1        2  4))))

@@ -10,19 +10,21 @@
 
 ;;; Parameters (files are preferably strings)
 (define db
-  (append substitution))
+  (append substitution equality category))
 
 (define boring
-  (append (list-head equality 2)))
+  (append (list-head equality 2)
+          substitution))
 
-(define max-steps    100)
+(define max-steps    7)
 (define trim?        #t)
 (define show-num     500)
-(define max-assum    5)
+(define max-assum    3)
 
-(define banned-ctor
+(define banned-ctors
   #|constructors not allowed in the hypotheses|#
-  '(= and apply ap-core decode))
+  '(= and subs))
+
 
 ;;; Main Routines
 (define cycle?
@@ -31,7 +33,7 @@
     (let loop ([mol   proof]
                [seen  (list)])
       (mol-< mol
-             (lambda _  #f) (lambda _  #f)
+             (lambda _  #f)  (lambda _  #f)
              (lambda _  (or (bool (member (get-ccs mol)
                                     seen))
                       (ormap (f> loop (cons (get-ccs mol)
@@ -42,7 +44,7 @@
   #|Counts how many => signs there are|#
   (lambda (proof)
     (mol-< proof
-           (lambda _ 0)  (lambda _ #f)
+           (lambda _ 0)  (lambda _ (error "proof-steps" "Not a proof" proof))
            (lambda _
              (fold-left + 1 (map proof-steps (get-prem proof)))))))
 
@@ -65,7 +67,7 @@
         ,@(get-ungrounded proof))))
 
 (define shuffle
-  ;; Warning: very sloppy style!
+  ;; Warning: sloppy style!
   (lambda (ls)
     (if (< (length ls) 2)  ls
         (let ([item  (list-ref ls (random (length ls)))])
@@ -84,9 +86,10 @@
               cond [(and (<= (length (get-ungrounded proof))
                           max-assum)
                        (mol-< (get-ccs (ref proof path))
-                              (lambda _     #f  #|Don't assume random propositions|#)
+                              (lambda _     #f  #|Don't assume variables|#)
                               (lambda _     #f  #|Don't assume constants|#)
-                              (lambda (pr)  (not (memq (car pr) banned-ctor)
+                              (lambda (pr)  (not (memq (car pr)
+                                                banned-ctors)
                                           #|Don't assume dumb things|#))))
                     (cons proof s-null  #|careful with this!|#)]
                    [else                 (list)]))
@@ -111,8 +114,7 @@
                                                ,@path cdr cdr]))))]))))))))
 
 (define query
-  '(decode (bind (:: (const =)
-                     (:: (*) (:: (*) (const ()))))) 0))
+  '(im 0))
 
 (define b
   ;; The main stream
