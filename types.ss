@@ -7,10 +7,7 @@
   (f> ref '[cdr car]))
 
 (define get-prem
-  (f>> (f> ref '[cdr cdr])
-       (f> mol-<
-           (lambda _  (list))  (lambda _  (list))
-           identity)))
+  (f> ref '[cdr cdr]))
 
 (define mk-proof
   (lambda (conclusion . premises)
@@ -53,9 +50,6 @@
       (-> (-> 0 1)
          (-> 0 2))))
 
-(define base
-  (list (mk-proof '(type prop))))
-
 (define equality
   (list (mk-proof '(prop (= 0 1))
                   '(type 2) '(2 0) '(2 1))
@@ -65,8 +59,7 @@
                   '(= 1 0))
 
         (mk-proof '(= 0 0)
-                  '(type 1)
-                  '(1 0))
+                  '(type 1) '(1 0))
 
         (mk-proof '(= 0 2)
                   '(type 3) '(3 0) '(3 1) '(3 2)
@@ -78,7 +71,7 @@
                   '(= 0 1)  '(subs 5 0 2)  2  '(subs 5 1 3))))
 
 (define category
-  (list (mk-proof '(prop (map 0)))
+  (list (mk-proof '(type map))
 
         (mk-proof '(map (compose 0 1))
                   '(map 0) '(map 1))
