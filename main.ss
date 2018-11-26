@@ -10,20 +10,18 @@
 
 ;;; Parameters (files are preferably strings)
 (define db
-  (append equality category))
+  (append base equality substitution category))
 
 (define boring
   (append (list-head equality 2)
           substitution))
 
-(define max-steps    6)
+(define max-steps    11)
 (define trim?        #t)
 (define show-num     500)
-(define max-assum    10)
 
-(define banned-ctors
-  #|constructors not allowed in the hypotheses|#
-  '(= and subs))
+(define allowed-ctors
+  '(= map prop))
 
 ;;; Main Routines
 (define cycle?
@@ -79,11 +77,10 @@
        lambda _     #f)
       (;; constants
        lambda _     #f)
-      (lambda (pr)  (;; other dumb things
-                not (or (number? (car pr))
-                     (pair?   (car pr))
-                     (memq    (car pr)
-                              banned-ctors))))))
+      (;; pairs
+       lambda (pr)  (bool (;; of the form (allowed-ctor vars ...)
+                      and (memq (car pr)  allowed-ctors)
+                        (for-all number?      (cdr pr)))))))
 
 (define main
   (lambda (proof lpath)
@@ -92,36 +89,35 @@
                    ,@lpath car]])
       (;; path invalid -> no more premise in list
        if (not (ref proof path))  (stream proof)
-          (s-append
-           (delay
-             (;; Just assume it (base case)
-              cond [(>> (ref proof path)
-                        get-ccs  assumable?)
-                    (;; just move on to the other premises
-                     force (main proof `[,@lpath cdr]))]
-                   [else                  (list)]))
+          (>> (s-append
+               (;; Just assume it (base case)
+                delay
+                 (cond [(>> (ref proof path)
+                            get-ccs  assumable?)
+                        (force (stream proof))]
+                       [else                    (force (stream))]))
 
-           (;; Substitute an axiom (recursive case)
-            delay
-             (force
-              (;; limit size for complete search
-               cond [(>= (proof-steps proof)
-                        max-steps)  s-null]
+               (;; Substitute an axiom (recursive case)
+                delay
+                 (force
+                  (;; limit size for complete search
+                   cond [(> (proof-steps proof)
+                            max-steps)  (stream)]
 
-                    [else  (s-flatmap
-                            (;; move on to the other premises ...
-                             f> main `[,@lpath cdr])
-                            (;; ... after enumerating down
-                             >> (s-map (l> up proof path)
-                                       (apply stream db))
-                                (l> s-filter
-                                    (f>> (negate cycle?)))
-                                (l> s-flatmap
-                                    (f> main `[#|premise of this proof|#
-                                               ,@path cdr cdr]))))]))))))))
+                        [else  (;; enumerate down
+                                >> (s-map (l> up proof path)
+                                          (apply stream db))
+                                   (l> s-filter
+                                       (f>> (negate cycle?)))
+                                   (l> s-flatmap
+                                       (f> main `[#|premise of this proof|#
+                                                  ,@path cdr cdr])))]))))
+              (l> s-flatmap
+                  (;; move on to the other premises
+                   f> main `[,@lpath cdr])))))))
 
 (define query
-  0)
+  '(im 0))
 
 (define b
   ;; The main stream

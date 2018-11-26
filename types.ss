@@ -53,35 +53,52 @@
       (-> (-> 0 1)
          (-> 0 2))))
 
+(define base
+  (list (mk-proof '(type prop))))
+
 (define equality
-  (list (mk-proof '(= 0 1)
+  (list (mk-proof '(prop (= 0 1))
+                  '(type 2) '(2 0) '(2 1))
+
+        (mk-proof '(= 0 1)
+                  '(type 2) '(2 0) '(2 1)
                   '(= 1 0))
 
-        (mk-proof '(= 0 0))
+        (mk-proof '(= 0 0)
+                  '(type 1)
+                  '(1 0))
 
         (mk-proof '(= 0 2)
+                  '(type 3) '(3 0) '(3 1) '(3 2)
                   '(= 0 1) '(= 1 2))
 
         (;; Second-order rule
-         bind (n1 n2 pred p1 p2)
-          (mk-proof p2
-                    `(= ,n1 ,n2)
-                    `(subs ,pred ,n1  ,p1)
-                    p1
-                    `(subs ,pred ,n2  ,p2)))))
+         mk-proof 3
+                  '(type 4) '(4 0) '(4 1) '(prop 2) '(prop 3)
+                  '(= 0 1)  '(subs 5 0 2)  2  '(subs 5 1 3))))
 
 (define category
-  (list (#|Left identity|#
+  (list (mk-proof '(prop (map 0)))
+
+        (mk-proof '(map (compose 0 1))
+                  '(map 0) '(map 1))
+
+        (mk-proof '(prop (im 0))
+                  '(map 0))
+
+        (#|Left identity|#
          mk-proof '(= (compose 0 1) 0)
-                  '(im 0))
+                  '(im 0) '(map 1))
 
         (#|Right identity|#
          mk-proof '(= (compose 1 0) 0)
-                  '(im 0))))
+                  '(im 0) '(map 1))))
 
 (define substitution
-  (list (;; subs: substitute argument for star
-         mk-proof '(subs (*) 0  0))
+  (list (mk-proof '(prop (subs 0 1 2)))
+
+        (;; subs: substitute argument for star
+         mk-proof '(subs * 0  0))
 
         (;; subs: ignore constants
          mk-proof '(subs (const 0) 1  0))
