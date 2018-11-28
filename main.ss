@@ -12,9 +12,10 @@
 (define db
   (append category equality))
 
-(define MAX-STEPS     10)
-(define TRIM?         #f)
-(define MAX-CCS-SIZE  9)
+(define MAX-STEPS     15)
+(define TRIM?         #t)
+(define MAX-CCS-SIZE  10)
+(define MAX-ASSUMED   3)
 
 (define banned-ctors
   '(=))
@@ -23,7 +24,8 @@
 (define trim
   (lambda (proof)
     `(=> ,(get-ccs proof)
-        ,@(get-assumed proof))))
+        ,@(>> (get-assumed proof)
+              strip-duplicates))))
 
 (define shuffle
   ;; Warning: sloppy style!
@@ -77,16 +79,13 @@
 
 (define get-assumed
   (lambda (proof)
-    (>> (let assumed-core ([proof  proof])
-          (mol-< (get-prem proof)
-                 (lambda _     (list))
-                 (lambda (c)   (case c
-                            ['()      (list)]
-                            [assumed  (list (get-ccs proof))]
-                            [else     (error "get-assumed" "What?")]))
-                 (lambda (pr)  (flatmap assumed-core pr))))
-
-        strip-duplicates)))
+    (mol-< (get-prem proof)
+           (lambda _     (list))
+           (lambda (c)   (case c
+                      ['()      (list)]
+                      [assumed  (list (get-ccs proof))]
+                      [else     (error "get-assumed" "What?")]))
+           (lambda (pr)  (flatmap get-assumed pr)))))
 
 (define assumable?
   (f> mol-<
@@ -103,13 +102,17 @@
 (define illegal?
   ;; Check if a proof is in an illegal state
   (lambda (proof)
-    (or (cycle? proof)
-       (;; Only assume interesting things
-        exists (negate assumable?)
-          (get-assumed proof))
-       (;; Good size
-        > (size (get-ccs proof))
-          MAX-CCS-SIZE))))
+    (let ([assumed  (>> (get-assumed proof)
+                        strip-duplicates)])
+      (or (cycle? proof)
+         (;; Only assume interesting things
+          exists (negate assumable?)
+            assumed)
+         (;; Don't assume too much
+          > (length assumed) MAX-ASSUMED)
+         (;; Good size
+          > (size (get-ccs proof))
+            MAX-CCS-SIZE)))))
 
 (define main
   (lambda (proof lpath)
@@ -142,7 +145,7 @@
                l> s-flatmap  (f> main `[,@lpath cdr])))))))
 
 (define query
-  '(= 0 1))
+  0)
 
 (define b
   ;; The main stream
