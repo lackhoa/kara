@@ -10,15 +10,14 @@
 
 ;;; Parameters (files are preferably strings)
 (define db
-  (append substitution
-          equality))
+  (append category equality))
 
-(define max-steps    10)
-(define trim?        #t)
-(define show-num     500)
+(define MAX-STEPS     10)
+(define TRIM?         #f)
+(define MAX-CCS-SIZE  9)
 
-(define allowed-ctors
-  '(= map im type))
+(define banned-ctors
+  '(=))
 
 ;;; Auxiliary routines
 (define trim
@@ -44,6 +43,13 @@
                         (let ([prem  (get-prem proof)])
                           (if (not (pair? prem))  (list)
                               (map proof-steps prem))))))))
+
+(define size
+  (f> mol-<
+      (lambda _ 1)  (lambda _ 1)
+      (lambda (pr)
+        (+ (size (car pr))
+           (size (cdr pr))))))
 
 
 ;;; Main Routines
@@ -89,16 +95,21 @@
       (;; constants
        lambda _     #f)
       (;; pairs
-       lambda (pr)  (bool (;; of the form (allowed-ctor vars ...)
-                      and (memq (car pr)  allowed-ctors)
-                        (for-all number? (cdr pr)))))))
+       lambda (pr)  (and (;; Interesting constructor
+                   not (memq (car pr) banned-ctors))
+                  (;; Only assume for variables
+                   for-all number? (cdr pr))))))
 
 (define illegal?
   ;; Check if a proof is in an illegal state
   (lambda (proof)
     (or (cycle? proof)
-       (exists (negate assumable?)
-          (get-assumed proof)))))
+       (;; Only assume interesting things
+        exists (negate assumable?)
+          (get-assumed proof))
+       (;; Good size
+        > (size (get-ccs proof))
+          MAX-CCS-SIZE))))
 
 (define main
   (lambda (proof lpath)
@@ -116,7 +127,7 @@
                    (force
                     (;; limit size for complete search
                      cond [(> (proof-steps proof)
-                              max-steps)  (stream)]
+                              MAX-STEPS)  (stream)]
 
                           [else  (;; enumerate down
                                   >> (s-map (l> up proof path)
@@ -148,10 +159,10 @@
 ;;; Jobs
 (do ([i 1 (+ i 1)])
     [(or (s-null? b)
-        (> i show-num))]
+        (> i 500))]
   (>> (let ([res  (s-car b)])
         (set! b (s-cdr b))
         res)
       (lambda (x)
-        (pydisplay (>> x (if trim? trim identity) clean))
+        (pydisplay (>> x (if TRIM? trim identity) clean))
         (pydisplay (proof-steps x) "steps"))))

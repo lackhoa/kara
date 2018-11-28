@@ -51,52 +51,24 @@
          (-> 0 2))))
 
 (define equality
-  (list (mk-proof '(prop (= 0 1))
-                  '(type 2) '(2 0) '(2 1))
-
-        (mk-proof '(= 0 1)
-                  '(type 2) '(2 0) '(2 1)
+  (list (mk-proof '(= 0 1)
                   '(= 1 0))
 
-        (mk-proof '(= 0 0)
-                  '(type 1) '(1 0))
+        (mk-proof '(= 0 0))
 
         (mk-proof '(= 0 2)
-                  '(type 3) '(3 0) '(3 1) '(3 2)
-                  '(= 0 1) '(= 1 2))
-
-        (;; Second-order rule
-         mk-proof 3
-                  '(type 4) '(4 0) '(4 1) '(prop 2) '(prop 3)
-                  '(= 0 1)  '(subs 5 0 2)  2  '(subs 5 1 3))))
+                  '(= 0 1) '(= 1 2))))
 
 (define category
-  (list (mk-proof '(type map))
+  (list (mk-proof '(= (c (c 0 1) 2)
+                      (c 0 (c 1 2)))
+                  '(-> 2 3 4) '(-> 1 4 5) '(-> 0 5 6))
 
-        (mk-proof '(map (compose 0 1))
-                  '(map 0) '(map 1))
+        (mk-proof '(-> 0 1 2)
+                  '(i-> 0 1 2))
 
-        (mk-proof '(prop (im 0))
-                  '(map 0))
+        (mk-proof '(= (c 0 (- 0)) 2)
+                  '(i-> 0 1 2))
 
-        (#|Left identity|#
-         mk-proof '(= (compose 0 1) 0)
-                  '(im 0) '(map 1))
-
-        (#|Right identity|#
-         mk-proof '(= (compose 1 0) 0)
-                  '(im 0) '(map 1))))
-
-(define substitution
-  (list (mk-proof '(prop (subs 0 1 2)))
-
-        (;; subs: substitute argument for star
-         mk-proof '(subs * 0  0))
-
-        (;; subs: ignore constants
-         mk-proof '(subs (const 0) 1  0))
-
-        (;; subs: recursively substitute for lists
-         mk-proof '(subs (:: 0 1) 2  (3 . 4))
-                  '(subs 0        2  3)
-                  '(subs 1        2  4))))
+        (mk-proof '(= (c (- 0) 0) 1)
+                  '(i-> 0 1 2))))
