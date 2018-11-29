@@ -12,10 +12,11 @@
 (define db
   (append category equality))
 
-(define MAX-STEPS     15)
+(define MAX-STEPS     22)
 (define TRIM?         #t)
 (define MAX-CCS-SIZE  10)
-(define MAX-ASSUMED   3)
+(define MAX-ASSUMED   7)
+(define MAGIC         100)
 
 (define banned-ctors
   '(=))
@@ -26,14 +27,6 @@
     `(=> ,(get-ccs proof)
         ,@(>> (get-assumed proof)
               strip-duplicates))))
-
-(define shuffle
-  ;; Warning: sloppy style!
-  (lambda (ls)
-    (if (< (length ls) 2)  ls
-        (let ([item  (list-ref ls (random (length ls)))])
-          (cons item
-                (shuffle (remove item ls)))))))
 
 (define proof-steps
   #|Counts how many => signs there are|#
@@ -104,7 +97,8 @@
   (lambda (proof)
     (let ([assumed  (>> (get-assumed proof)
                         strip-duplicates)])
-      (or (cycle? proof)
+      (or (;; No cycle
+          cycle? proof)
          (;; Only assume interesting things
           exists (negate assumable?)
             assumed)
@@ -112,7 +106,11 @@
           > (length assumed) MAX-ASSUMED)
          (;; Good size
           > (size (get-ccs proof))
-            MAX-CCS-SIZE)))))
+            MAX-CCS-SIZE)
+         (;; Random elimination: chance of acceptance:
+          ;; (/ MAGIC (>> (proof-steps proof) exp))
+          > (>> (proof-steps proof) exp random)
+            MAGIC)))))
 
 (define main
   (lambda (proof lpath)
@@ -123,26 +121,23 @@
        if (not (ref proof path))  (stream proof)
           (>> (delay
                 (cons
-                 #|Base case: Assume|#
-                 (up proof  `[,@path cdr cdr]  'assumed)
-                 (;; Recursive case: Substitute an axiom
-                  delay
-                   (force
-                    (;; limit size for complete search
-                     cond [(> (proof-steps proof)
-                              MAX-STEPS)  (stream)]
-
-                          [else  (;; enumerate down
-                                  >> (s-map (l> up proof path)
-                                            (apply stream db))
-                                     (l> s-filter identity)
-                                     (l> s-flatmap
-                                         (f> main `[#|premises of this|#
-                                                    ,@path cdr cdr])))])))))
+                 (#|Base case: Assume|#
+                  up proof  `[,@path cdr cdr]  'assumed)
+                 (cond [(> (proof-steps proof)
+                           MAX-STEPS)  (stream)]
+                       [else
+                        (;; Recursive case: Substitute an axiom
+                         >> (s-map (l> up proof path)
+                                   (apply stream db))
+                            (l> s-filter identity)
+                            (l> s-flatmap
+                                (;; enumerate down
+                                 f> main `[#|premises of this|#
+                                           ,@path cdr cdr])))])))
               (;; checking
-               l> s-filter  (negate illegal?))
+               l> s-filter (negate illegal?))
               (;; move on to the other premises
-               l> s-flatmap  (f> main `[,@lpath cdr])))))))
+               l> s-flatmap (f> main `[,@lpath cdr])))))))
 
 (define query
   0)
