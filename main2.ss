@@ -14,12 +14,14 @@
 
 (define MAX-STEPS     10)
 (define TRIM?         #t)
-(define MAX-CCS-SIZE  20)
+(define MAX-CCS-SIZE  100)
 
 ;;; Auxiliary routines
 (define trim
   (lambda (proof)
-    `(=> ,(get-ccs proof))))
+    `(=> ,(get-ccs proof)
+        ,@(>> (get-assumed proof)
+              strip-duplicates))))
 
 (define proof-steps
   #|Counts how many => signs there are|#
@@ -63,14 +65,44 @@
                                   ormap (f> loop (cons ccs seen))
                                         pr))))))))))
 
+(define get-assumed
+  (lambda (proof)
+    (mol-< (get-prem proof)
+           (lambda _     (list))
+           (lambda (c)   (case c
+                      ['()      (list)]
+                      [assumed  (list (get-ccs proof))]
+                      [else     (error "get-assumed" "What?")]))
+           (lambda (pr)  (flatmap get-assumed pr)))))
+
+(define assumable?
+  (f> mol-<
+      (;; variables
+       lambda _     #f)
+      (;; constants
+       lambda _     #f)
+      (;; pairs
+       lambda (pr)  (;; Special treatment for constraints
+                case (car pr)
+                 [=/=        (not (equal? (cadr pr)
+                                      (caddr pr)))]
+                 [!member  (not (member (cadr pr)
+                                      (caddr pr)))]
+                 [else     #f]))))
+
 (define illegal?
   ;; Check if a proof is in an illegal state
   (lambda (proof)
-    (or (;; No cycle
-        cycle? proof)
-       (;; Good size
-        > (size (get-ccs proof))
-          MAX-CCS-SIZE))))
+    (let ([assumed  (>> (get-assumed proof)
+                        strip-duplicates)])
+      (or (;; No cycle
+          cycle? proof)
+         (;; Only assume interesting things
+          exists (negate assumable?)
+            assumed)
+         (;; Good size
+          > (size (get-ccs proof))
+            MAX-CCS-SIZE)))))
 
 (define main
   (lambda (proof lpath)
@@ -79,17 +111,21 @@
                    ,@lpath car]])
       (;; path invalid -> no more premise in list
        if (not (ref proof path))  (stream proof)
-          (>> (cond [(> (proof-steps proof)
-                        MAX-STEPS)  (stream)]
-                    [else
-                     (;; Substitute an axiom
-                      >> (s-map (l> up proof path)
-                                (apply stream db))
-                         (l> s-filter identity)
-                         (l> s-flatmap
-                             (;; enumerate down
-                              f> main `[#|premises of this|#
-                                        ,@path cdr cdr])))])
+          (>> (delay
+                (cons
+                 (#|Base case: Assume|#
+                  up proof  `[,@path cdr cdr]  'assumed)
+                 (cond [(> (proof-steps proof)
+                           MAX-STEPS)  (stream)]
+                       [else
+                        (;; Recursive case: Substitute an axiom
+                         >> (s-map (l> up proof path)
+                                   (apply stream db))
+                            (l> s-filter identity)
+                            (l> s-flatmap
+                                (;; enumerate down
+                                 f> main `[#|premises of this|#
+                                           ,@path cdr cdr])))])))
               (;; checking
                l> s-filter (negate illegal?))
               (;; move on to the other premises
