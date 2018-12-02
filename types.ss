@@ -78,9 +78,45 @@
 
         (mk-proof '(= (c (- 0) 0) 1)
                   '(i-> 0)
-                  '(-> 0 1 2))
+                  '(-> 0 1 2))))
 
-        (mk-proof '()
-                  '())
+(define circuit
+  (list
+   ;; (mk-proof '(V 0 1 (- 2))
+   ;;           '(V 1 0 2))
 
-        ))
+   ;; (mk-proof '(V 0 1 (+ 2 3))
+   ;;           '(V 0 4 2)
+   ;;           '(V 4 1 3))
+
+   (mk-proof '(res 0 1 2)
+             '(res 0 2 1))
+
+   (mk-proof '(bat (- 0) 2 1)
+             '(bat 0 1 2))
+
+   (mk-proof '(any-elm 0 1 2)
+             '(res 0 1 2))
+   (mk-proof '(any-elm 0 1 2)
+             '(bat 0 1 2))
+
+   (mk-proof '(path (0) 1 2)
+             '(any-elm 0 1 2))
+
+   (mk-proof '(path (0 4 . 1) 2 3)
+             '(any-elm 0 2 4)
+             '(path 1 4 3))
+   ))
+
+(define ca49
+  (list '(=> (all-elm p1 r1))
+        '(=> (all-elm p2 r1 r4 b1))
+        '(=> (all-elm p3 r1 r2 r4))
+        '(=> (all-elm p4 r3 r4 r5))
+
+        '(=> (res r1 p1 p3))
+        '(=> (res r2 p2 p3))
+        '(=> (res r3 p1 p4))
+        '(=> (res r4 p2 p4))
+        '(=> (res r5 p3 p4))
+        '(=> (bat b1 p1 p2))))
