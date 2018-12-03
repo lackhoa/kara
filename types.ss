@@ -104,16 +104,18 @@
    (mk-proof '(any-elm 0 1 2)
              '(bat 0 1 2))
 
-   (mk-proof '(path (0) 1 2)
-             '(any-elm 0 1 2))
+   (mk-proof '(path (0) 1 2 3)
+             '(any-elm 0 1 2)
+             '(!mem 0 3))
 
-   (mk-proof '(path (0 4 . 1) 2 3)
+   (mk-proof '(path (0 4 . 1) 2 3 5)
              '(any-elm 0 2 4)
-             '(path 1 4 3))
-   ))
+             '(!mem 4 5)
+             '(!mem 0 5)
+             '(path 1 4 3 (0 2 . 5)))))
 
 (define ca49
-  (list '(=> (all-elm p1 r1))
+  (list '(=> (all-elm p1 r1 r3 b1))
         '(=> (all-elm p2 r1 r4 b1))
         '(=> (all-elm p3 r1 r2 r4))
         '(=> (all-elm p4 r3 r4 r5))

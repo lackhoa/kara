@@ -12,7 +12,7 @@
 (define db
   (append circuit ca49))
 
-(define MAX-STEPS     12)
+(define MAX-STEPS     20)
 (define TRIM?         #t)
 (define MAX-CCS-SIZE  100)
 
@@ -83,17 +83,16 @@
        lambda _     #f)
       (;; pairs
        lambda (pr)  (case (car pr)
-                      [=/=     (not (equal? (cadr pr)
-                                            (caddr pr)))]
+                 [=/=     (not (equal? (cadr pr)
+                                   (caddr pr)))]
 
-                      [!neg  (let ([focus  (cadr pr)])
-                               (or (atom? focus)
-                                   (not (eq? (car focus) '-))))
-                             ]
+                 [!neg  (let ([focus  (cadr pr)])
+                          (or (atom? focus)
+                             (not (eq? (car focus) '-))))]
 
-                      [!mem  (not (member (cadr pr)
-                                          (caddr pr)))]
-                      [else     #f]))))
+                 [!mem  (not (member (cadr pr)
+                                   (caddr pr)))]
+                 [else     #f]))))
 
 (define illegal?
   ;; Check if a proof is in an illegal state
@@ -137,7 +136,7 @@
                l> s-flatmap (f> main `[,@lpath cdr])))))))
 
 (define query
-  '(path 0 p1 p2))
+  '(path 0 p1 p1 ()))
 
 (define b
   ;; The main stream
