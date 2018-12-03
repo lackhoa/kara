@@ -93,7 +93,11 @@
              '(res 0 2 1))
 
    (mk-proof '(bat (- 0) 2 1)
-             '(bat 0 1 2))
+             '(bat 0 1 2)
+             '(;; meta-logical constraint
+               !neg 0))
+   (mk-proof '(bat 0 2 1)
+             '(bat (- 0) 1 2))
 
    (mk-proof '(any-elm 0 1 2)
              '(res 0 1 2))

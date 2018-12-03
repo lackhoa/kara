@@ -82,12 +82,17 @@
       (;; constants
        lambda _     #f)
       (;; pairs
-       lambda (pr)  (;; Special treatment for constraints
-                case (car pr)
-                 [=/=        (not (equal? (cadr pr)
-                                      (caddr pr)))]
-                 [!member  (not (member (cadr pr)
-                                      (caddr pr)))]
+       lambda (pr)  (case (car pr)
+                 [=/=     (not (equal? (cadr pr)
+                                   (caddr pr)))]
+
+                 [!neg  (let ([focus  (cadr pr)])
+                          (or (atom? focus)
+                             (not (eq? (car focus) '-))))
+                        ]
+
+                 [!mem  (not (member (cadr pr)
+                                   (caddr pr)))]
                  [else     #f]))))
 
 (define illegal?
