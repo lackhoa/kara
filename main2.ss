@@ -12,7 +12,7 @@
 (define db
   (append circuit ca49))
 
-(define MAX-STEPS     10)
+(define MAX-STEPS     12)
 (define TRIM?         #t)
 (define MAX-CCS-SIZE  100)
 
@@ -52,27 +52,27 @@
              (lambda _  #f)
              (lambda _  #f)
              (lambda _  (let ([ccs   (get-ccs proof)])
-                     (or (bool (member ccs seen))
-                        (mol-< (get-prem proof)
-                               (lambda _  #f)
-                               (lambda (c)
-                                 (case c
-                                   [(assumed ())  #f]
-                                   [else          (error "cycle?" "What?" c)]))
-                               (lambda (pr)
-                                 (;; Only this proof's premises will be
-                                  ;; checked against this conclusion
-                                  ormap (f> loop (cons ccs seen))
-                                        pr))))))))))
+                          (or (bool (member ccs seen))
+                              (mol-< (get-prem proof)
+                                     (lambda _  #f)
+                                     (lambda (c)
+                                       (case c
+                                         [(assumed ())  #f]
+                                         [else          (error "cycle?" "What?" c)]))
+                                     (lambda (pr)
+                                       (;; Only this proof's premises will be
+                                        ;; checked against this conclusion
+                                        ormap (f> loop (cons ccs seen))
+                                              pr))))))))))
 
 (define get-assumed
   (lambda (proof)
     (mol-< (get-prem proof)
            (lambda _     (list))
            (lambda (c)   (case c
-                      ['()      (list)]
-                      [assumed  (list (get-ccs proof))]
-                      [else     (error "get-assumed" "What?")]))
+                           ['()      (list)]
+                           [assumed  (list (get-ccs proof))]
+                           [else     (error "get-assumed" "What?")]))
            (lambda (pr)  (flatmap get-assumed pr)))))
 
 (define assumable?
@@ -83,17 +83,17 @@
        lambda _     #f)
       (;; pairs
        lambda (pr)  (case (car pr)
-                 [=/=     (not (equal? (cadr pr)
-                                   (caddr pr)))]
+                      [=/=     (not (equal? (cadr pr)
+                                            (caddr pr)))]
 
-                 [!neg  (let ([focus  (cadr pr)])
-                          (or (atom? focus)
-                             (not (eq? (car focus) '-))))
-                        ]
+                      [!neg  (let ([focus  (cadr pr)])
+                               (or (atom? focus)
+                                   (not (eq? (car focus) '-))))
+                             ]
 
-                 [!mem  (not (member (cadr pr)
-                                   (caddr pr)))]
-                 [else     #f]))))
+                      [!mem  (not (member (cadr pr)
+                                          (caddr pr)))]
+                      [else     #f]))))
 
 (define illegal?
   ;; Check if a proof is in an illegal state
