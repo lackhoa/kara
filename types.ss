@@ -84,69 +84,51 @@
               (i-> 0)
               (-> 0 1 2))))
 
+(define list-axioms
+  (ls-proof
+   '((mem 0 (0 . 1)))
+
+   '((mem 0 (1 . 2))
+     (=/= 0 1)
+     (mem 0 2))
+
+   '((!mem 0 ()))
+
+   '((!mem 0 (1 . 2))
+     (=/= 0 1)
+     (!mem 0 2))))
+
 (define circuit
-  (ls-proof '((res 0 1 2)
-              (res 0 2 1))
+  (ls-proof
+   '(;; Leg 4 is mounted at point 0 in circuit 10
+     (mnt 4 0 10)
+     (mem (0 . 55) 10)
+     (mem 4 55))
 
-            '((bat (- 0) 2 1)
-              (bat 0 1 2)
-              (;; meta-logical constraint
-               !neg 0))
-            '((bat 0 2 1)
-              (bat (- 0) 1 2))
+   '(;; Path going through one device
+     (path [4] 0 1 10)
+     (mnt (4 8) 0)
+     (mnt (4 9) 1)
+     (=/= 8 9))
 
-            '((any-elm 0 1 2)
-              (res 0 1 2))
-            '((any-elm 0 1 2)
-              (bat 0 1 2))
-
-            '((path (0) 1 2 3)
-              (any-elm 0 1 2)
-              (!mem 0 3))
-
-            '((path (0 4 . 1) 2 3 5)
-              (any-elm 0 2 4)
-              (!mem 4 5)
-              (!mem 0 5)
-              (path 1 4 3 (0 2 . 5)))
-
-            '((sp 0 1 2)
-              (res 0 1 2))
-
-            '((sp (sr 0 1) 2 4)
-              (sp 0 2 3)
-              (sp 1 3 4)
-              (;; Nothing connected to b
-               all-elm 3))
-
-            '((sp (pr 0 1) 2 3)
-              (sp 0 2 3)
-              (sp 1 2 3)
-              (=/= 0 1))))
-
-(define ca49
-  (ls-proof '((all-elm p1 r1 r3 b1))
-            '((all-elm p2 r1 r4 b1))
-            '((all-elm p3 r1 r2 r4))
-            '((all-elm p4 r3 r4 r5))
-
-            '((res r1 p1 p3))
-            '((res r2 p2 p3))
-            '((res r3 p1 p4))
-            '((res r4 p2 p4))
-            '((res r5 p3 p4))
-            '((bat b1 p1 p2))))
+   '(;; Complex path
+     (path [(8 9) 2 . 22] 0 1 10)
+     (mnt 0 (4 5) 10)
+     (;; Goes in on one end of the device -> comes out on the other
+      =/= 3 4)
+     (point-id 3 10)
+     (;; No loops
+      !mem (2 3) 22)
+     (path 22 2 1 10))))
 
 (define ca40
-  (ls-proof '((res r1 p1 p2))
-            '((res r2 p2 p3))
-            '((res r3 p3 p4))
-            '((res r4 p2 p4))
-            '((res r5 p2 p4))
-            '((ter t1 p1))
-            '((ter t2 p4))
+  '((p1 (r1 a) (t1 a))
+    (p2 (r1 b) (r2 a) (r4 a) (r5 a))
+    (p3 (r2 b) (r3 a))
+    (p4 (r3 b) (r4 b) (r5 b) (t2 a))))
 
-            '((all-elm p1 r1 t1))
-            '((all-elm p2 r1 r2 r4 r5))
-            '((all-elm p3 r2 r3))
-            '((all-elm p4 r3 r4 r5 t2))))
+(define ca49
+  '((p1 (r1 a) (r3 a) (b +))
+    (p2 (r2 a) (r4 a) (b -))
+    (p3 (r1 b) (r2 b) (r5 a))
+    (p4 (r3 b) (r4 b) (r5 b))))
