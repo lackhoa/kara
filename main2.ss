@@ -12,9 +12,10 @@
 (define db
   (append (ls-proof '((and 0 1) 0 1))
           circuit
-          list-axioms))
+          list-axioms
+          (parse-circuit ca49)))
 
-(define MAX-STEPS     100)
+(define MAX-STEPS     40)
 (define TRIM?         #t)
 (define MAX-CCS-SIZE  #f)
 
@@ -174,7 +175,7 @@
                l> s-flatmap (f> main `[,@lpath cdr])))))))
 
 (define query
-  `(path 0 p1 p1 ,ca49))
+  `(path 0 p1 p1))
 
 (define b
   ;; The main stream

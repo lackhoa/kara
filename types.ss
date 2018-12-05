@@ -9,15 +9,28 @@
 (define get-prem
   (f> ref '[cdr cdr]))
 
+(define fill-underscore
+  (lambda (root)
+    (let ([get-var  (let ([next  (last-var root)])
+                      (lambda _
+                        (set! next (1+ next))
+                        next))])
+      (let loop ([mol  root])
+        (mol-< mol
+               identity
+               (lambda (c)   (if (eq? c '_) (get-var)
+                            c))
+               (lambda (pr)  (cons (loop (car pr))
+                              (loop (cdr pr)))))))))
+
 (define mk-proof
   (lambda (conclusion . premises)
-    `(=> ,conclusion
-        ,@(let loop ([premises  premises]
-                     [i         100])
-            (if (null? premises)  (list)
-                (cons `(=> ,(car premises) . ,i)
-                      (loop (cdr premises)
-                            (+ i 1))))))))
+    (>> `(=> ,conclusion
+            ,@(let loop ([premises  premises])
+                (if (null? premises)  (list)
+                    (cons `(=> ,(car premises) . _)
+                          (loop (cdr premises))))))
+        fill-underscore)))
 
 (define ls-proof
   (lambda ls
@@ -59,7 +72,7 @@
               (= 1 0))
 
             '((= 0 2)
-              (= 0 1) '(= 1 2))))
+              (= 0 1) (= 1 2))))
 
 (define category
   (ls-proof '((= 1 3)
@@ -100,33 +113,51 @@
 
 (define circuit
   (ls-proof
-   '(;; Device 4 is mounted at point 0 in circuit 10
-     (mnt 4 0 10)
-     (mem (point 0 . 55) 10)
-     (mem 4 55))
-
    '(;; Path through one device
-     (path [8] 0 1 10)
+     (path [8] 0 1)
      (=/= 0 1)
-     (mnt 8 0 10) (mnt 8 1 10))
+     (at 0 8) (at 1 8))
 
    '(;; Complex path
-     (path [8 2 . 22] 0 1 10)
+     (path [8 2 . 22] 0 1)
      (=/= 0 2) (=/= 2 1)
-     (mnt 8 0 10) (mnt 8 2 10)
+     (at 0 8) (at 2 8)
      ;; No loops
      (!mem 8 22) (!mem 0 22)
-     (path 22 2 1 10))))
+     (path 22 2 1))
+
+   ))
 
 (define ca40
-  '((point p1 r1 t1)
-    (point p2 r1 r2 r4 r5)
-    (point p3 r2 r3)
-    (point p4 r3 r4 r5 t2)))
+  '(((res r1) (res r2) (res r3) (res r4) (res r5))
+
+    (p1 r1 t1)
+    (p2 r1 r2 r4 r5)
+    (p3 r2 r3)
+    (p4 r3 r4 r5 t2)))
 
 (define ca49
-  '((bat b p1 p2)
-    (point p1 r1 r3 b)
-    (point p2 r2 r4 b)
-    (point p3 r1 r2 r5)
-    (point p4 r3 r4 r5)))
+  '(((bat b p1 p2)
+     (res r1) (res r2) (res r3) (res r4) (res r5))
+
+    (p1 r1 r3 b)
+    (p2 r2 r4 b)
+    (p3 r1 r2 r5)
+    (p4 r3 r4 r5)))
+
+(define get-mount-points
+  (lambda (point-lists)
+    (flatmap (lambda (point-list)
+               (let* ([point  (car point-list)]
+                      [devs   (cdr point-list)])
+                 (map (lambda (dev)  `(at ,point ,dev))
+                      devs)))
+             point-lists)))
+
+(define parse-circuit
+  (lambda (circ)
+    (apply ls-proof
+      (>> (append (car circ)
+                  (cdr circ)
+                  (get-mount-points (cdr circ)))
+          (l> map list)))))
