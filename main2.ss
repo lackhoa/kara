@@ -13,7 +13,7 @@
   (append (ls-proof '((and 0 1) 0 1))
           circuit
           list-axioms
-          (parse-circuit ca49)))
+          (parse-circuit ca40)))
 
 (define MAX-STEPS     40)
 (define TRIM?         #t)
@@ -175,7 +175,7 @@
                l> s-flatmap (f> main `[,@lpath cdr])))))))
 
 (define query
-  `(path 0 p1 p1))
+  `(sp 0 1 2))
 
 (define b
   ;; The main stream
