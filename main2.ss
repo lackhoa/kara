@@ -14,7 +14,7 @@
           circuit
           list-axioms))
 
-(define MAX-STEPS     30)
+(define MAX-STEPS     100)
 (define TRIM?         #t)
 (define MAX-CCS-SIZE  #f)
 
@@ -141,7 +141,7 @@
              (> (size (get-ccs proof))
                 MAX-CCS-SIZE))))))
 
-(trace-define main
+(define main
   (lambda (proof lpath)
     ;; `lpath` points to the list of remaining premises
     (let ([path  `[;; points to the current premise
@@ -174,7 +174,7 @@
                l> s-flatmap (f> main `[,@lpath cdr])))))))
 
 (define query
-  `(path 0 (r1 a) (r2 a) ,ca49))
+  `(path 0 p1 p1 ,ca49))
 
 (define b
   ;; The main stream

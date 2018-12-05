@@ -100,35 +100,33 @@
 
 (define circuit
   (ls-proof
-   '(;; Leg 4 is mounted at point 0 in circuit 10
+   '(;; Device 4 is mounted at point 0 in circuit 10
      (mnt 4 0 10)
-     (mem (0 . 55) 10)
+     (mem (point 0 . 55) 10)
      (mem 4 55))
 
-   '(;; Path going through one device
-     (path [4] 0 1 10)
-     (mnt (4 8) 0)
-     (mnt (4 9) 1)
-     (=/= 8 9))
+   '(;; Path through one device
+     (path [8] 0 1 10)
+     (=/= 0 1)
+     (mnt 8 0 10) (mnt 8 1 10))
 
    '(;; Complex path
-     (path [(8 9) 2 . 22] 0 1 10)
-     (mnt 0 (4 5) 10)
-     (;; Goes in on one end of the device -> comes out on the other
-      =/= 3 4)
-     (point-id 3 10)
-     (;; No loops
-      !mem (2 3) 22)
+     (path [8 2 . 22] 0 1 10)
+     (=/= 0 2) (=/= 2 1)
+     (mnt 8 0 10) (mnt 8 2 10)
+     ;; No loops
+     (!mem 8 22) (!mem 0 22)
      (path 22 2 1 10))))
 
 (define ca40
-  '((p1 (r1 a) (t1 a))
-    (p2 (r1 b) (r2 a) (r4 a) (r5 a))
-    (p3 (r2 b) (r3 a))
-    (p4 (r3 b) (r4 b) (r5 b) (t2 a))))
+  '((point p1 r1 t1)
+    (point p2 r1 r2 r4 r5)
+    (point p3 r2 r3)
+    (point p4 r3 r4 r5 t2)))
 
 (define ca49
-  '((p1 (r1 a) (r3 a) (b +))
-    (p2 (r2 a) (r4 a) (b -))
-    (p3 (r1 b) (r2 b) (r5 a))
-    (p4 (r3 b) (r4 b) (r5 b))))
+  '((bat b p1 p2)
+    (point p1 r1 r3 b)
+    (point p2 r2 r4 b)
+    (point p3 r1 r2 r5)
+    (point p4 r3 r4 r5)))
