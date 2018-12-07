@@ -110,14 +110,12 @@
 (define list-axioms
   (ls-proof
    '((mem 0 (0 . 1)))
-
    '((mem 0 (1 . 2))
      (=/= 0 1) (mem 0 2))
 
-   '((!mem 0 ()))
-
-   '((!mem 0 (1 . 2))
-     (=/= 0 1) (!mem 0 2))
+   '((last (0) 0))
+   '((last (0 . 1) 2)
+     (last 1 2))
 
    '((forall 5 ()))
    '((forall 5 (1 . 11))
@@ -125,49 +123,17 @@
 
 (define circuit
   (ls-proof
-   '(;; Path through one device
-     (path [8] 0 1)
-     (=/= 0 1)
-     (at 0 8) (at 1 8))
+   '(;; Path through one device (the last node is left out for a reason)
+     (path (0 8) 1)
+     (=/= 0 1) (at 0 8) (at 1 8))
 
    '(;; Complex path
-     (path [8 2 . 22] 0 1)
-     (=/= 0 2) (=/= 2 1)
-     (at 0 8) (at 2 8)
+     (path (0 8 2 . 22) 1)
+     (=/= 0 2) (=/= 2 1) (at 0 8) (at 2 8)
      ;; No loops
-     (!mem 8 22) (!mem 0 22)
-     (path 22 2 1))
-
-   '(;; Series-parallel circuit: A single resistor
-     (sp 8 0 1)
-     (res 8) (at 0 8) (at 1 8) (=/= 0 1))
-
-   '(;; Part of an sp circuit: resistor
-     (sp-part 8 (sp 8 _ _)))
-
-   '(;; Part of an sp circuit: series
-     (sp-part 7 (sr 8 9))
-     (sp-part 7 8))
-   '((sp-part 7 (sr 8 9))
-     (sp-part 7 9))
-
-   '(;; Part of an sp circuit: parallel
-     (sp-part 7 (pr 8 9))
-     (sp-part 7 8))
-   '((sp-part 7 (pr 8 9))
-     (sp-part 7 9))
-
-   '(;; Sp circuit: a series
-     (sp (sr 8 9) 0 1)
-     (=/= 0 1) (sp 8 0 2) (sp 8 2 1)
-     ;; All devices at 2 must be a part of 8 or 9
-     (all 2 . 22)
-     (forall (sp-part * 8) 22)
-     (forall (sp-part * 9) 22))
-
-   '(;; Sp circuit: a parallel
-     (sp (pr 8 9) 0 1)
-     (=/= 0 1) (=/= 8 9) (sp 8 0 1) (sp 9 0 1))
+     (!mem 8 22) (;; note that 0 can be 1
+                  !mem 0 22)
+     (path (2 . 22) 1))
    ))
 
 (define ca40

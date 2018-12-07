@@ -13,7 +13,7 @@
   (append (ls-proof '((and 0 1) 0 1))
           circuit
           list-axioms
-          (parse-circuit ca40)))
+          (parse-circuit ca49)))
 
 (define MAX-STEPS     40)
 (define TRIM?         #t)
@@ -37,8 +37,8 @@
                           lambda (ccs)
                            (or (not (list? ccs))
                               (case (car ccs)
-                                [=/=     (not (constant? ccs))]
-                                [else  #t]))))
+                                [(=/= !mem atom)  (not (constant? ccs))]
+                                [else           #t]))))
               strip-duplicates))))
 
 (define proof-steps
@@ -125,6 +125,10 @@
        lambda (pr)  (case (car pr)
                  [=/=     (not (equal? (cadr pr)
                                    (caddr pr)))]
+                 [!mem  (or (not (list? (caddr pr)))
+                           (not (member (cadr pr)
+                                      (caddr pr))))]
+                 [atom  (atom? (cadr pr))]
                  [else  #f]))))
 
 (define illegal?
@@ -175,7 +179,7 @@
                l> s-flatmap (f> main `[,@lpath cdr])))))))
 
 (define query
-  `(sp 0 1 2))
+  '(path (p1 . 0) p1))
 
 (define b
   ;; The main stream
