@@ -134,19 +134,35 @@
 (define circuit
   (ls-proof
    '(;; Ohm's law
-     (v 0 1 (* (i 0 1) 8))
-     (res 8) (at 0 8) (at 1 8))
+     (related ((v 0 1) (i 0 1) (r 0 1))))
 
-   '(;; Path through one device (the last node is left out for a reason)
-     (path (0 8) 1)
+   '(;; Kirchhoff's voltage law
+     (related 33)
+     (path (0 . 22) 0)
+     (KVL 0 (0 . 22) 33))
+
+   '(;; KVL processing: last node
+     (KVL 0 (1) ((v 1 0))))
+
+   '(;; KVL processing: intermediate nodes
+     (KVL 0 (1 2 . 22) ((v 1 2) . 33))
+     (KVL 0 (2 . 22) 33))
+
+   '(;; Assumption of resistance
+     (known (r 0 1))
+     (=/= 0 1) (res 2) (at 0 2) (at 1 2))
+
+   ;; Paths (the last node is left out for a reason)
+   '(;; Path through one device
+     (path (0) 1)
      (=/= 0 1) (at 0 8) (at 1 8))
 
    '(;; Complex path
-     (path (0 8 2 . 22) 1)
+     (path (0 2 . 22) 1)
      (=/= 0 2) (=/= 2 1) (at 0 8) (at 2 8)
      ;; No loops
-     (!mem 8 22) (;; note that 0 can be 1
-                  !mem 0 22)
+     (;; note that 0 can be 1
+      !mem 0 22)
      (path (2 . 22) 1))
    ))
 
