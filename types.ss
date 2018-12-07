@@ -117,12 +117,26 @@
    '((last (0 . 1) 2)
      (last 1 2))
 
+   '((remove 1 () ()))
+   '((remove 1 (1 . 10) 10))
+   '((remove 1 (2 . 10) (2 . 9))
+     (=/= 1 2) (remove 1 10 9))
+
    '((forall 5 ()))
    '((forall 5 (1 . 11))
      (apply 5 1 2) 2 (forall 5 11))))
 
+(define knowledge
+  (ls-proof
+   '((known 1)
+     (remove 1 11 10) (forall (known *) 10) (related 11))))
+
 (define circuit
   (ls-proof
+   '(;; Ohm's law
+     (v 0 1 (* (i 0 1) 8))
+     (res 8) (at 0 8) (at 1 8))
+
    '(;; Path through one device (the last node is left out for a reason)
      (path (0 8) 1)
      (=/= 0 1) (at 0 8) (at 1 8))

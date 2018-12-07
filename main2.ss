@@ -9,14 +9,20 @@
 
 
 ;;; Parameters (files are preferably strings)
-(define db
-  (append (ls-proof '((and 0 1) 0 1))
+(define DB
+  (append (ls-proof '((and 0 1) 0 1)
+                    '((known x)) '((known y)) '((related (z x y))))
+          knowledge
+          apply-axioms
           circuit
           list-axioms
           (parse-circuit ca49)))
 
+(define QUERY
+  '(known 0))
+
 (define MAX-STEPS     40)
-(define TRIM?         #t)
+(define TRIM?         #f)
 (define MAX-CCS-SIZE  #f)
 
 ;;; Auxiliary routines
@@ -167,7 +173,7 @@
                                     MAX-STEPS)  (stream)]
                                 [else
                                  (>> (s-map (l> up proof path)
-                                            (apply stream db))
+                                            (apply stream DB))
                                      (l> s-filter identity)
                                      (l> s-flatmap
                                          (;; Enumerate down
@@ -178,17 +184,14 @@
               (;; move on to the other premises
                l> s-flatmap (f> main `[,@lpath cdr])))))))
 
-(define query
-  '(path (p1 . 0) p1))
-
 (define b
   ;; The main stream
   (s-flatmap (f> main '[;; Top-level premise list
                         cdr cdr])
              (apply stream
                (>> (map (;; unify query with the conclusion
-                         f> up '[cdr car] query)
-                        db)
+                         f> up '[cdr car] QUERY)
+                        DB)
                    (l> filter identity)))))
 
 ;;; Tracing Business
