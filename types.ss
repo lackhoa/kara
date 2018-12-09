@@ -23,6 +23,11 @@
                (lambda (pr)  (cons (loop (car pr))
                               (loop (cdr pr)))))))))
 
+'(=> 0 200
+    (U 100 200)
+    (map premises 3 100)
+    . 3)
+
 (define mk-proof
   (lambda (conclusion . premises)
     (>> `(=> ,conclusion
@@ -122,9 +127,13 @@
    '((remove 1 (2 . 10) (2 . 9))
      (=/= 1 2) (remove 1 10 9))
 
+   '((map 5 () ()))
+   '((map 5 (1 . 10) (2 . 20))
+     (apply 5 1 2) (map 5 10 20))
+
    '((forall 5 ()))
-   '((forall 5 (1 . 11))
-     (apply 5 1 2) 2 (forall 5 11))))
+   '((forall 5 (1 . 10))
+     (apply 5 1 2) 2 (forall 5 10))))
 
 (define knowledge
   (ls-proof
