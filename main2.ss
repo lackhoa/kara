@@ -10,18 +10,19 @@
 
 ;;; Parameters (files are preferably strings)
 (define DB
-  (append (ls-proof '((and 0 1) 0 1)
-                    '((known (v p1 p2))))
+  (append (ls-proof '(one) '(two) '(three))
+          misc
+          list-axioms
+
           knowledge
           apply-axioms
           circuit
-          list-axioms
           (parse-circuit ca49)))
 
 (define QUERY
-  '(related . 0))
+  '(or sixty five two))
 
-(define MAX-STEPS     50)
+(define MAX-STEPS     20)
 (define TRIM?         #t)
 (define MAX-CCS-SIZE  #f)
 

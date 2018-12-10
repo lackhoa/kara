@@ -23,11 +23,6 @@
                (lambda (pr)  (cons (loop (car pr))
                               (loop (cdr pr)))))))))
 
-'(=> 0 200
-    (U 100 200)
-    (map premises 3 100)
-    . 3)
-
 (define mk-proof
   (lambda (conclusion . premises)
     (>> `(=> ,conclusion
@@ -102,6 +97,14 @@
               (i-> 0)
               (-> 0 1 2))))
 
+(define misc
+  (ls-proof
+   '((and))
+   '((and 1 . 10) 1 (and . 10))
+   '((or 1 . 10) 1)
+   '((or 1 . 10) (or . 10)))
+  )
+
 (define apply-axioms
   (ls-proof
    '((apply 3 1 3)
@@ -118,6 +121,10 @@
    '((mem 0 (1 . 2))
      (=/= 0 1) (mem 0 2))
 
+   '((append () 0 0))
+   '((append (1 . 10) 0 (1 . 2))
+     (append 10 0 2))
+
    '((last (0) 0))
    '((last (0 . 1) 2)
      (last 1 2))
@@ -133,7 +140,14 @@
 
    '((forall 5 ()))
    '((forall 5 (1 . 10))
-     (apply 5 1 2) 2 (forall 5 10))))
+     (apply 5 1 2) 2 (forall 5 10))
+
+   '((reverse 0 1)
+     (reverse 0 () 1))
+   '((reverse () 0 0))
+   '((reverse (1 . 10) 0 2)
+     (reverse 10 (1 . 0) 2))
+   ))
 
 (define knowledge
   (ls-proof
