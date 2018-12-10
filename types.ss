@@ -138,26 +138,19 @@
 (define knowledge
   (ls-proof
    '((known 1)
-     (remove 1 11 10) (forall (known *) 10) (related 11))))
+     (remove 1 11 10) (forall (known *) 10) (related . 11))))
 
 (define circuit
   (ls-proof
    '(;; Ohm's law
-     (related ((v 0 1) (i 0 1) (r 0 1))))
+     (related . ((v 0 1) (i 0 1) (r 0 1))))
 
    '(;; Kirchhoff's current law
-     (related 33)
-     (all 0 88) (KCL 0 88 33))
-
-   '(;; KCL processing
-     (KCL 88 99)
-     (map ))
-
-   '(;; KCL processing 2
-     (KCL2 0 8))
+     (related . 33)
+     (all 0 . 88) (map (i *) 88 33))
 
    '(;; Kirchhoff's voltage law
-     (related 33)
+     (related . 33)
      (path (0 . 22) 0)
      (KVL 0 (0 . 22) 33))
 
