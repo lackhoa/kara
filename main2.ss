@@ -15,6 +15,7 @@
                     '(has-feathers tweety)
                     '(lays-eggs tweety))
           meta
+          grammar
           misc
           list-axioms
 
@@ -24,7 +25,7 @@
           (parse-circuit ca49)))
 
 (define QUERY
-  '(from (tweety) derive is-bird))
+  '(parse verb-phrase 0))
 
 (define MAX-STEPS     (make-parameter 25))
 (define MAX-CCS-SIZE  (make-parameter #f))
@@ -240,7 +241,7 @@
                       l> filter identity))))))
 (define b
   ;; The main stream
-  (entry '(apply 0 john (hello john))))
+  (entry QUERY))
 
 ;;; Tracing Business
 

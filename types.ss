@@ -245,3 +245,32 @@
                   (cdr circ)
                   (get-mount-points (cdr circ)))
           (l> map list)))))
+
+(define grammar
+  (ls-proof
+   '((--> sentence           noun-phrase verb-phrase))
+   '((--> noun-phrase        proper-noun))
+   '((--> noun-phrase        article adjective noun))
+   '((--> noun-phrase        article noun))
+   '((--> verb-phrase        intransitive-verb))
+   '((--> verb-phrase        transitive-verb noun-phrase))
+   '((--> article            (the)))
+   '((--> adjective          (lazy)))
+   '((--> adjective          (rapid)))
+   '((--> proper-noun        (achilles)))
+   '((--> noun               (turtle)))
+   '((--> intransitive-verb  (sleeps)))
+   '((--> transitive-verb    (beats)))
+
+   '(;; Parse to terminal
+     (parse 0 (1))
+     (--> 0 (2 . 20)) (mem 1 (2 . 20)))
+   '(;; Parse to multiple parts
+     (parse 0 1)
+     (--> 0 2 3 . 30) (append 4 5 1) (parse 1 4) (parse (3 . 30) 5))
+   '(;; Parse empty list
+     (parse () ()))
+   '(;; Parse list
+     (parse (1 . 2) 30)
+     (append 10 20 30) (parse 1 10) (parse 2 20))
+   ))
