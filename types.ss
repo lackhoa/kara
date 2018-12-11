@@ -79,9 +79,12 @@
             '(;; Derivation from assumption
               (from 11 derive 1)
               (mem 1 11))
-            '(;; Derivation in general
+            '(;; Derivation from axiom
+              (from 10 derive 0)
+              (=> 0 . 1) (from 10 derive . 1))
+            '(;; Derivation of many
               (from 2 derive 0 . 1)
-              (=> 0 . 3) (from 2 derive . 3) (from 2 derive . 1))))
+              (from 2 derive 0) (from 2 derive . 1))))
 
 (define equality
   (ls-proof '((= 0 1)

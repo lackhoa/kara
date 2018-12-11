@@ -26,9 +26,9 @@
 (define QUERY
   '(from (tweety) derive is-bird))
 
-(define MAX-STEPS     20)
+(define MAX-STEPS     (make-parameter 25))
+(define MAX-CCS-SIZE  (make-parameter #f))
 (define TRIM?         #f)
-(define MAX-CCS-SIZE  #f)
 
 ;;; Auxiliary routines
 (define constant?
@@ -153,9 +153,9 @@
           exists (negate assumable?)
             assumed)
          (;; Good size
-          if (not MAX-CCS-SIZE)  #f
+          if (not (MAX-CCS-SIZE))  #f
              (> (size (get-ccs proof))
-                MAX-CCS-SIZE))))))
+                (MAX-CCS-SIZE)))))))
 
 (define main
   (lambda (proof lpath)
@@ -174,8 +174,10 @@
                     (cons (;; Base case: Assume
                            up proof `[,@path cdr cdr] 'assumed)
                           (;; Recursive case: Substitute an axiom if not out of steps
-                           cond [(> (proof-steps proof)
-                                    MAX-STEPS)  (stream)]
+                           cond [(and (MAX-STEPS)
+                                    (> (proof-steps proof)
+                                       (MAX-STEPS)))
+                                 (stream)]
                                 [else
                                  (>> (s-map (l> up proof path)
                                             (apply stream DB))
@@ -189,15 +191,20 @@
               (;; move on to the other premises
                l> s-flatmap (f> main `[,@lpath cdr])))))))
 
+(define entry
+  (lambda (query)
+    (s-flatmap (f> main '[;; Top-level premise list
+                          cdr cdr])
+               (apply stream
+                 (>> (map (;; unify `query` with the heads in the database
+                           f> up '[cdr car] query)
+                          DB)
+                     (;; Filter, this is the main driving force of the program loop
+                      l> filter identity))))))
 (define b
   ;; The main stream
-  (s-flatmap (f> main '[;; Top-level premise list
-                        cdr cdr])
-             (apply stream
-               (>> (map (;; unify query with the conclusion
-                         f> up '[cdr car] QUERY)
-                        DB)
-                   (l> filter identity)))))
+  (entry '(from (tweety has-gills)
+                derive is-fish)))
 
 ;;; Tracing Business
 
