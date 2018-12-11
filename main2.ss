@@ -10,7 +10,11 @@
 
 ;;; Parameters (files are preferably strings)
 (define DB
-  (append (ls-proof '(one) '(two) '(three))
+  (append (ls-proof '(is-bird has-feathers lays-eggs)
+                    '(is-fish has-gills lays-eggs)
+                    '(has-feathers tweety)
+                    '(lays-eggs tweety))
+          meta
           misc
           list-axioms
 
@@ -20,10 +24,10 @@
           (parse-circuit ca49)))
 
 (define QUERY
-  '(or sixty five two))
+  '(from (tweety) derive is-bird))
 
 (define MAX-STEPS     20)
-(define TRIM?         #t)
+(define TRIM?         #f)
 (define MAX-CCS-SIZE  #f)
 
 ;;; Auxiliary routines

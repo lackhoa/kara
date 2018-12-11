@@ -34,7 +34,10 @@
 
 (define ls-proof
   (lambda ls
-    (map (l> apply mk-proof) ls)))
+    (append (;; The fact that the axiom exists
+             map (lambda (x)  `(=> (=> ,@x))) ls)
+            (;; The version for deduction
+             map (l> apply mk-proof) ls))))
 
 ;;; Combinators
 (define i '(-> 0 0))
@@ -66,6 +69,19 @@
   '(-> (-> 1 2)
       (-> (-> 0 1)
          (-> 0 2))))
+
+(define meta
+  (ls-proof '((prove . 0)
+              (from () derive . 0))
+
+            '(;; Derivation of the truth
+              (from _ derive))
+            '(;; Derivation from assumption
+              (from 11 derive 1)
+              (mem 1 11))
+            '(;; Derivation in general
+              (from 2 derive 0 . 1)
+              (=> 0 . 3) (from 2 derive . 3) (from 2 derive . 1))))
 
 (define equality
   (ls-proof '((= 0 1)
@@ -119,7 +135,7 @@
   (ls-proof
    '((mem 0 (0 . 1)))
    '((mem 0 (1 . 2))
-     (=/= 0 1) (mem 0 2))
+     (mem 0 2))
 
    '((append () 0 0))
    '((append (1 . 10) 0 (1 . 2))
