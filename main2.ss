@@ -28,7 +28,7 @@
 
 (define MAX-STEPS     (make-parameter 25))
 (define MAX-CCS-SIZE  (make-parameter #f))
-(define TRIM?         #f)
+(define TRIM?         #t)
 
 ;;; Auxiliary routines
 (define constant?
@@ -40,16 +40,22 @@
              (and (constant? (car pr))
                 (constant? (cdr pr)))))))
 
+(define fup
+  ;; Force an update
+  (lambda (mol path new)
+    (cond [(null? path)  new]
+          [else          (let ([pnext  (car path)]
+                               [prest  (cdr path)])
+                           (case pnext
+                             [car  (cons (fup (car mol) prest new)
+                                         (cdr mol))]
+                             [cdr  (cons (car mol)
+                                         (fup (cdr mol) prest new))]))])))
+
 (define trim
   (lambda (proof)
     `(=> ,(get-ccs proof)
-        ,@(>> (get-assumed proof)
-              (l> filter (;; Don't show things that are trivially true
-                          lambda (ccs)
-                           (or (not (list? ccs))
-                              (case (car ccs)
-                                [(=/= !mem atom)  (not (constant? ccs))]
-                                [else           #t]))))
+        ,@(>> (get-assumed-ccs proof)
               strip-duplicates))))
 
 (define proof-steps
@@ -92,12 +98,23 @@
                                         pr))))))))))
 
 (define get-assumed
+  ;; Get the paths of assumed proofs
   (lambda (proof)
-    (mol-< (get-prem proof)
-           (lambda _     (list))
-           (lambda (c)   (if (eq? c 'assumed)  (list (get-ccs proof))
-                        (list)))
-           (lambda (pr)  (flatmap get-assumed pr)))))
+    (let loop ([;; Points to the current premise list
+                lpath  '[cdr cdr]])
+      ;; Returns: lists of paths
+      (let* ([path  `[,@lpath car]]
+             [;; The focused proof
+              p     (ref proof path)])
+        (if (not p)  (list)
+            (append (mol-< (get-prem p)
+                           (lambda _     (list))
+                           (lambda (c)   (if (not (eq? c 'assumed))  (list)
+                                        (list path)))
+                           (lambda (pr)  (;; Go down to search its premises
+                                     loop `[,@path cdr cdr])))
+                    (loop `[;; Continue to the next sibling premises
+                            ,@lpath cdr])))))))
 
 (define complete-proof?
   (lambda (proof)
@@ -126,36 +143,54 @@
                  (lambda _     (list))
                  (lambda (pr)  (flatmap all-ccs pr))))))
 
-(define assumable?
-  (f> mol-<
-      (;; variables
-       lambda _     #f)
-      (;; constants
-       lambda _     #f)
-      (;; pairs
-       lambda (pr)  (case (car pr)
-                 [=/=     (not (equal? (cadr pr)
-                                   (caddr pr)))]
-                 [!mem  (or (not (list? (caddr pr)))
-                           (not (member (cadr pr)
-                                      (caddr pr))))]
-                 [atom  (atom? (cadr pr))]
-                 [else  #f]))))
+(define get-assumed-ccs
+  ;; Get assumed conclusions from the list of paths
+  (lambda (proof)
+    (map (lambda (x)
+           (>> x (l> ref proof) get-ccs))
+         (get-assumed proof))))
 
 (define illegal?
-  ;; Check if a proof is in an illegal state
   (lambda (proof)
-    (let ([assumed  (>> (get-assumed proof)
-                        strip-duplicates)])
-      (or (;; No cycle
-          cycle? proof)
-         (;; Only assume interesting things
-          exists (negate assumable?)
-            assumed)
-         (;; Good size
-          if (not (MAX-CCS-SIZE))  #f
-             (> (size (get-ccs proof))
-                (MAX-CCS-SIZE)))))))
+    (or (;; No cycle
+        cycle? proof)
+       (;; Good size
+        if (not (MAX-CCS-SIZE))  #f
+           (> (size (get-ccs proof))
+              (MAX-CCS-SIZE))))))
+
+(define reinforce
+  ;; Check if a proof is in an illegal state, and transform it if needed
+  (lambda (proof)
+    (if (illegal? proof)  #f
+        (;; Deal with assumptions
+         let* ([assumed  (get-assumed proof)])
+          (let loop ([proof    proof]
+                     [assumed  assumed])
+            (if (null? assumed)  proof
+                (let* ([path   (car assumed)]
+                       [ccs    (>> (ref proof path)
+                                   get-ccs)])
+                  (>> (mol-< ccs
+                             (;; variables
+                              lambda _     #f)
+                             (;; constants
+                              lambda _     #f)
+                             (;; pairs
+                              lambda (pr)  (and (case (car pr)
+                                           [=/=     (not (equal? (cadr pr)
+                                                             (caddr pr)))]
+                                           [!mem  (or (not (list? (caddr pr)))
+                                                     (not (member (cadr pr)
+                                                                (caddr pr))))]
+                                           [atom  (atom? (cadr pr))]
+                                           [else  #f])
+
+                                         (cond [(;; Constants won't change -> truth established
+                                                 constant? pr)
+                                                (fup proof `[,@path cdr cdr] '())]
+                                               [else            proof]))))
+                      (f> loop (cdr assumed))))))))))
 
 (define main
   (lambda (proof lpath)
@@ -187,7 +222,9 @@
                                           f> main `[;; Premises of this
                                                     ,@path cdr cdr])))]))))
               (;; checking
-               l> s-filter (negate illegal?))
+               l> s-map reinforce)
+              (;; remove illegal states
+               l> s-filter identity)
               (;; move on to the other premises
                l> s-flatmap (f> main `[,@lpath cdr])))))))
 
@@ -203,8 +240,7 @@
                       l> filter identity))))))
 (define b
   ;; The main stream
-  (entry '(from (tweety has-gills)
-                derive is-fish)))
+  (entry '(apply 0 john (hello john))))
 
 ;;; Tracing Business
 
