@@ -71,7 +71,7 @@
          (-> 0 2))))
 
 (define meta
-  (ls-proof '((prove . 0)
+  (ls-proof '((derive . 0)
               (from () derive . 0))
 
             '(;; Derivation of the truth
@@ -143,6 +143,10 @@
    '((append () 0 0))
    '((append (1 . 10) 0 (1 . 2))
      (append 10 0 2))
+
+   '((append-dl (++ 0 1)
+                (++ 1 2)
+                (++ 0 2)))
 
    '((last (0) 0))
    '((last (0 . 1) 2)
@@ -246,31 +250,15 @@
                   (get-mount-points (cdr circ)))
           (l> map list)))))
 
-(define grammar
-  (ls-proof
-   '((--> sentence           noun-phrase verb-phrase))
-   '((--> noun-phrase        proper-noun))
-   '((--> noun-phrase        article adjective noun))
-   '((--> noun-phrase        article noun))
-   '((--> verb-phrase        intransitive-verb))
-   '((--> verb-phrase        transitive-verb noun-phrase))
-   '((--> article            (the)))
-   '((--> adjective          (lazy)))
-   '((--> adjective          (rapid)))
-   '((--> proper-noun        (achilles)))
-   '((--> noun               (turtle)))
-   '((--> intransitive-verb  (sleeps)))
-   '((--> transitive-verb    (beats)))
+(define default
+  (ls-proof '((default (:- (flies 0) (bird 0))))
+            '((rule (:- (not (flies 0)) (penguin 0))))
+            '((rule (:- (bird 0) (penguin 0))))
+            '((rule (:- (penguin tweety))))
+            '((rule (:- (bird opus))))
 
-   '(;; Parse to terminal
-     (parse 0 (1))
-     (--> 0 (2 . 20)) (mem 1 (2 . 20)))
-   '(;; Parse to multiple parts
-     (parse 0 1)
-     (--> 0 2 3 . 30) (append 4 5 1) (parse 1 4) (parse (3 . 30) 5))
-   '(;; Parse empty list
-     (parse () ()))
-   '(;; Parse list
-     (parse (1 . 2) 30)
-     (append 10 20 30) (parse 1 10) (parse 2 20))
-   ))
+            '((explain 0 1)
+              (explain 0 () 1))
+            '((explain () 0 0))
+            '((explain (0 . 1) 2)
+              (explain ))))

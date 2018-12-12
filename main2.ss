@@ -10,12 +10,8 @@
 
 ;;; Parameters (files are preferably strings)
 (define DB
-  (append (ls-proof '(is-bird has-feathers lays-eggs)
-                    '(is-fish has-gills lays-eggs)
-                    '(has-feathers tweety)
-                    '(lays-eggs tweety))
+  (append (ls-proof )
           meta
-          grammar
           misc
           list-axioms
 
@@ -25,9 +21,9 @@
           (parse-circuit ca49)))
 
 (define QUERY
-  '(parse verb-phrase 0))
+  'p)
 
-(define MAX-STEPS     (make-parameter 25))
+(define MAX-STEPS     (make-parameter 100))
 (define MAX-CCS-SIZE  (make-parameter #f))
 (define TRIM?         #t)
 
@@ -185,15 +181,28 @@
                                                      (not (member (cadr pr)
                                                                 (caddr pr))))]
                                            [atom  (atom? (cadr pr))]
+                                           [;; Check operator
+                                            !^    (let ([op   (cadr pr)]
+                                                        [exp  (caddr pr)])
+                                                    (or (atom? exp)
+                                                       (eq? (car exp) op)))]
+                                           [;; Prolog Negation!
+                                            /+    (>> (parameterize ([MAX-STEPS #f])
+                                                        (entry (cadr pr)))
+                                                      s-null?)]
                                            [else  #f])
 
-                                         (cond [(;; Constants won't change -> truth established
-                                                 constant? pr)
-                                                (fup proof `[,@path cdr cdr] '())]
+                                         (cond [;; Separating the cases that won't be computed twice
+                                                (or (;; Negation
+                                                    eq? (car pr) '/+)
+                                                   (;; Constants won't change
+                                                    constant? pr))
+                                                (;; The proof is changed to "immediately evident"
+                                                 fup proof `[,@path cdr cdr] '())]
                                                [else            proof]))))
                       (f> loop (cdr assumed))))))))))
 
-(define main
+(trace-define main
   (lambda (proof lpath)
     ;; `lpath` points to the list of remaining premises
     (let ([path  `[;; points to the current premise
