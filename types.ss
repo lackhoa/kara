@@ -87,34 +87,47 @@
               (from 2 derive 0) (from 2 derive . 1))))
 
 (define equality
-  (ls-proof '((= 0 1)
+  (ls-proof '((= 0 0))
+
+            '((= 0 1)
               (= 1 0))
 
             '((= 0 2)
-              (= 0 1) (= 1 2))))
+              (= 0 1) (= 1 2))
+
+            '(;; DANGER: Second-order rule
+              7
+              (apply 5 1 7)
+              (apply 5 0 6)
+              (;; Don't deal with constant formula
+               =/= 5 6)
+              6
+              (= 0 1))
+            ))
 
 (define category
-  (ls-proof '((= 1 3)
-              (-> 0 1 2)
-              (-> 0 3 4))
+  (ls-proof '(;; Associativity of composition
+              (= (c (c 0 1) 2)
+                 (c 0 (c 1 2))))
 
-            '((= 2 4)
-              (-> 0 1 2)
-              (-> 0 3 4))
+            '(;; Isomorphism 1
+              (= (c 0 (- 0)) 2)
+              (iMap 0) (Map 0 1 2))
 
-            '((= (c (c 0 1) 2)
-                 (c 0 (c 1 2)))
-              (-> 2 3 4)
-              (-> 1 4 5)
-              (-> 0 5 6))
+            '(;; Isomorphism 2
+              (= (c (- 0) 0) 1)
+              (iMap 0) (Map 0 1 2))
 
-            '((= (c 0 (- 0)) 2)
-              (i-> 0)
-              (-> 0 1 2))
+            '(;; Identity map 1
+              (= (c 0 1) 0)
+              (Map 0 1 2))
 
-            '((= (c (- 0) 0) 1)
-              (i-> 0)
-              (-> 0 1 2))))
+            '(;; Identity map 2
+              (= (c 2 0) 0)
+              (Map 0 1 2))
+
+
+            ))
 
 (define misc
   (ls-proof

@@ -9,27 +9,64 @@
 
 
 ;;; Parameters (files are preferably strings)
-(define db
-  (append category equality))
+(define DB
+  (append misc
+          list-axioms
+          apply-axioms
+          ;; equality
+          category
+          (ls-proof '((cute one))
+                    '((= one two)))
+          ;; (ls-proof '((Map i1 P1 X1)) '((Map i2 P2 X2))
+          ;;           '((Map s1 X1 P1)) '((Map s2 X2 P2))
+          ;;           '((Map t1 X1 P1)) '((Map t2 X2 P2))
 
-(define MAX-STEPS     22)
-(define TRIM?         #t)
-(define MAX-CCS-SIZE  10)
-(define MAX-ASSUMED   7)
-(define MAGIC         100)
+          ;;           '((= (c s1 i1) P1)) '((= (c s2 i2) P2))
+          ;;           '((= (c t1 i1) P1)) '((= (c t2 i2) P2))
 
-(define banned-ctors
-  '(=))
+          ;;           '((= (c fd s1) (c s2 fa)))
+          ;;           '((= (c fd s1) (c t2 fa)))
+          ;;           '((= (c i2 fd) (c fa i1)))
+          ;;           )
+          ))
+
+(define QUERY
+  '(apply 0 two (cute two)))
+
+(define MAX-STEPS     (make-parameter 15))
+(define MAX-CCS-SIZE  (make-parameter #f))
+(define TRIM?         #f)
 
 ;;; Auxiliary routines
+(define constant?
+  (lambda (mol)
+    (mol-< mol
+           (lambda _    #f)
+           (lambda _    #t)
+           (lambda (pr)
+             (and (constant? (car pr))
+                (constant? (cdr pr)))))))
+
+(define fup
+  ;; Force an update
+  (lambda (mol path new)
+    (cond [(null? path)  new]
+          [else          (let ([pnext  (car path)]
+                               [prest  (cdr path)])
+                           (case pnext
+                             [car  (cons (fup (car mol) prest new)
+                                         (cdr mol))]
+                             [cdr  (cons (car mol)
+                                         (fup (cdr mol) prest new))]))])))
+
 (define trim
   (lambda (proof)
     `(=> ,(get-ccs proof)
-        ,@(>> (get-assumed proof)
+        ,@(>> (get-assumed-ccs proof)
               strip-duplicates))))
 
 (define proof-steps
-  #|Counts how many => signs there are|#
+  ;; Counts how many => signs there are
   (lambda (proof)
     (mol-< proof
            (lambda _ 0)  (lambda _ (error "proof-steps" "Not a proof" proof))
@@ -49,7 +86,7 @@
 
 ;;; Main Routines
 (define cycle?
-  #|Test whether or not we're encountering goal duplication|#
+  ;; Test whether or not we're encountering goal duplication
   (lambda (proof)
     (let loop ([proof  proof]
                [seen   (list)])
@@ -60,10 +97,7 @@
                      (or (bool (member ccs seen))
                         (mol-< (get-prem proof)
                                (lambda _  #f)
-                               (lambda (c)
-                                 (case c
-                                   [(assumed ())  #f]
-                                   [else          (error "cycle?" "What?" c)]))
+                               (lambda _  #f)
                                (lambda (pr)
                                  (;; Only this proof's premises will be
                                   ;; checked against this conclusion
@@ -71,85 +105,162 @@
                                         pr))))))))))
 
 (define get-assumed
+  ;; Get the paths of assumed proofs
+  (lambda (proof)
+    (let loop ([;; Points to the current premise list
+                lpath  '[cdr cdr]])
+      ;; Returns: lists of paths
+      (let* ([path  `[,@lpath car]]
+             [;; The focused proof
+              p     (ref proof path)])
+        (if (not p)  (list)
+            (append (mol-< (get-prem p)
+                           (lambda _     (list))
+                           (lambda (c)   (if (not (eq? c 'assumed))  (list)
+                                             (list path)))
+                           (lambda (pr)  (;; Go down to search its premises
+                                          loop `[,@path cdr cdr])))
+                    (loop `[;; Continue to the next sibling premises
+                            ,@lpath cdr])))))))
+
+(define complete-proof?
   (lambda (proof)
     (mol-< (get-prem proof)
-           (lambda _     (list))
-           (lambda (c)   (case c
-                      ['()      (list)]
-                      [assumed  (list (get-ccs proof))]
-                      [else     (error "get-assumed" "What?")]))
-           (lambda (pr)  (flatmap get-assumed pr)))))
+           (lambda _     #f)
+           (;; Either assumed, already proven or no premise (a priori)
+            lambda _     #t)
+           (lambda (pr)  (for-all complete-proof? pr)))))
 
-(define assumable?
-  (f> mol-<
-      (;; variables
-       lambda _     #f)
-      (;; constants
-       lambda _     #f)
-      (;; pairs
-       lambda (pr)  (and (;; Interesting constructor
-                   not (memq (car pr) banned-ctors))
-                  (;; Only assume for variables
-                   for-all number? (cdr pr))))))
+(define ccs-proven?
+  (lambda (ccs proof)
+    (or (and (equal? ccs
+                     (get-ccs proof))
+             (complete-proof? proof))
+
+        (let ([prems  (get-prem proof)])
+          (and (list? prems)
+               (exists (l> ccs-proven? ccs)
+                       prems))))))
+
+(define all-ccs
+  (lambda (proof)
+    (cons (get-ccs proof)
+          (mol-< (get-prem proof)
+                 (lambda _     (list))
+                 (lambda _     (list))
+                 (lambda (pr)  (flatmap all-ccs pr))))))
+
+(define get-assumed-ccs
+  ;; Get assumed conclusions from the list of paths
+  (lambda (proof)
+    (map (lambda (x)
+           (>> x (l> ref proof) get-ccs))
+         (get-assumed proof))))
 
 (define illegal?
-  ;; Check if a proof is in an illegal state
   (lambda (proof)
-    (let ([assumed  (>> (get-assumed proof)
-                        strip-duplicates)])
-      (or (;; No cycle
-          cycle? proof)
-         (;; Only assume interesting things
-          exists (negate assumable?)
-            assumed)
-         (;; Don't assume too much
-          > (length assumed) MAX-ASSUMED)
-         (;; Good size
-          > (size (get-ccs proof))
-            MAX-CCS-SIZE)
-         (;; Random elimination: chance of acceptance:
-          ;; (/ MAGIC (>> (proof-steps proof) exp))
-          > (>> (proof-steps proof) exp random)
-            MAGIC)))))
+    (or (;; No cycle
+         cycle? proof)
+        (;; Good size
+         if (not (MAX-CCS-SIZE))  #f
+            (> (size (get-ccs proof))
+               (MAX-CCS-SIZE))))))
+
+(define reinforce
+  ;; Check if a proof is in an illegal state, and transform it if needed
+  (lambda (proof)
+    (if (illegal? proof)  #f
+        (;; Deal with assumptions
+         let* ([assumed  (get-assumed proof)])
+          (let loop ([proof    proof]
+                     [assumed  assumed])
+            (if (null? assumed)  proof
+                (let* ([path   (car assumed)]
+                       [ccs    (>> (ref proof path)
+                                   get-ccs)])
+                  (>> (mol-< ccs
+                             (;; variables
+                              lambda _     #f)
+                             (;; constants
+                              lambda _     #f)
+                             (;; pairs
+                              lambda (pr)  (and (case (car pr)
+                                                  [=/=     (not (equal? (cadr pr)
+                                                                        (caddr pr)))]
+                                                  [!mem  (or (not (list? (caddr pr)))
+                                                             (not (member (cadr pr)
+                                                                          (caddr pr))))]
+                                                  [atom  (atom? (cadr pr))]
+                                                  [;; Check operator
+                                                   !^    (let ([op   (cadr pr)]
+                                                               [exp  (caddr pr)])
+                                                           (or (atom? exp)
+                                                               (eq? (car exp) op)))]
+                                                  [;; Prolog Negation!
+                                                   /+    (>> (parameterize ([MAX-STEPS #f])
+                                                               (entry (cadr pr)))
+                                                             s-null?)]
+                                                  [else  #f])
+
+                                                (cond [;; Separating the cases that won't be computed twice
+                                                       (or (;; Negation
+                                                            eq? (car pr) '/+)
+                                                           (;; Constants won't change
+                                                            constant? pr))
+                                                       (;; The proof is changed to "immediately evident"
+                                                        fup proof `[,@path cdr cdr] '())]
+                                                      [else            proof]))))
+                      (f> loop (cdr assumed))))))))))
 
 (define main
   (lambda (proof lpath)
-    ;; `lpath points to the list of remaining premises`
+    ;; `lpath` points to the list of remaining premises
     (let ([path  `[;; points to the current premise
                    ,@lpath car]])
       (;; path invalid -> no more premise in list
        if (not (ref proof path))  (stream proof)
           (>> (delay
-                (cons
-                 (#|Base case: Assume|#
-                  up proof  `[,@path cdr cdr]  'assumed)
-                 (cond [(> (proof-steps proof)
-                           MAX-STEPS)  (stream)]
-                       [else
-                        (;; Recursive case: Substitute an axiom
-                         >> (s-map (l> up proof path)
-                                   (apply stream db))
-                            (l> s-filter identity)
-                            (l> s-flatmap
-                                (;; enumerate down
-                                 f> main `[#|premises of this|#
-                                           ,@path cdr cdr])))])))
+                (if (;; If already proven then just say so
+                     ccs-proven? (get-ccs (ref proof path))
+                                 proof)
+                    (cons (up proof `[,@path cdr cdr] 'proven)
+                          (stream))
+
+                    (cons (;; Base case: Assume
+                           up proof `[,@path cdr cdr] 'assumed)
+                          (;; Recursive case: Substitute an axiom if not out of steps
+                           cond [(and (MAX-STEPS)
+                                    (> (proof-steps proof)
+                                       (MAX-STEPS)))
+                                 (stream)]
+                                [else
+                                 (>> (s-map (l> up proof path)
+                                            (apply stream DB))
+                                     (l> s-filter identity)
+                                     (l> s-flatmap
+                                         (;; Enumerate down
+                                          f> main `[;; Premises of this
+                                                    ,@path cdr cdr])))]))))
               (;; checking
-               l> s-filter (negate illegal?))
+               l> s-map reinforce)
+              (;; remove illegal states
+               l> s-filter identity)
               (;; move on to the other premises
                l> s-flatmap (f> main `[,@lpath cdr])))))))
 
-(define query
-  0)
-
+(define entry
+  (lambda (query)
+    (s-flatmap (f> main '[;; Top-level premise list
+                          cdr cdr])
+               (apply stream
+                 (>> (map (;; unify `query` with the heads in the database
+                           f> up '[cdr car] query)
+                          DB)
+                     (;; Filter, this is the main driving force of the program loop
+                      l> filter identity))))))
 (define b
   ;; The main stream
-  (s-flatmap (f> main '[cdr cdr  #|Top-level premise list|#])
-             (apply stream
-               (>> (map (;; unify query with the conclusion
-                         f> up '[cdr car] query)
-                        db)
-                   (l> filter identity)))))
+  (entry QUERY))
 
 ;;; Tracing Business
 
