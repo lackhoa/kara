@@ -111,21 +111,20 @@
                  (c 0 (c 1 2))))
 
             '(;; Isomorphism 1
-              (= (c 0 (- 0)) 2)
-              (iMap 0) (Map 0 1 2))
+              (id (c 0 (- 0)))
+              (iMap 0))
 
             '(;; Isomorphism 2
-              (= (c (- 0) 0) 1)
-              (iMap 0) (Map 0 1 2))
+              (id (c (- 0) 0))
+              (iMap 0))
 
             '(;; Identity map 1
               (= (c 0 1) 0)
-              (Map 0 1 2))
+              (id 0))
 
             '(;; Identity map 2
-              (= (c 2 0) 0)
-              (Map 0 1 2))
-
+              (= (c 1 0) 0)
+              (id 0))
 
             ))
 
