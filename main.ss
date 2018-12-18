@@ -13,15 +13,28 @@
   (>> (append misc
               list-axioms
               apply-axioms
-              ;; equality
-              ;; category
+              equality
+              category
+
+              '(((Map i1 P1 X1)) ((Map i2 P2 X2))
+                ((Map s1 X1 P1)) ((Map s2 X2 P2))
+                ((Map t1 X1 P1)) ((Map t2 X2 P2))
+                ((Map fa X1 X2)) ((Map fd P1 P2))
+
+                ((= (c s1 i1) P1)) ((= (c s2 i2) P2))
+                ((= (c t1 i1) P1)) ((= (c t2 i2) P2))
+
+                ((= (c fd s1) (c s2 fa)))
+                ((= (c fd s1) (c t2 fa)))
+                ((= (c i2 fd) (c fa i1)))
+                )
               )
       (l> apply ls-proof)))
 
 (define QUERY
-  '(apply 0 1 (cute two)))
+  '(= 0 1 2 . 3))
 
-(define MAX-STEPS     (make-parameter 15))
+(define MAX-STEPS     (make-parameter 20))
 (define MAX-CCS-SIZE  (make-parameter #f))
 (define TRIM?         #t)
 

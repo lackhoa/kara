@@ -87,37 +87,43 @@
      (from 2 derive 0) (from 2 derive . 1))))
 
 (define equality
-  '(((= 0 0))
-
+  '(
     ((= 0 1)
      (= 1 0))
 
-    ((= 0 2)
-     (= 0 1) (= 1 2))
-    ))
+    (;; Equality path
+     (= 1 2 . 22)
+     (= 1 2) (=/= 1 2) (!mem 1 22) (= 2 . 22))))
 
 (define category
-  '((;; Associativity of composition
+  '((;; Composition intro 1
+     (= (c 0 1) (c 2 1))
+     (Map 1 4 5) (Map 0 5 6) (= 0 2))
+
+    (;; Composition intro 2
+     (= (c 0 1) (c 0 3))
+     (Map 1 4 5) (Map 0 5 6) (= 1 3))
+
+    (;; Associativity of composition
      (= (c (c 0 1) 2)
-        (c 0 (c 1 2))))
+        (c 0 (c 1 2)))
+     (Map 2 3 4) (Map 1 4 5) (Map 0 5 6))
 
     (;; Isomorphism 1
-     (id (c 0 (- 0)))
-     (iMap 0))
+     (= (c 0 (- 0)) 2)
+     (iMap 0) (Map 0 1 2))
 
     (;; Isomorphism 2
-     (id (c (- 0) 0))
-     (iMap 0))
+     (= (c (- 0) 0) 1)
+     (iMap 0) (Map 0 1 2))
 
     (;; Identity map 1
      (= (c 0 1) 0)
-     (id 0))
+     (Map 0 1 2))
 
     (;; Identity map 2
-     (= (c 1 0) 0)
-     (id 0))
-
-    ))
+     (= (c 2 0) 0)
+     (Map 0 1 2))))
 
 (define misc
   '(((and))
@@ -200,7 +206,7 @@
      (known (r 0 1))
      (=/= 0 1) (res 2) (at 0 2) (at 1 2))
 
-                                        ; Paths (the last node is left out for a reason)
+    ;; Paths (the last node is left out for a reason)
     (;; Path through one device
      (path (0) 1)
      (=/= 0 1) (at 0 8) (at 1 8))
