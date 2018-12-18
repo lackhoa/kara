@@ -71,162 +71,148 @@
          (-> 0 2))))
 
 (define meta
-  (ls-proof '((derive . 0)
-              (from () derive . 0))
+  '(((derive . 0)
+     (from () derive . 0))
 
-            '(;; Derivation of the truth
-              (from _ derive))
-            '(;; Derivation from assumption
-              (from 11 derive 1)
-              (mem 1 11))
-            '(;; Derivation from axiom
-              (from 10 derive 0)
-              (=> 0 . 1) (from 10 derive . 1))
-            '(;; Derivation of many
-              (from 2 derive 0 . 1)
-              (from 2 derive 0) (from 2 derive . 1))))
+    (;; Derivation of the truth
+     (from _ derive))
+    (;; Derivation from assumption
+     (from 11 derive 1)
+     (mem 1 11))
+    (;; Derivation from axiom
+     (from 10 derive 0)
+     (=> 0 . 1) (from 10 derive . 1))
+    (;; Derivation of many
+     (from 2 derive 0 . 1)
+     (from 2 derive 0) (from 2 derive . 1))))
 
 (define equality
-  (ls-proof '((= 0 0))
+  '(((= 0 0))
 
-            '((= 0 1)
-              (= 1 0))
+    ((= 0 1)
+     (= 1 0))
 
-            '((= 0 2)
-              (= 0 1) (= 1 2))
-
-            '(;; DANGER: Second-order rule
-              7
-              (apply 5 1 7)
-              (apply 5 0 6)
-              (;; Don't deal with constant formula
-               =/= 5 6)
-              6
-              (= 0 1))
-            ))
+    ((= 0 2)
+     (= 0 1) (= 1 2))
+    ))
 
 (define category
-  (ls-proof '(;; Associativity of composition
-              (= (c (c 0 1) 2)
-                 (c 0 (c 1 2))))
+  '((;; Associativity of composition
+     (= (c (c 0 1) 2)
+        (c 0 (c 1 2))))
 
-            '(;; Isomorphism 1
-              (id (c 0 (- 0)))
-              (iMap 0))
+    (;; Isomorphism 1
+     (id (c 0 (- 0)))
+     (iMap 0))
 
-            '(;; Isomorphism 2
-              (id (c (- 0) 0))
-              (iMap 0))
+    (;; Isomorphism 2
+     (id (c (- 0) 0))
+     (iMap 0))
 
-            '(;; Identity map 1
-              (= (c 0 1) 0)
-              (id 0))
+    (;; Identity map 1
+     (= (c 0 1) 0)
+     (id 0))
 
-            '(;; Identity map 2
-              (= (c 1 0) 0)
-              (id 0))
+    (;; Identity map 2
+     (= (c 1 0) 0)
+     (id 0))
 
-            ))
+    ))
 
 (define misc
-  (ls-proof
-   '((and))
-   '((and 1 . 10) 1 (and . 10))
-   '((or 1 . 10) 1)
-   '((or 1 . 10) (or . 10)))
+  '(((and))
+    ((and 1 . 10) 1 (and . 10))
+    ((or 1 . 10) 1)
+    ((or 1 . 10) (or . 10)))
   )
 
 (define apply-axioms
-  (ls-proof
-   '((apply 3 1 3)
+  '(((apply 3 1 3)
      (atom 3) (=/= 3 *))
 
-   '((apply * 0 0))
+    ((apply * 0 0))
 
-   '((apply (1 . 11) 0 (2 . 22))
+    ((apply (1 . 11) 0 (2 . 22))
      (apply 1 0 2) (apply 11 0 22))))
 
 (define list-axioms
-  (ls-proof
-   '((mem 0 (0 . 1)))
-   '((mem 0 (1 . 2))
+  '(((mem 0 (0 . 1)))
+    ((mem 0 (1 . 2))
      (mem 0 2))
 
-   '((append () 0 0))
-   '((append (1 . 10) 0 (1 . 2))
+    ((append () 0 0))
+    ((append (1 . 10) 0 (1 . 2))
      (append 10 0 2))
 
-   '((append-dl (++ 0 1)
+    ((append-dl (++ 0 1)
                 (++ 1 2)
                 (++ 0 2)))
 
-   '((last (0) 0))
-   '((last (0 . 1) 2)
+    ((last (0) 0))
+    ((last (0 . 1) 2)
      (last 1 2))
 
-   '((remove 1 () ()))
-   '((remove 1 (1 . 10) 10))
-   '((remove 1 (2 . 10) (2 . 9))
+    ((remove 1 () ()))
+    ((remove 1 (1 . 10) 10))
+    ((remove 1 (2 . 10) (2 . 9))
      (=/= 1 2) (remove 1 10 9))
 
-   '((map 5 () ()))
-   '((map 5 (1 . 10) (2 . 20))
+    ((map 5 () ()))
+    ((map 5 (1 . 10) (2 . 20))
      (apply 5 1 2) (map 5 10 20))
 
-   '((forall 5 ()))
-   '((forall 5 (1 . 10))
+    ((forall 5 ()))
+    ((forall 5 (1 . 10))
      (apply 5 1 2) 2 (forall 5 10))
 
-   '((reverse 0 1)
+    ((reverse 0 1)
      (reverse 0 () 1))
-   '((reverse () 0 0))
-   '((reverse (1 . 10) 0 2)
+    ((reverse () 0 0))
+    ((reverse (1 . 10) 0 2)
      (reverse 10 (1 . 0) 2))
-   ))
+    ))
 
 (define knowledge
-  (ls-proof
-   '((known 1)
+  '(((known 1)
      (remove 1 11 10) (forall (known *) 10) (related . 11))))
 
 (define circuit
-  (ls-proof
-   '(;; Ohm's law
+  '((;; Ohm's law
      (related . ((v 0 1) (i 0 1) (r 0 1))))
 
-   '(;; Kirchhoff's current law
+    (;; Kirchhoff's current law
      (related . 33)
      (all 0 . 88) (map (i *) 88 33))
 
-   '(;; Kirchhoff's voltage law
+    (;; Kirchhoff's voltage law
      (related . 33)
      (path (0 . 22) 0)
      (KVL 0 (0 . 22) 33))
 
-   '(;; KVL processing: last node
+    (;; KVL processing: last node
      (KVL 0 (1) ((v 1 0))))
 
-   '(;; KVL processing: intermediate nodes
+    (;; KVL processing: intermediate nodes
      (KVL 0 (1 2 . 22) ((v 1 2) . 33))
      (KVL 0 (2 . 22) 33))
 
-   '(;; Assumption of resistance
+    (;; Assumption of resistance
      (known (r 0 1))
      (=/= 0 1) (res 2) (at 0 2) (at 1 2))
 
-   ;; Paths (the last node is left out for a reason)
-   '(;; Path through one device
+                                        ; Paths (the last node is left out for a reason)
+    (;; Path through one device
      (path (0) 1)
      (=/= 0 1) (at 0 8) (at 1 8))
 
-   '(;; Complex path
+    (;; Complex path
      (path (0 2 . 22) 1)
      (=/= 0 2) (=/= 2 1) (at 0 8) (at 2 8)
      ;; No loops
      (;; note that 0 can be 1
       !mem 0 22)
      (path (2 . 22) 1))
-   ))
+    ))
 
 (define ca40
   '(((res r1) (res r2) (res r3) (res r4) (res r5))
@@ -256,21 +242,20 @@
 
 (define parse-circuit
   (lambda (circ)
-    (apply ls-proof
-      (>> (append (car circ)
-                  (cdr circ)
-                  (get-mount-points (cdr circ)))
-          (l> map list)))))
+    (>> (append (car circ)
+                (cdr circ)
+                (get-mount-points (cdr circ)))
+        (l> map list))))
 
 (define default
-  (ls-proof '((default (:- (flies 0) (bird 0))))
-            '((rule (:- (not (flies 0)) (penguin 0))))
-            '((rule (:- (bird 0) (penguin 0))))
-            '((rule (:- (penguin tweety))))
-            '((rule (:- (bird opus))))
+  '(((default (:- (flies 0) (bird 0))))
+    ((rule (:- (not (flies 0)) (penguin 0))))
+    ((rule (:- (bird 0) (penguin 0))))
+    ((rule (:- (penguin tweety))))
+    ((rule (:- (bird opus))))
 
-            '((explain 0 1)
-              (explain 0 () 1))
-            '((explain () 0 0))
-            '((explain (0 . 1) 2)
-              (explain ))))
+    ((explain 0 1)
+     (explain 0 () 1))
+    ((explain () 0 0))
+    ((explain (0 . 1) 2)
+     (explain ))))

@@ -10,21 +10,20 @@
 
 ;;; Parameters (files are preferably strings)
 (define DB
-  (append misc
-          list-axioms
-          apply-axioms
-          ;; equality
-          category
-          (ls-proof '((cute one))
-                    '((= one two)))
-          ))
+  (>> (append misc
+              list-axioms
+              apply-axioms
+              ;; equality
+              ;; category
+              )
+      (l> apply ls-proof)))
 
 (define QUERY
-  '(apply 0 two (cute two)))
+  '(apply 0 1 (cute two)))
 
 (define MAX-STEPS     (make-parameter 15))
 (define MAX-CCS-SIZE  (make-parameter #f))
-(define TRIM?         #f)
+(define TRIM?         #t)
 
 ;;; Auxiliary routines
 (define constant?
