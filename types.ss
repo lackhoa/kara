@@ -275,7 +275,8 @@
      (== T1 T2))
 
     (;; Pairs
-     (anti-unify (T1 . T1s) (T2 . T2s) (T . Ts)
+     (;; This does NOT work properly on variables, as they'll be unified to lists
+      anti-unify (T1 . T1s) (T2 . T2s) (T . Ts)
                  S1 S1++ S2 S2++)
      (anti-unify T1 T2 T
                  S1 S1+ S2 S2+)
