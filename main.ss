@@ -10,31 +10,18 @@
 
 ;;; Parameters (files are preferably strings)
 (define DB
-  (>> (append misc
-              list-axioms
-              apply-axioms
-              equality
-              category
-
-              '(((Map i1 P1 X1)) ((Map i2 P2 X2))
-                ((Map s1 X1 P1)) ((Map s2 X2 P2))
-                ((Map t1 X1 P1)) ((Map t2 X2 P2))
-                ((Map fa X1 X2)) ((Map fd P1 P2))
-
-                ((= (c s1 i1) P1)) ((= (c s2 i2) P2))
-                ((= (c t1 i1) P1)) ((= (c t2 i2) P2))
-
-                ((= (c fd s1) (c s2 fa)))
-                ((= (c fd s1) (c t2 fa)))
-                ((= (c i2 fd) (c fa i1)))
-                )
-              )
+  (>> (append anti-unify
+              misc
+              '())
       (l> apply ls-proof)))
 
 (define QUERY
-  '(= 0 1 2 . 3))
+  '(anti-unify ((reverse [tw o] [th] [o tw th]) :- (reverse [o] [tw th] [o tw th]))
+               ((reverse [a] [] [a])            :- (reverse [] [a] [a]))
+               T () S1 () S2)
+  )
 
-(define MAX-STEPS     (make-parameter 20))
+(define MAX-STEPS     (make-parameter #f))
 (define MAX-CCS-SIZE  (make-parameter #f))
 (define TRIM?         #t)
 
@@ -109,20 +96,22 @@
   ;; Get the paths of assumed proofs
   (lambda (proof)
     (let loop ([;; Points to the current premise list
-                lpath  '[cdr cdr]])
+                lpath  #f])
       ;; Returns: lists of paths
-      (let* ([path  `[,@lpath car]]
+      (let* ([path  (if (not lpath)  '[]
+                        `[,@lpath car])]
              [;; The focused proof
               p     (ref proof path)])
         (if (not p)  (list)
             (append (mol-< (get-prem p)
                            (lambda _     (list))
                            (lambda (c)   (if (not (eq? c 'assumed))  (list)
-                                             (list path)))
+                                        (list path)))
                            (lambda (pr)  (;; Go down to search its premises
-                                          loop `[,@path cdr cdr])))
-                    (loop `[;; Continue to the next sibling premises
-                            ,@lpath cdr])))))))
+                                     loop `[,@path cdr cdr])))
+                    (if (not lpath)  '()  ;; We're done here
+                        (loop `[;; Continue to the next sibling premises
+                                ,@lpath cdr]))))))))
 
 (define complete-proof?
   (lambda (proof)
@@ -186,38 +175,45 @@
                               lambda _     #f)
                              (;; pairs
                               lambda (pr)  (and (case (car pr)
-                                                  [=/=     (not (equal? (cadr pr)
-                                                                        (caddr pr)))]
-                                                  [!mem  (or (not (list? (caddr pr)))
-                                                             (not (member (cadr pr)
-                                                                          (caddr pr))))]
-                                                  [atom  (atom? (cadr pr))]
-                                                  [;; Check operator
-                                                   !^    (let ([op   (cadr pr)]
-                                                               [exp  (caddr pr)])
-                                                           (or (atom? exp)
-                                                               (eq? (car exp) op)))]
-                                                  [;; Prolog Negation!
-                                                   /+    (>> (parameterize ([MAX-STEPS #f])
-                                                               (entry (cadr pr)))
-                                                             s-null?)]
-                                                  [else  #f])
+                                           [=/=     (not (equal? (cadr pr)
+                                                             (caddr pr)))]
+                                           [==     (equal? (cadr pr)
+                                                          (caddr pr))]
+                                           [!mem  (or (not (list? (caddr pr)))
+                                                     (not (member (cadr pr)
+                                                                (caddr pr))))]
+                                           [atom  (atom? (cadr pr))]
+                                           [;; Check the operator
+                                            !^    (let ([op   (cadr pr)]
+                                                        [exp  (caddr pr)])
+                                                    (or (atom? exp)
+                                                       (eq? (car exp) op)))]
+                                           [var   (number? (cadr pr))]
+                                           [!var  (not (number? (cadr pr)))]
 
-                                                (cond [;; Separating the cases that won't be computed twice
-                                                       (or (;; Negation
-                                                            eq? (car pr) '/+)
-                                                           (;; Constants won't change
-                                                            constant? pr))
-                                                       (;; The proof is changed to "immediately evident"
-                                                        fup proof `[,@path cdr cdr] '())]
-                                                      [else            proof]))))
+                                           [;; Prolog Negation!
+                                            /+    (>> (parameterize ([MAX-STEPS #f])
+                                                        (entry (cadr pr)))
+                                                      s-null?)]
+                                           [else  #f])
+
+                                         (cond [;; Separating the cases that aren't/doesn't need computed twice
+                                                (or (;; Negation
+                                                    eq? (car pr) '/+)
+                                                   (;; Constants
+                                                    constant? pr))
+                                                (;; The proof is changed to "immediately evident"
+                                                 fup proof `[,@path cdr cdr] '())]
+                                               [else            proof]))))
                       (f> loop (cdr assumed))))))))))
 
 (define main
   (lambda (proof lpath)
     ;; `lpath` points to the list of remaining premises
-    (let ([path  `[;; points to the current premise
-                   ,@lpath car]])
+    (let ([;; points to the current premise
+           path  (if (;;Starting up
+                      not lpath)       '[]
+                      `[,@lpath car])])
       (;; path invalid -> no more premise in list
        if (not (ref proof path))  (stream proof)
           (>> (delay
@@ -246,22 +242,19 @@
                l> s-map reinforce)
               (;; remove illegal states
                l> s-filter identity)
-              (;; move on to the other premises
-               l> s-flatmap (f> main `[,@lpath cdr])))))))
+              (lambda (res-stream)
+                (;; move on to the other premises, but if at the top level then return
+                 if (not lpath)  res-stream
+                    (s-flatmap (f> main `[,@lpath cdr])
+                               res-stream))))))))
 
 (define entry
   (lambda (query)
-    (s-flatmap (f> main '[;; Top-level premise list
-                          cdr cdr])
-               (apply stream
-                 (>> (map (;; unify `query` with the heads in the database
-                           f> up '[cdr car] query)
-                          DB)
-                     (;; Filter, this is the main driving force of the program loop
-                      l> filter identity))))))
+    (main (up '(=> 0 . 1) '[cdr car] query) #f)))
+
 (define b
   ;; The main stream
-  (entry QUERY))
+  (entry (parse QUERY)))
 
 ;;; Tracing Business
 

@@ -9,17 +9,29 @@
 (define get-prem
   (f> ref '[cdr cdr]))
 
-(define fill-underscore
+(define parse
   (lambda (root)
-    (let ([get-var  (let ([next  (last-var root)])
-                      (lambda _
-                        (set! next (1+ next))
-                        next))])
+    (let ([translate
+           (let ([subs  '()]
+                 [next  -1])
+             (lambda (c)
+               (cond [(null? c)               '()]
+                     [(eq? c '_)              (begin (set! next (1+ next))
+                                                     next)]
+                     [(>> (symbol->string c)
+                          (f> string-ref 0)
+                          char-upper-case?)   (let ([lookup  (assq c subs)])
+                                                (if lookup  (cdr lookup)
+                                                    (begin (set! next (1+ next))
+                                                           (set! subs (cons (cons c next)
+                                                                            subs))
+                                                           next)))]
+                     [else                    c])))])
+
       (let loop ([mol  root])
         (mol-< mol
-               identity
-               (lambda (c)   (if (eq? c '_) (get-var)
-                            c))
+               (lambda (v)   (error "parse" "Got variable mixed in" v))
+               (lambda (c)   (translate c))
                (lambda (pr)  (cons (loop (car pr))
                               (loop (cdr pr)))))))))
 
@@ -30,7 +42,7 @@
                 (if (null? premises)  (list)
                     (cons `(=> ,(car premises) . _)
                           (loop (cdr premises))))))
-        fill-underscore)))
+        parse)))
 
 (define ls-proof
   (lambda ls
@@ -87,8 +99,7 @@
      (from 2 derive 0) (from 2 derive . 1))))
 
 (define equality
-  '(
-    ((= 0 1)
+  '(((= 0 1)
      (= 1 0))
 
     (;; Equality path
@@ -127,9 +138,9 @@
 
 (define misc
   '(((and))
-    ((and 1 . 10) 1 (and . 10))
-    ((or 1 . 10) 1)
-    ((or 1 . 10) (or . 10)))
+    ((and X . Xs) X (and . Xs))
+    ((or X . Xs) X)
+    ((or X . Xs) (/+ X) (or . Xs)))
   )
 
 (define apply-axioms
@@ -253,15 +264,42 @@
                 (get-mount-points (cdr circ)))
         (l> map list))))
 
-(define default
-  '(((default (:- (flies 0) (bird 0))))
-    ((rule (:- (not (flies 0)) (penguin 0))))
-    ((rule (:- (bird 0) (penguin 0))))
-    ((rule (:- (penguin tweety))))
-    ((rule (:- (bird opus))))
+(define anti-unify
+  '(((anti-unify T1 T2 T)
+     (;; Beginning of the computation
+      anti-unify T1 T2 T () _ () _))
 
-    ((explain 0 1)
-     (explain 0 () 1))
-    ((explain () 0 0))
-    ((explain (0 . 1) 2)
-     (explain ))))
+    (;; The two terms are identical (literally, not just UNIFIABLE)
+     (anti-unify T1 T2 T1
+                 S1 S1 S2 S2)
+     (== T1 T2))
+
+    (;; Pairs
+     (anti-unify (T1 . T1s) (T2 . T2s) (T . Ts)
+                 S1 S1++ S2 S2++)
+     (anti-unify T1 T2 T
+                 S1 S1+ S2 S2+)
+     (anti-unify T1s T2s Ts
+                 S1+ S1++ S2+ S2++))
+
+    (;; Already substituted
+     (anti-unify T1 T2 V
+                 S1 S1 S2 S2)
+     (=/= T1 T2) (or (atom T1) (atom T2))
+     (subs-lookup S1 S2 T1 T2 V))
+
+    (;; Reverse-substitute a fresh variable
+     (anti-unify T1 T2 V
+                 S1 ([T1 -> V] . S1)
+                 S2 ([T2 -> V] . S2))
+     (=/= T1 T2) (or (atom T1) (atom T2))
+     (/+ (subs-lookup S1 S2 T1 T2 _)))
+
+    ((subs-lookup ([T1 -> V] . _) ([T2 -> V] . _)
+                  Term1 Term2 V)
+     (== T1 Term1) (== T2 Term2))
+
+    ((subs-lookup ([T1 -> _] . S1) ([T2 -> _] . S2)
+                  Term1 Term2 V)
+     (subs-lookup S1 S2 Term1 Term2 V))
+    ))

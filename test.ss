@@ -27,8 +27,15 @@
 
       (let loop ([m1  mol1]
                  [m2  mol2])
-        (cond [(equal? m1 m2)  m1]
+        (cond [(and (eq? m1 m2)
+                  (or (null? m1) (symbol? m1)))
+               m1]
               [(and (pair? m1)
-                  (pair? m2)   (cons (loop (car m1) (car m2))
-                                     (loop (cdr m1) (cdr m2))))]
-              [else            (subs-lookup! m1 m2)])))))
+                  (pair? m2)    (cons (loop (car m1) (car m2))
+                                      (loop (cdr m1) (cdr m2))))]
+              [else             (subs-lookup! m1 m2)])))))
+
+(pretty-print
+ (anti-unify '((rev [n2 n1] [n3] [n1 n2 n3]) :- (rev [n1] [n2 n3] [n1 n2 n3]))
+             '((rev [a] [] [a])              :- (rev [] [a] [a]))
+             ))

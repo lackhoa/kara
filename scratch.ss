@@ -45,7 +45,7 @@
         (#|Definition of elements|#
          mk-proof '((elem 0 2))
                   '(and (= (dom 0) (1))
-                      (= (codom 0) 2)))
+                        (= (codom 0) 2)))
 
         (#|Definition of an empty object|#
          mk-proof '((elem 0 (empty)))
@@ -79,61 +79,15 @@
          mk-proof '()
                   '(prod? (prod 0 1 (pr1 0 1) (pr2 0 1))))))
 
-(=> (ap-core (bind (bind (*))) 0 (bind (bind (const 0)))))
-3 steps
+(((Map i1 P1 X1)) ((Map i2 P2 X2))
+ ((Map s1 X1 P1)) ((Map s2 X2 P2))
+ ((Map t1 X1 P1)) ((Map t2 X2 P2))
+ ((Map fa X1 X2)) ((Map fd P1 P2))
 
-(=> (ap-core (bind (bind (* * . 0))) 1 (bind (bind (* . 0)))))
-3 steps
+ ((= (c s1 i1) P1)) ((= (c s2 i2) P2))
+ ((= (c t1 i1) P1)) ((= (c t2 i2) P2))
 
-(=> (ap-core (bind (bind (const 0))) 1 (bind (bind (const 0)))))
-3 steps
-(=> (ap-core (bind (*)) 0 (bind (const 0))))
-2 steps
-(=> (ap-core (bind (* * . 0)) 1 (bind (* . 0))))
-2 steps
-(=> (ap-core (bind (const 0)) 1 (bind (const 0))))
-2 steps
-(=> (ap-core (*) 0 (const 0)))
-1 steps
-(=> (ap-core (* * . 0) 1 (* . 0)))
-1 steps
-(=> (ap-core (const 0) 1 (const 0)))
-1 steps
-(=> (ap-core (:: (*) (*)) 0 (:: (const 0) (const 0))))
-3 steps
-(=> (ap-core (:: (*) (* * . 0)) 1 (:: (const 1) (* . 0))))
-3 steps
-(=> (ap-core (:: (*) (const 0)) 1 (:: (const 1) (const 0))))
-3 steps
-(=> (ap-core (:: (* * . 0) (*)) 1 (:: (* . 0) (const 1))))
-3 steps
-(=> (ap-core (:: (* * . 0) (* * . 1)) 2 (:: (* . 0) (* . 1))))
-3 steps
-(=> (ap-core (:: (* * . 0) (const 1)) 2 (:: (* . 0) (const 1))))
-3 steps
-(=> (ap-core (:: (const 0) (*)) 1 (:: (const 0) (const 1))))
-3 steps
-(=> (ap-core (:: (const 0) (* * . 1)) 2 (:: (const 0) (* . 1))))
-3 steps
-(=> (ap-core (:: (const 0) (const 1)) 2 (:: (const 0) (const 1))))
-3 steps
-(=> (apply (bind (bind (*))) 0 (bind (const 0))))
-3 steps
-(=> (apply (bind (bind (* * . 0))) 1 (bind (* . 0))))
-3 steps
-(=> (apply (bind (bind (const 0))) 1 (bind (const 0))))
-3 steps
-(=> (apply (bind (*)) 0 (const 0)))
-2 steps
-(=> (apply (bind (* * . 0)) 1 (* . 0)))
-2 steps
-(=> (apply (bind (const 0)) 1 (const 0)))
-2 steps
-(=> (decode (const 0) 0))
-1 steps
-(=> (decode (:: (const 0) (const 1)) (0 . 1)))
-3 steps
-(=> (decode (bind (*)) 0))
-3 steps
-(=> (decode (bind (const 0)) 0))
-3 steps
+ ((= (c fd s1) (c s2 fa)))
+ ((= (c fd s1) (c t2 fa)))
+ ((= (c i2 fd) (c fa i1)))
+ )
