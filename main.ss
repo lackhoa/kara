@@ -12,13 +12,14 @@
 (define DB
   (>> (append anti-unify
               misc
-              '())
+              '((one) (two)))
       (l> apply ls-proof)))
 
 (define QUERY
-  '(anti-unify ((reverse [tw o] [th] [o tw th]) :- (reverse [o] [tw th] [o tw th]))
-               ((reverse [a] [] [a])            :- (reverse [] [a] [a]))
-               T () S1 () S2)
+  ;; '(anti-unify ((reverse [tw o] [th] [o tw th]) :- (reverse [o] [tw th] [o tw th]))
+  ;;              ((reverse [a] [] [a])            :- (reverse [] [a] [a]))
+  ;;              T () S)
+  '(anti-unify (= (* two two) (+ two two)) (= (* two three) (+ three three)) _)
   )
 
 (define MAX-STEPS     (make-parameter #f))
@@ -158,54 +159,67 @@
 
 (define reinforce
   ;; Check if a proof is in an illegal state, and transform it if needed
+  ;; Returns: the (transformed) proof
   (lambda (proof)
-    (if (illegal? proof)  #f
-        (;; Deal with assumptions
-         let* ([assumed  (get-assumed proof)])
-          (let loop ([proof    proof]
-                     [assumed  assumed])
-            (if (null? assumed)  proof
-                (let* ([path   (car assumed)]
-                       [ccs    (>> (ref proof path)
-                                   get-ccs)])
-                  (>> (mol-< ccs
-                             (;; variables
-                              lambda _     #f)
-                             (;; constants
-                              lambda _     #f)
-                             (;; pairs
-                              lambda (pr)  (and (case (car pr)
-                                           [=/=     (not (equal? (cadr pr)
-                                                             (caddr pr)))]
-                                           [==     (equal? (cadr pr)
-                                                          (caddr pr))]
-                                           [!mem  (or (not (list? (caddr pr)))
-                                                     (not (member (cadr pr)
-                                                                (caddr pr))))]
-                                           [atom  (atom? (cadr pr))]
-                                           [;; Check the operator
-                                            !^    (let ([op   (cadr pr)]
-                                                        [exp  (caddr pr)])
-                                                    (or (atom? exp)
-                                                       (eq? (car exp) op)))]
-                                           [var   (number? (cadr pr))]
-                                           [!var  (not (number? (cadr pr)))]
+    (and (not (illegal? proof))
+       (;; Deal with assumptions
+        let* ([assumed  (get-assumed proof)])
+         (let loop ([proof    proof]
+                    [assumed  assumed])
+           (if (null? assumed)  proof
+               (let* ([path   (car assumed)]
+                      [ccs    (>> (ref proof path)
+                                  get-ccs)])
+                 (>> (mol-< ccs
+                            (lambda (v)  #f) (lambda (c)  #f)
+                            (;; pairs
+                             lambda (pr)
+                              (define ie-proc
+                                ;; Change a proof to "immediately evident"
+                                (f> fup `[,@path cdr cdr] '()))
 
-                                           [;; Prolog Negation!
-                                            /+    (>> (parameterize ([MAX-STEPS #f])
-                                                        (entry (cadr pr)))
-                                                      s-null?)]
-                                           [else  #f])
+                              (define ie (ie-proc proof))
 
-                                         (cond [;; Separating the cases that aren't/doesn't need computed twice
-                                                (or (;; Negation
-                                                    eq? (car pr) '/+)
-                                                   (;; Constants
-                                                    constant? pr))
-                                                (;; The proof is changed to "immediately evident"
-                                                 fup proof `[,@path cdr cdr] '())]
-                                               [else            proof]))))
-                      (f> loop (cdr assumed))))))))))
+                              (case (car ccs)
+                                ;; Constraint
+                                [=/=      (and (not (equal? (cadr ccs)
+                                                      (caddr ccs)))
+                                           (if (constant? ccs) ie
+                                               proof))]
+                                [!mem   (and (or (not (list? (caddr ccs)))
+                                              (not (member (cadr ccs)
+                                                         (caddr ccs))))
+                                           (if (constant? ccs) ie
+                                               proof))]
+                                [atom   (and (atom? (cadr ccs))
+                                           (if (constant? (cadr ccs)) ie
+                                               proof))]
+                                [;; Check the operator
+                                 !^     (and (let ([op   (cadr ccs)]
+                                                 [exp  (caddr ccs)])
+                                             (or (and (var? exp) proof)
+                                                (and (atom? exp) ie)
+                                                (and (var? (car exp)) proof)
+                                                (and (eq? (car exp) op) ie))))]
+
+                                ;; Prolog Negation
+                                [/+     (and (>> (parameterize ([MAX-STEPS #f])
+                                                 (entry (cadr ccs)))
+                                               s-null?)
+                                           ie)]
+
+                                ;; One-time computations
+                                [var    (and (var? (cadr ccs)) ie)]
+                                [!var   (and (not (var? (cadr ccs))) ie)]
+                                [==      (and (equal? (cadr ccs)
+                                                   (caddr ccs))
+                                           ie)]
+                                [unify  (>> (sync proof
+                                                  `[,@path cdr car cdr car]
+                                                  `[,@path cdr car cdr cdr car])
+                                            ie-proc)]
+                                [else   #f])))
+                     (f> loop (cdr assumed))))))))))
 
 (define main
   (lambda (proof lpath)

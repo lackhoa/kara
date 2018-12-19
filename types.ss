@@ -267,40 +267,43 @@
 (define anti-unify
   '(((anti-unify T1 T2 T)
      (;; Beginning of the computation
-      anti-unify T1 T2 T () _ () _))
+      anti-unify T1 T2 T () _))
 
     (;; The two terms are identical (literally, not just UNIFIABLE)
      (anti-unify T1 T2 T1
-                 S1 S1 S2 S2)
+                 S S)
      (== T1 T2))
 
     (;; Pairs
      (;; This does NOT work properly on variables, as they'll be unified to lists
-      anti-unify (T1 . T1s) (T2 . T2s) (T . Ts)
-                 S1 S1++ S2 S2++)
-     (anti-unify T1 T2 T
-                 S1 S1+ S2 S2+)
-     (anti-unify T1s T2s Ts
-                 S1+ S1++ S2+ S2++))
+      anti-unify T1 T2 (T . Ts)
+                 S S++)
+     (=/= T1 T2)
+     (!var T1) (!var T2)  ;; Variables can turn to lists, which is illegal in our case
+     (unify T1 (T1h . T1tl))
+     (unify T2 (T2h . T2tl))
+     (anti-unify T1h T2h T
+                 S S+)
+     (anti-unify T1tl T2tl Ts
+                 S+ S++))
 
     (;; Already substituted
      (anti-unify T1 T2 V
-                 S1 S1 S2 S2)
+                 S S)
      (=/= T1 T2) (or (atom T1) (atom T2))
-     (subs-lookup S1 S2 T1 T2 V))
+     (subs-lookup S T1 T2 V))
 
     (;; Reverse-substitute a fresh variable
      (anti-unify T1 T2 V
-                 S1 ([T1 -> V] . S1)
-                 S2 ([T2 -> V] . S2))
+                 S ([T1 T2 -> V] . S))
      (=/= T1 T2) (or (atom T1) (atom T2))
-     (/+ (subs-lookup S1 S2 T1 T2 _)))
+     (/+ (subs-lookup S T1 T2 _)))
 
-    ((subs-lookup ([T1 -> V] . _) ([T2 -> V] . _)
+    ((subs-lookup ([T1 T2 -> V] . _)
                   Term1 Term2 V)
      (== T1 Term1) (== T2 Term2))
 
-    ((subs-lookup ([T1 -> _] . S1) ([T2 -> _] . S2)
+    ((subs-lookup ([_ _ -> _] . S)
                   Term1 Term2 V)
-     (subs-lookup S1 S2 Term1 Term2 V))
+     (subs-lookup S Term1 Term2 V))
     ))
