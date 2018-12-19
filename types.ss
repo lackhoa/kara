@@ -28,12 +28,12 @@
                                                            next)))]
                      [else                    c])))])
 
-      (let loop ([mol  root])
-        (mol-< mol
-               (lambda (v)   (error "parse" "Got variable mixed in" v))
-               (lambda (c)   (translate c))
-               (lambda (pr)  (cons (loop (car pr))
-                              (loop (cdr pr)))))))))
+      (let loop ([exp  root])
+        (cond [;; Negate numbers, since they clash with variables
+               (integer? exp)  (string-append "n" (number->string exp))]
+              [(atom? exp)     (translate exp)]
+              [else            (cons (loop (car exp))
+                                     (loop (cdr exp)))])))))
 
 (define mk-proof
   (lambda (conclusion . premises)

@@ -1,7 +1,8 @@
 (import (kara-lang main))
 
 ;; Molcules:
-(define var? number?)
+(define var?
+  (lambda (x)  (and (integer? x) (nonnegative? x))))
 
 (define mol-<
   ;; Dispatch function for molecule
