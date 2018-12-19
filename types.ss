@@ -307,3 +307,35 @@
                   Term1 Term2 V)
      (subs-lookup S Term1 Term2 V))
     ))
+
+(define lgg
+  '(((lgg (H1 :- . B1) (H2 :- . B2) (H :- . B))
+     (;; Head
+      anti-unify H1 H2 H [] S)
+     (;; Bodies
+      lgg-bodies B1 B2 [] B S S+))
+
+    ;; Select literal from the first body
+    ((lgg-bodies [] B2 B B S S))
+
+    ((lgg-bodies [L . B1] B2 B B++ S S++)
+     (lgg-b2 L B2 B B+ S S+)
+     (lgg-bodies B1 B2 B+ B++ S+ S++))
+
+    ;; and one from second body
+    ((lgg-b2 B1 [] B B S S))
+
+    ((lgg-b2 L1 [L2 . B2] B B+ S S++)
+     (same-predicate L1 L2)
+     (anti-unify L1 L2 L S S+)
+     (lgg-b2 L1 B2 [L . B] B+ S+ S++))
+
+    ((lgg-b2 L1 [L2 . B2] B B+ S S+)
+     (/+ (same-predicate L1 L2))
+     (lgg-b2 L1 B2 B B+ S S+))
+
+    ((same-predicate L1 L2)
+     (!var L1) (!var L2)
+     (unify L1 [P1 . _]) (unify L2 [P2 . _])
+     (== P1 P2))
+    ))

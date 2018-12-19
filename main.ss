@@ -11,6 +11,7 @@
 ;;; Parameters (files are preferably strings)
 (define DB
   (>> (append anti-unify
+              lgg
               misc
               '((one) (two)))
       (l> apply ls-proof)))
@@ -19,7 +20,9 @@
   ;; '(anti-unify ((reverse [tw o] [th] [o tw th]) :- (reverse [o] [tw th] [o tw th]))
   ;;              ((reverse [a] [] [a])            :- (reverse [] [a] [a]))
   ;;              T () S)
-  '(anti-unify (= (* two two) (+ two two)) (= (* two three) (+ three three)) _)
+  '(lgg ((element c [b c])   :- (element c [c]))
+        ((element d [b c d]) :- (element d [c d]) (element d [d]))
+        C)
   )
 
 (define MAX-STEPS     (make-parameter #f))
