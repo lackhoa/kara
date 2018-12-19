@@ -23,8 +23,11 @@
   ;; '(lgg ((element c [b c])   :- (element c [c]))
   ;;       ((element d [b c d]) :- (element d [c d]) (element d [d]))
   ;;       C)
-  '(lgg ((reverse [2 1] [3] [1 2 3]) :- (reverse [1] [2 3] [1 2 3]))
-        ((reverse [a] [] [a]) :- (reverse [] [a] [a]))
+  '(lgg ((append [1 2] [3 4] [1 2 3 4]) :-
+         (append [2] [3 4] [2 3 4]))
+
+        ((append [a] [] [a]) :-
+         (append [] [] []))
         C)
   )
 

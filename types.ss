@@ -339,3 +339,34 @@
      (unify L1 [P1 . _]) (unify L2 [P2 . _])
      (== P1 P2))
     ))
+
+(define rlgg
+  '(((rlgg E1 E2 M (H :- B))
+     (anti-unify (E1 E2 H [] S))
+     (varsin H V)
+     (rlgg-bodies M M [] B S S+ V))
+
+    ;; Select literal from the first body
+    ((rlgg-bodies [] B2 B B S S V))
+
+    ((rlgg-bodies [L . B1] B2 B B++ S S++ V)
+     (rlgg-b2 L B2 B B+ S S+ V)
+     (rlgg-bodies B1 B2 B+ B++ S+ S++ V))
+
+    ;; and one from second body
+    ((rlgg-b2 B1 [] B B S S V))
+
+    ((rlgg-b2 L1 [L2 . B2] B B+ S S++ V)
+     (same-predicate L1 L2)
+     (anti-unify L1 L2 L S S+)
+     (varsin L Vars)
+     (var-proper-subset Vars V)
+     (rlgg-b2 L1 B2 [L . B] B+ S+ S++ V))
+
+    ((rlgg-b2 L1 [L2 . B2] B B+ S S+)
+     (varsin L Vars)
+     (or (/+ (same-predicate L1 L2))
+        (/+ (anti-unify L1 L2 L S S+))
+        (/+ (var-proper-subset Vars V)))
+     (rlgg-b2 L1 B2 B B+ S S+))
+    ))
