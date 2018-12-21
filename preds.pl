@@ -24,6 +24,6 @@ setof0(X, G, L):-
     setof(X, G, L), !.
 setof0(_, _, []).
 
-element(X, [X | _]).
+element(X, [X | _]) :- !.
 element(X , [_ | Ys]) :-
     element(X, Ys).
