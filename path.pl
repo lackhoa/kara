@@ -1,20 +1,27 @@
 :- [preds].
 
-eq(a, b). eq(b, c). eq(d, c).
+%% Problem description
+k_n(N, Adjs) :-
+    range(N, Nodes),
+    maplist(adjs(Nodes), Nodes, Adjs).
 
-eq(x, y). eq(y, y). eq(y, z).
+adjs(Nodes, Node, Node-As) :-
+    tfilter(dif(Node), Nodes, As).
 
-path([A, B]) :-
-    (eq(A, B); eq(B, A)),
-    A \== B.
 
-path([A, B, C | Cs]) :-
-    path([A, B]),
-    path([B, C]),
-    A \== C,
-    path([B, C | Cs]),
-    \+(element(A, [B, C | Cs])).
+%% Algorithm description
+warshall(Adjs, NodesIn, NodesOut) :-
+    phrase(reachables(NodesIn, Adjs), Rs, NodesIn),
+    % Rs is the reachables with NodesIn at the end,
+    % since we need to include them, also
+    sort(Rs, Rs_sorted),
+    if_(Rs_sorted = NodesIn,
+        NodesOut = Rs_sorted,
+        warshall(Adjs, Rs_sorted, NodesOut)).
 
-max_path(X) :-
-    path(X),
-    \+(path([_ | X])).
+%% Get all the adjacent nodes of a list of nodes
+reachables([], _) --> [].
+reachables([Node|Nodes], Adjs) -->
+    { member(Node-Rs, Adjs) },
+    Rs,
+    reachables(Nodes, Adjs).
