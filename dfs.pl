@@ -21,17 +21,18 @@ arc(X, Y) :-
 node_children(Node, Children) :-
     findall(C, arc(Node, C), Children).
 
-prev_visited_revpath(Prev, Visited, [ArcName>>Prev|RevPath]) :-
+prev_visited_path(Prev, Visited, [ArcName>>Prev|Path]) :-
     member(PrevPrev-Prev, Visited),
     (  arc(PrevPrev, Prev, ArcName)
-    ->  prev_visited_revpath(PrevPrev, Visited, RevPath)
-    ;  RevPath = [],  % Met root
+    ->  prev_visited_path(PrevPrev, Visited, Path)
+    ;  Path = [],  % Met root
        ArcName = 'noarc'  ).
 
 search([Prev-Goal|_], Visited, Goal, Path) :-
     goal(Goal),
-    prev_visited_revpath(Goal, [Prev-Goal|Visited], RevPath),
-    reverse(RevPath, Path).
+    prev_visited_path(Goal, [Prev-Goal|Visited], Path0),
+    % Reverse only for aesthetics
+    reverse(Path0, Path).
 
 search([Prev-Node|Rest], Visited, Goal, Path) :-
     %% format('Node: ~w\n', [Node]),
