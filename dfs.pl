@@ -1,8 +1,12 @@
 :- [preds].
 
 %% Test program
-% nodes are lists of letters
-%% arc(T, [H | T]) :-
+%% Nodes are lists of letters
+% Unnamed arcs
+arc(X, Y) :-
+    arc(X, Y, _).
+
+%% arc(T, [H | T], H) :-
 %%     length(T, N), N<3,
 %%     member(H, [a, d, i]).
 
@@ -11,21 +15,23 @@
 %%     reverse(L, L).
 
 %% main(Goal, Path) :-
-%%     search([start-[]], [], Goal, Path).
+%%     search([nil-[]], [], Goal, Path).
 
 %% General search with loop detection (and path reconstruction)
 node_children(Node, Children) :-
     findall(C, arc(Node, C), Children).
 
-prev_visited_path(Prev, Visited, [Prev|Path]) :-
-    (  member(PrevPrev-Prev, Visited)
-    ->  prev_visited_path(PrevPrev, Visited, Path)
-    ;  Path = []  % Met the root
-    ).
+prev_visited_revpath(Prev, Visited, [ArcName>>Prev|RevPath]) :-
+    member(PrevPrev-Prev, Visited),
+    (  arc(PrevPrev, Prev, ArcName)
+    ->  prev_visited_revpath(PrevPrev, Visited, RevPath)
+    ;  RevPath = [],  % Met root
+       ArcName = 'noarc'  ).
 
 search([Prev-Goal|_], Visited, Goal, Path) :-
     goal(Goal),
-    prev_visited_path(Prev, Visited, Path).
+    prev_visited_revpath(Goal, [Prev-Goal|Visited], RevPath),
+    reverse(RevPath, Path).
 
 search([Prev-Node|Rest], Visited, Goal, Path) :-
     %% format('Node: ~w\n', [Node]),

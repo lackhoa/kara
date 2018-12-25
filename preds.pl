@@ -47,9 +47,14 @@ range(Low, High, Ls) :-
 range(High, Ls) :-
     range(0, High, Ls).
 
+%% Safe length
+list_length([], 0).
+list_length([_|Ls], N) :-
+    list_length(Ls, M), N #= M+1.
+
 %% Length minus one
 length_pred(Ls, N) :-
-    length(Ls, M), N #= M - 1.
+    list_length(Ls, M), N #= M-1.
 
 %% Choose function
 n_from_chosen(0, _, []).

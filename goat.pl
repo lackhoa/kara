@@ -5,13 +5,15 @@
 % something from here, then unload it on the other side,
 % or just move to the other side without doing anything
 arc(state(Here-L0,     There-K),
-    state(There-[X|K], Here-L)) :-
+    state(There-[X|K], Here-L),
+    carry-X) :-
         select(X, L0, L),
         \+(subset([cabbage,goat], L)),
         \+(subset([wolf,goat],    L)).
 
 arc(state(Here-L,  There-K),
-    state(There-K, Here-L)) :-
+    state(There-K, Here-L),
+    cross) :-
         \+(subset([cabbage,goat], L)),
         \+(subset([wolf,goat],    L)).
 

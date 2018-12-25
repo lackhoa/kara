@@ -9,7 +9,7 @@ pair_go(jug(ACap,A0), jug(BCap,B0),
     (  A #= ACap ; B #= BCap
      ; A #= 0    ; B #= 0  ).
 
-jugs_go(Jugs0, Jugs) :-
+arc(Jugs0, Jugs, XId-and-YId) :-
     length_pred(Jugs0, LenPred),
     [XId, YId] ins 0..LenPred, XId #\= YId, label([XId,YId]),
     nth0(XId, Jugs0, jug(XCap,X0)),
@@ -20,9 +20,6 @@ jugs_go(Jugs0, Jugs) :-
         Jugs0,
         [XId-jug(XCap,X), YId-jug(YCap,Y)],
         Jugs).
-
-arc(J1, J2) :-
-    jugs_go(J1, J2).
 
 goal([_, jug(_,4), jug(_,4)]).
 
