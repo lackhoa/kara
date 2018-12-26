@@ -78,3 +78,7 @@ list_ivs_updated_(I, [X|Xs], [Id-Val|IVs], [X|Rest]) :-
     I #\= Id,
     J #= I+1,
     list_ivs_updated_(J, Xs, [Id-Val|IVs], Rest).
+
+% Triska's DCG state
+state(S),     [S] --> [S].
+state(S0, S), [S] --> [S0].

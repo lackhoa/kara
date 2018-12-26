@@ -4,12 +4,12 @@ tree_build([A1,A2|As], test(Trait, Yes, No)) :-
     Candidates = [A1,A2|As],
     all_traits(AllTraits),
     findall(Delta-T-Pos,
-            (   member(T, AllTraits),
-                trait_positive(T, AllPos),
-                intersection(AllPos, Candidates, Pos),
-                length(Pos, PL),
-                length(Candidates, CL),
-                Delta is abs((PL/CL) - 0.5)   ),
+            ( member(T, AllTraits),
+              trait_positive(T, AllPos),
+              intersection(AllPos, Candidates, Pos),
+              length(Pos, PL),
+              length(Candidates, CL),
+              Delta is abs((PL/CL) - 0.5) ),
             DTPs),
     findall(Delta, member(Delta-T-_, DTPs), Deltas),
     min_list(Deltas, Min_Delta),
@@ -28,7 +28,7 @@ animal_trait([  dog     - [fur,woof,tetra,live,birth,cute],
                 android - [biped,think],
                 ai      - [think,perfect],
                 god     - [biped,think,perfect]
-                ]).
+             ]).
 
 all_traits(Traits) :-
     animal_trait(ATs),

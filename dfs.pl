@@ -21,7 +21,7 @@ arc(X, Y) :-
 node_children(Node, Children) :-
     findall(C, arc(Node, C), Children).
 
-prev_visited_path(Prev, Visited, [ArcName>>Prev|Path]) :-
+prev_visited_path(Prev, Visited, [ArcName >> Prev|Path]) :-
     member(PrevPrev-Prev, Visited),
     (  arc(PrevPrev, Prev, ArcName)
     ->  prev_visited_path(PrevPrev, Visited, Path)
@@ -35,7 +35,6 @@ search([Prev-Goal|_], Visited, Goal, Path) :-
     reverse(Path0, Path).
 
 search([Prev-Node|Rest], Visited, Goal, Path) :-
-    %% format('Node: ~w\n', [Node]),
     node_children(Node, Children),
     findall(Node-Child, member(Child, Children), NC),
     add_df(NC, Rest, Visited, Agenda),  % Insert scheduling algo here!
