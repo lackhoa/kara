@@ -1,52 +1,86 @@
 :- [preds].
+%% General search framework with loop detection (and path reconstruction)
 
 %% Test program
-%% Nodes are lists of letters
-% Unnamed arcs
-arc(X, Y) :-
-    arc(X, Y, _).
+% Specify queueing function
+queue_algo(dfs).
 
-%% arc(T, [H | T], H) :-
+%% States are lists of letters
+%% Specify arcs: arc(Head, Name, Weight, Tail)
+%% pred_arc(T, H, 1, [H | T]) :-
 %%     length(T, N), N<3,
 %%     member(H, [a, d, i]).
 
-% find palindromes
+% Specify goals: find palindromes
 %% goal(L) :-
-%%     reverse(L, L).
+%%     length(L, 3), reverse(L, L).
 
-%% main(Goal, Path) :-
-%%     search([nil-[]], [], Goal, Path).
+%% main(Solution) :-
+%%     search([], Solution).
 
-%% General search with loop detection (and path reconstruction)
-node_children(Node, Children) :-
-    findall(C, arc(Node, C), Children).
+%% The general search algorithm
+% Node == path == [links] == ArcName-ArcWeight>>State
+% Visited is a list of expanded states
+% Solution is a node
+search(StartState, Solution) :-
+    StartNode  = [nil-0>>StartState],
+    StartQueue = [StartNode],
+    search(StartQueue, [], Solution).
 
-prev_visited_path(Prev, Visited, [ArcName >> Prev|Path]) :-
-    member(PrevPrev-Prev, Visited),
-    (  arc(PrevPrev, Prev, ArcName)
-    ->  prev_visited_path(PrevPrev, Visited, Path)
-    ;  Path = [],  % Met root
-       ArcName = 'noarc'  ).
+search([VisitingNode | QueueRest0],
+       Visited,
+       Solution) :-
+    VisitingNode = [_-_>>State | _],
 
-search([Prev-Goal|_], Visited, Goal, Path) :-
+    findall(DummyNode,
+            (
+                pred_arc(State, Name, Weight, Child),
+                DummyNode = [Name-Weight>>Child
+                             | VisitingNode],
+                %% Eliminate loops - phase 1
+                % Child is the point of contention
+                \+((   member(Child, Visited)
+                   % A better proposal already exists
+                   ;   BetterPath = [_-_>>Child | _],
+                       member(BetterPath, QueueRest0),
+                       path_cost(BetterPath, BetterCost),
+                       path_cost(DummyNode,  Cost),
+                       BetterCost #=< Cost
+                   ))
+            ),
+            NewNodes),
+
+    %% Eliminate loops - phase 2
+    % Remaining nodes with the same state in the queue,
+    % are worse than this node
+    findall(DummyPath,
+            (
+                member(DummyPath, QueueRest0),
+                \+(( DummyPath = [_-_>>Child | _],
+                     member([_-_>>Child | _], NewNodes) ))
+            ),
+            QueueRest),
+
+    queue_algo(Algo),
+    call(Algo, NewNodes, QueueRest, Queue),
+    search(Queue, [State|Visited], Solution).
+
+search([RevSolution|_], _, Solution) :-
+    RevSolution = [_-_>>Goal | _],
     goal(Goal),
-    prev_visited_path(Goal, [Prev-Goal|Visited], Path0),
-    % Reverse only for aesthetics
-    reverse(Path0, Path).
+    reverse(RevSolution, Solution).
 
-search([Prev-Node|Rest], Visited, Goal, Path) :-
-    node_children(Node, Children),
-    findall(Node-Child, member(Child, Children), NC),
-    add_df(NC, Rest, Visited, Agenda),  % Insert scheduling algo here!
-    search(Agenda, [Prev-Node|Visited], Goal, Path).
+path_cost([], 0).
+path_cost([_-Weight>>_ | RestPath], Cost) :-
+    path_cost(RestPath, RestCost),
+    Cost #= Weight+RestCost.
 
+%% Queueing strategy
+dfs(New, Queue0, Queue) :-
+    append(New, Queue0, Queue).
 
-%% dfs-specific
-add_df([], Agenda, _, Agenda).
-
-add_df([Prev-Node|Rest], Agenda0, Visited, Agenda):-
-    (  (member(_-Node, Agenda0);
-        member(_-Node, Visited))
-    ->  add_df(Rest, Agenda0,             Visited, Agenda)
-    ;  add_df(Rest, [Prev-Node|Agenda0], Visited, Agenda)
-    ).
+bfs(New, Queue0, Queue) :-
+    map_list_to_pairs(path_cost, New,    KeyNew),
+    map_list_to_pairs(path_cost, Queue0, KeyQueue0),
+    keysort(KeyNew, KeyQueue0, KeyQueue),
+    pairs_values(KeyQueue, Queue).

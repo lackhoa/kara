@@ -1,5 +1,4 @@
 :- use_module(library(clpfd)).
-:- use_module(reif).
 
 % See if the goal succeed without side effects
 try(Goal) :-
@@ -59,12 +58,12 @@ length_pred(Ls, N) :-
 %% Choose function
 n_from_chosen(0, _, []).
 n_from_chosen(N, [X|Es], [X|Xs]) :-
-   N #> 0,
-   N #= N0+1,
-   n_from_chosen(N0, Es, Xs).
+    N #> 0,
+    N #= N0+1,
+    n_from_chosen(N0, Es, Xs).
 n_from_chosen(N, [_|Es], Xs) :-
-   N #> 0,
-   n_from_chosen(N, Es, Xs).
+    N #> 0,
+    n_from_chosen(N, Es, Xs).
 
 %% Update list
 list_ivs_updated(L0, IVs0, L) :-
@@ -79,6 +78,16 @@ list_ivs_updated_(I, [X|Xs], [Id-Val|IVs], [X|Rest]) :-
     J #= I+1,
     list_ivs_updated_(J, Xs, [Id-Val|IVs], Rest).
 
+
 % Triska's DCG state
 state(S),     [S] --> [S].
 state(S0, S), [S] --> [S0].
+
+
+% Key merge sort
+keymerge([],        R,         R).
+keymerge(R,         [],        R).
+keymerge([Kx-X|Xs], [Ky-Y|Ys], [Kw-W|Ws]) :-
+    (   Kx #< Ky
+    ->   Kw-W = Kx-X, keymerge(Xs, [Ky-Y|Ys], Ws)
+    ;   Kw-W = Ky-Y, keymerge([Kx-X|Xs], Ys, Ws)).

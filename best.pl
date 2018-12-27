@@ -34,8 +34,8 @@ add_one(Value, Child, [Node | Rest], [Node | Rest_p]) :-
     % Keep looking for a place to insert
     add_one(Value, Child, Rest, Rest_p).
 
-merge([], R, R) :- !.
-merge(R, [], R) :- !.
+merge([], R, R).
+merge(R, [], R).
 
 merge([X | Xs], [Y | Ys], [X | R]) :-
     % The smaller element is on the left
