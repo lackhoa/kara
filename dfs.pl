@@ -82,5 +82,5 @@ dfs(New, Queue0, Queue) :-
 bfs(New, Queue0, Queue) :-
     map_list_to_pairs(path_cost, New,    KeyNew),
     map_list_to_pairs(path_cost, Queue0, KeyQueue0),
-    keysort(KeyNew, KeyQueue0, KeyQueue),
+    keymerge(KeyNew, KeyQueue0, KeyQueue),
     pairs_values(KeyQueue, Queue).
