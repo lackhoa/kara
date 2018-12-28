@@ -7,16 +7,16 @@ queue_algo(dfs).
 
 %% States are lists of letters
 %% Specify arcs: arc(Head, Name, Weight, Tail)
-%% pred_arc(T, H, 1, [H | T]) :-
-%%     length(T, N), N<3,
-%%     member(H, [a, d, i]).
+pred_arc(T, H, 1, [H | T]) :-
+    length(T, N), N<3,
+    member(H, [a, d, i]).
 
 % Specify goals: find palindromes
-%% goal(L) :-
-%%     length(L, 3), reverse(L, L).
+goal(L) :-
+    length(L, 3), reverse(L, L).
 
-%% main(Solution) :-
-%%     search([], Solution).
+main(Solution) :-
+    search([], Solution).
 
 %% The general search algorithm
 % Node == path == [links] == ArcName-ArcWeight>>State

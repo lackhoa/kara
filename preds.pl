@@ -91,3 +91,13 @@ keymerge([Kx-X|Xs], [Ky-Y|Ys], [Kw-W|Ws]) :-
     (   Kx #< Ky
     ->   Kw-W = Kx-X, keymerge(Xs, [Ky-Y|Ys], Ws)
     ;   Kw-W = Ky-Y, keymerge([Kx-X|Xs], Ys, Ws)).
+
+% Select many items (the combination of "n_from_choose" and "select")
+select_many([], Ls, Ls).
+
+select_many([Del|Dels], [Del|Ls], Remains) :-
+    select_many(Dels, Ls, Remains).
+
+select_many([D|Dels], [R|Ls], [R|Remains]) :-
+    dif(D, R),
+    select_many([D|Dels], Ls, Remains).

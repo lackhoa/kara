@@ -10,5 +10,5 @@ goal([]-[]).
 queue_algo(bfs).
 
 main(Solution) :-
-    search([a,b,c,e,f]-[a,x,b,d,e,f],
+    search([a,x,b,d,e,f]-[a,b,c,e,f],
            Solution).
