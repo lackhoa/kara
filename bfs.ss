@@ -1,18 +1,14 @@
 (define arcs
   (lambda (tail)
-    (>> (run* (name head)
+    (>> (run* (weight name head)
           (fresh (n)
             (lengtho tail n)
             (<o n (build-num 4)))
-          (membero name '[i a b c])
-          (cro head name tail))
-        (l> map
-            (l> apply
-                (lambda (name head)
-                  (list (case name
-                          [i  1] [a  2] [b  3] [c  4])
-                        name
-                        head)))))))
+          (membero `(,weight ,name)
+                   '[(1 i) (2 a) (3 b) (4 c)])
+          (cro head name tail)))))
+
+(define heuristic length)
 
 (define goal
   (lambda (x) (reverseo x x)))
@@ -27,17 +23,19 @@
 (define node->prev   cddr)
 (define node-extend
   (lambda (weight name child node^)
-    (let* ([cost^ (node->cost node^)])
-      (cons (+ cost^ weight)
-            (cons (list name child)
-                  (cdr node^))))))
+    (let* ([cost^   (node->cost node^)]
+           [state^  (node->state node^)]
+           [heu     (- (heuristic child) (heuristic state^))]
+           [cost    (+ cost^ weight heu)])
+      (cons cost (cons (list name child)
+                       (cdr node^))))))
 
 (define bfs
   (lambda (start-state solution)
     (bfs-core (;; Starting queue
-               list (;; Starting node with cost 0, a dummy arc
-                     ;; and the input start state
-                     cons 0
+               list (;; Starting node with a computed cost,
+                     ;; a dummy arc and the input start state
+                     cons (heuristic start-state)
                           (list (list 'nil start-state))))
               '[]  ;; None visited
               solution)))
@@ -54,21 +52,21 @@
                  [;; Possibly ignore goal and keep looking
                   (let* ([new-nodes
                           (>> (arcs state^)
-                              (l> filter
-                                  (l> apply
-                                      (lambda (weight _ state)
-                                        (and (;; Visited?
-                                            not (member state visited))
-                                           (;; Compete with the rest of the queue
-                                            for-all (lambda (qnode)
-                                                (not (and (equal? (node->state qnode)
-                                                              state)
-                                                      (<= (node->cost qnode)
-                                                         (+ (node->cost node^) weight)))))
-                                              (cdr queue^))))))
                               (l> map
                                   (l> apply
-                                      (lambda (w n s) (node-extend w n s node^)))))]
+                                      (lambda (w n s) (node-extend w n s node^))))
+                              (l> filter
+                                  (lambda (node)
+                                    (let ([state  (node->state node)])
+                                      (and (;; Visited?
+                                          not (member state visited))
+                                         (;; Compete with the rest of the queue
+                                          for-all (lambda (qnode)
+                                              (not (and (equal? (node->state qnode)
+                                                            state)
+                                                    (<= (node->cost qnode)
+                                                       (node->cost node)))))
+                                            (cdr queue^)))))))]
                          [;; Purify the rest of the queue
                           qrest
                           (>> (cdr queue^)
