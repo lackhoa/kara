@@ -10,5 +10,4 @@
 
 (query-display
  (run* (q)
-   (fresh ()
-     (main q))))
+   (main q)))
