@@ -1,4 +1,4 @@
-;;; Adjustable parameters
+;;; (semi-)Adjustable parameters
 (define arcs
   (lambda (tail)
     (>> (run* (weight name head)

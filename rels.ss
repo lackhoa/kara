@@ -38,11 +38,54 @@
               (newline)
               a))]))
 
+(define select
+  (lambda (x ls res)
+    (fresh (a d)
+      (cro ls a d)
+      (conde [(== x a)  (== res d)]
+             [(fresh (resd)
+                (select x d resd)
+                (cro res a resd))]))))
+
+(define select-many
+  (lambda (l1 l l2)
+    (conde [(nullo l1)  (== l l2)]
+           [(fresh (x l1d ld)
+              (cro l1 x l1d)
+              (cro l  x ld)
+              (select-many l1d ld l2))]
+           [(fresh (x y l1d l2d ld)
+              (cro l1 x l1d)
+              (cro l2 y l2d)
+              (cro l y ld)
+              (select-many (cons x l1d) ld l2d))])))
+
+(define appendo
+  (lambda (l1 l2 l)
+    (conde [(nullo l1)  (== l l2)]
+           [(fresh (l1a l1d ld)
+              (cro l1 l1a l1d)
+              (cro l l1a ld)
+              (appendo l1d l2 ld))])))
+
+(define appendo*
+  (lambda (l* l)
+    (conde [(nullo l*)  (nullo l)]
+           [(fresh (x)
+              (== l* (list x))
+              (== l x))]
+           [(fresh (l*a l*b l*d l*bd)
+              (== l* `[,l*a ,l*b . ,l*d])
+              (appendo l*a l*bd l)
+              (appendo* (cons l*b l*d) l*bd))])))
+
+
 (define list-splito-core
   (lambda (l1^ l2^ n^ l1 l2)
     (conde [(== n^ (build-num 0))
             (reverseo l1^ l1)
             (== l2^ l2)]
+
 
            [(fresh (l2^car l2^cdr n)
               (;; This must be first, otherwise predo
@@ -142,6 +185,24 @@
               (key-sorto l^1 l1)
               (key-sorto l^2 l2)
               (key-mergeo l1 l2 l))])))
+
+(define rembero
+  (lambda (x l res)
+    (conde [(nullo l)  (nullo res)]
+           [(fresh (ld)
+              (cro l x ld)
+              (rembero x ld res))]
+           [(fresh (la ld resd)
+              (cro l la ld)
+              (=/= x la)
+              (cro res la resd)
+              (rembero x ld resd))])))
+
+
+
+
+
+;;; Higher order stuff
 
 (define composeo
   (lambda (f1 f2)
