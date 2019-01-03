@@ -2,7 +2,7 @@
   (lambda (x) (== x '[])))
 
 (define pairo
-  (lambda (x) (fresh (_0) (caro x _0))))
+  (lambda (x) (fresh (a d) (== x (cons a d)))))
 
 (define atomo
   (lambda (x) (conde [(nullo x)]
