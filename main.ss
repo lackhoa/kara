@@ -9,12 +9,12 @@
 (define query-display
   (l> for-each (lambda (x) (display x) (newline))))
 
-;; (query-display
-;;  (run* (x y)
-;;    (rembero x '[0 1 0 4 5] y)))
-
 (query-display
- (arcs '((-) (0 0 0) (0 0 0 0) (0 0 0 0) (0 0 0 0))))
+ (run 2 (s)
+   (main s)))
+
+;; (query-display
+;;  (arcs '(1 (0 0 0) (0 0 0 0) (0 0 0 0) (0 0 0 0))))
 
 ;; (display (sort (lambda (x y)
 ;;                  (or (equal? x '[-]) (< (length x) (length y))))

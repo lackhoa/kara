@@ -1,5 +1,6 @@
 ;;; (semi-)Adjustable parameters
 (define arcs
+  ;; A Scheme list
   (lambda (tail)
     (>> (run* (weight name head)
           (fresh (n)
@@ -12,9 +13,11 @@
 (define heuristic length)
 
 (define goal
+  ;; A miniKanren term
   (lambda (x) (reverseo x x)))
 
 (define main
+  ;; A miniKanren program
   (lambda (solution)
     (search '[c] solution)))
 
@@ -96,7 +99,10 @@
     (if (null? queue^)  fail
         (let* ([node^   (car queue^)]
                [state^  (node->state node^)])
-          (conde [(goal state^)  (== solution node^)]
+          (conde [(goal state^)  (project (node^)
+                                   (== solution (cons (car node^)
+                                                     (;; Reverse the path for viewing pleasure
+                                                      reverse (cdr node^)))))]
                  [;; Possibly ignore goal and keep looking
                   (let* ([new-nodes
                           (>> (arcs state^)
