@@ -4,11 +4,11 @@
 (load "kara-lang/main.ss")
 (load "rels.ss")
 (load "bfs.ss")
-(load "zurg.ss")
+(load "cate.ss")
 
-(define qpp
-  (l> for-each (lambda (x) (pretty-print x) (newline))))
+(define pp pretty-print)
+(define lpp (l> for-each pp))
 
-(qpp
- (run 3 (s)
-   (main s)))
+(lpp
+ (run 6 (s)
+   (search s)))
