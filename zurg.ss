@@ -1,6 +1,5 @@
-(define time
-  (lambda (x)
-    (case x [buzz 1] [woody 2] [rex 3] [hamm 4])))
+(define toy-list
+  '[1 3 3 4 5])
 
 ;; A state transition begins with selecting
 ;; one or two person from Here, then move to There
@@ -8,40 +7,35 @@
 (define arcs
   (lambda (tail)
     (run* (weight name head)
-      (fresh (here l^ there k^ time^)
-        (== tail [list here l^ there k^ time^])
-        (fresh (chosen l n)
-          ;; Selct for the bridge
-          (membero chosen (list (build-num 1) (build-num 2)))
-          (lengtho chosen n)
-          (select-many chosen l^ l)
-          ;; Time concern
-          (project (time^ chosen)
-            (let* ([tot-time (max (map time chosen))]
-                   [time (- time^ tot-time)])))
+      (pmatch tail
+        [(,here ,h^ ,there ,t^)
+         (fresh (chosen h)
+           ;; Selct toys for the bridge
+           (conde [(fresh (_0 _1) (== chosen (list _0 _1)))]
+                  [(fresh (_0)    (== chosen (list _0)))])
+           (select-many chosen h^ h)
+           (== name  chosen)
+           ;; Time concern
+           (project (chosen)
+             (== weight  (apply max chosen)))
+           ;; Unload toys
+           (fresh (t)
+             (appendo chosen t^ t)
+             (project (t h)
+               (== head (list there (sort < t)
+                             here  (sort < h))))))]))))
 
-          ()
-          )))))
+(define heuristic
+  (lambda (state)
+    (pmatch state
+      [(left ,? right ,r)  (- (length r) (length toy-list))]
+      [(right ,r left ,?)  (- (length r) (length toy-list))])))
 
-pred_arc(state(Here-L0, There-K0, Time0),
-              Xs,
-              TotTime,
-              state(There-K, Here-L, Time)
-              ) :-
-% Select toys
-select_many(Xs, L0, L),
-% The bridge
-length(Xs, LenXs), LenXs in 1..2,
-% Time concern
-maplist(time, Xs, Ts), max_list(Ts, TotTime),
-Time #= Time0-TotTime, 0 #=< Time,
-% Unload toys
-append(Xs, K0, K).
+(define goal
+  (lambda (state)
+    (fresh (_0) (== state `(right ,_0 left [])))))
 
-goal(state(right-_, left-[], _)).
-
-main(Solution) :-
-search(state(left-[buzz,woody,rex,hamm],
-                  right-[],
-                  60),
-            Solution).
+(define main
+  (lambda (solution)
+    (search `(left ,toy-list right [])
+            solution)))

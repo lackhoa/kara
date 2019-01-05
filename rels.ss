@@ -22,14 +22,6 @@
     (fresh (x-car)
       (cro x x-car x-cdr))))
 
-(define predo
-  (lambda (n^ n)
-    (pluso n (build-num 1) n^)))
-
-(define succo
-  (lambda (n^ n)
-    (pluso n^ (build-num 1) n)))
-
 (define-syntax reflect
   (syntax-rules ()
     [(_ x)
@@ -44,8 +36,8 @@
       (cro ls a d)
       (conde [(== x a)  (== res d)]
              [(fresh (resd)
-                (select x d resd)
-                (cro res a resd))]))))
+                (cro res a resd)
+                (select x d resd))]))))
 
 (define select-many
   (lambda (l1 l l2)
@@ -86,7 +78,6 @@
             (reverseo l1^ l1)
             (== l2^ l2)]
 
-
            [(fresh (l2^car l2^cdr n)
               (;; This must be first, otherwise predo
                ;; can keep running forever
@@ -125,11 +116,11 @@
 
 (define lengtho
   (lambda (ls len)
-    (conde [(nullo ls) (zeroo len)]
+    (conde [(nullo ls)  (zeroo len)]
            [(fresh (x xs n)
+              (pluso n (build-num 1) len)
               (cro ls x xs)
-              (lengtho xs n)
-              (pluso n '[1] len))])))
+              (lengtho xs n))])))
 
 (define membero
   (lambda (mem ls)

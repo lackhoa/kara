@@ -4,7 +4,11 @@
 (load "kara-lang/main.ss")
 (load "rels.ss")
 (load "bfs.ss")
-;; (load "zurg.ss")
+(load "zurg.ss")
 
-(define query-display
-  (l> for-each (lambda (x) (display x) (newline))))
+(define qpp
+  (l> for-each (lambda (x) (pretty-print x) (newline))))
+
+(qpp
+ (run 3 (s)
+   (main s)))
