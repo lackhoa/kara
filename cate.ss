@@ -20,11 +20,11 @@
           (-> b c n))]
 
        ;; Problem-specific
-       [(== x '(* fD s))  (== y '(* s- fA))  (== name 'f1)]
-       [(== x '(* fD t))  (== y '(* t- fA))  (== name 'f2)]
-       [(== x '(* gD s-)) (== y '(* s-- gA)) (== name 'g1)]
-       [(== x '(* gD t-)) (== y '(* t-- gA)) (== name 'g2)]
+       ;; [(== x '(* f a)) (== y '(* b f))             (== name 'f)]
+       ;; [(== x 'y)       (== y '(* f x))             (== name 'y)]
        ))))
+
+
 
 (define <->
   (lambda (x y name)
@@ -45,10 +45,10 @@
 (goal
  (lambda (s)
    (project (s)
-     (if (and (<= (size s) 7)
+     (if (and (<= (size s) 2)
             (not (occurs 1 s)))
          succeed
          fail))))
 
 (heuristic   size)
-(start-state '(* (* gD fD) s))
+(start-state '(* f x1))

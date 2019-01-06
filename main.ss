@@ -10,5 +10,5 @@
 (define lpp (l> for-each pp))
 
 (lpp
- (run 6 (s)
+ (run 1 (s)
    (search s)))

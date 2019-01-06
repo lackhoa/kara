@@ -128,11 +128,7 @@
     (if (null? queue^)  fail
         (let* ([node^   (car queue^)]
                [state^  (node->state node^)])
-          (conde [((goal) state^)  (project (node^)
-                                     (== solution (cons (car node^)
-                                                       (;; Reverse the path
-                                                        ;;for viewing pleasure
-                                                        reverse (cdr node^)))))]
+          (conde [((goal) state^)  (== solution node^)]
                  [;; Possibly ignore goal and keep looking
                   (let* ([new-nodes
                           (>> ((arcs) state^)
