@@ -1,5 +1,6 @@
-(load "mini-kanren/mk.scm")
-(load "mini-kanren/numbers.scm")
+(load "faster-miniKanren/mk-vicare.scm")
+(load "faster-miniKanren/mk.scm")
+(load "faster-miniKanren/matche.scm")
 
 (load "kara-lang/main.ss")
 (load "rels.ss")
@@ -10,5 +11,5 @@
 (define lpp (l> for-each pp))
 
 (lpp
- (run 1 (s)
-   (search s)))
+ (run 2 (q)
+   (conde [(== q 2)] [(== q 3)])))

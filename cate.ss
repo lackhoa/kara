@@ -1,3 +1,7 @@
+(define user-eqs
+  '[((* f a) (* b f) f)
+    (y       (f x)   y)])
+
 (define ->
   (lambda (x y name)
     (fresh (a b c)
@@ -20,10 +24,8 @@
           (-> b c n))]
 
        ;; Problem-specific
-       ;; [(== x '(* f a)) (== y '(* b f))             (== name 'f)]
-       ;; [(== x 'y)       (== y '(* f x))             (== name 'y)]
+       [(membero (list x y name) user-eqs)]
        ))))
-
 
 
 (define <->
@@ -45,10 +47,10 @@
 (goal
  (lambda (s)
    (project (s)
-     (if (and (<= (size s) 2)
+     (if (and (<= (size s) 3)
             (not (occurs 1 s)))
          succeed
          fail))))
 
 (heuristic   size)
-(start-state '(* f x1))
+(start-state '(* f a))

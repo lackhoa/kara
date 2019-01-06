@@ -97,26 +97,26 @@
 (define node->name   (f>> cadr car))
 (define node->state  (f>> cadr cadr))
 (define node->prev   cddr)
-(define make-node
+(define khoa:make-node
   (lambda (path-cost heu name state prev)
     (cons (cons path-cost heu)
           (cons (list name state)
                 prev))))
 (define node-extend
   (lambda (weight name child node^)
-    (make-node (+ (node->pcost node^)
-                  weight)
-               ((heuristic) child)
-               name child
-               (;; node^ without the costs
-                cdr node^))))
+    (khoa:make-node (+ (node->pcost node^)
+                       weight)
+                    ((heuristic) child)
+                    name child
+                    (;; node^ without the costs
+                     cdr node^))))
 
 ;;; The framework
 (define search
   (lambda (solution)
     (search-core (;; Starting queue
-                  list (make-node 0 ((heuristic) (start-state))
-                                  'start (start-state) '[]))
+                  list (khoa:make-node 0 ((heuristic) (start-state))
+                                       'start (start-state) '[]))
                  '[]  ;; None visited
                  solution)))
 

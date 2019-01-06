@@ -7,3 +7,4 @@ kara-lang/
 log/
 db/
 mini-kanren/
+faster-miniKanren/
