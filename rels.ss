@@ -22,13 +22,11 @@
     (fresh (x-car)
       (cro x x-car x-cdr))))
 
-(define-syntax reflect
-  (syntax-rules ()
-    [(_ x)
-     (lambdag@ (a : B E S)
-       (begin (display (walk* x S))
-              (newline)
-              a))]))
+(define reflect
+  (lambda (x)
+    (project (x)
+      (begin (display x) (newline)
+             succeed))))
 
 (define select
   (lambda (x ls res)
