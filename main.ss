@@ -12,4 +12,4 @@
 
 (lpp
  (run 2 (q)
-   (conde [(== q 2)] [(== q 3)])))
+   (search q)))

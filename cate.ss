@@ -1,29 +1,42 @@
 (define user-eqs
-  '[((* f a) (* b f) f)
-    (y       (f x)   y)])
+  '[])
+
+(define assoc-ops '(c * +))
+(define commu-ops '(* +))
 
 (define ->
   (lambda (x y name)
-    (fresh (a b c)
+    (fresh (a b c op)
       (conde
-       ;; Category theorey
-       [(== x `(* ,a (* ,b ,c)))
-        (== y `(* (* ,a ,b) ,c))
-        (== name 'assoc)]
-       [(== x `(* ,a 1))   (== y a)         (== name 'idr)]
-       [(== x `(* 1 ,a))   (=/= a 1) (== y a) (== name 'idl)]
-       [(== x `(* ,a ,b))
-        (== y `(* ,c ,b))
-        (fresh (n)
-          (== name (cons '< n))
-          (-> a c n))]
-       [(== x `(* ,a ,b))
-        (== y `(* ,a ,c))
-        (fresh (n)
-          (== name (cons '> n))
-          (-> b c n))]
+       ;; [;; Associativity
+       ;;  (== x `(,op ,a (,op ,b ,c)))
+       ;;  (== y `(,op (,op ,a ,b) ,c))
+       ;;  (membero op assoc-ops)
+       ;;  (== name 'assoc)]
+       ;; [;; Commutativity
+       ;;  (== x `(,op ,a ,b))
+       ;;  (== y `(,op ,b ,a))
+       ;;  (membero op commu-ops)
+       ;;  (== name 'commu)]
+       ;; [(== x `(c ,a 1))   (== y a)         (== name 'idr)]
+       ;; [(== x `(c 1 ,a))   (=/= a 1) (== y a) (== name 'idl)]
+       ;; [(== x `(,op ,a ,b))
+       ;;  (== y `(,op ,c ,b))
+       ;;  (fresh (n)
+       ;;    (== name (cons '< n))
+       ;;    (-> a c n))]
+       ;; [(== x `(,op ,a ,b))
+       ;;  (== y `(,op ,a ,c))
+       ;;  (fresh (n)
+       ;;    (== name (cons '> n))
+       ;;    (-> b c n))]
+
 
        ;; Problem-specific
+       [(== x `(not (+ ,a ,b)))
+        (== y a)
+        (== name 'winker2)
+        ]
        [(membero (list x y name) user-eqs)]
        ))))
 
@@ -47,10 +60,12 @@
 (goal
  (lambda (s)
    (project (s)
-     (if (and (<= (size s) 3)
+     (if (and (<= (size s) 5)
             (not (occurs 1 s)))
          succeed
          fail))))
 
 (heuristic   size)
-(start-state '(* f a))
+(start-state '(not (+ j k)))
+;; (not (+ (not (+ j k))
+;;       (not (+ j (not k)))))
