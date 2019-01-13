@@ -8,34 +8,34 @@
   (lambda (x y name)
     (fresh (a b c op)
       (conde
-       ;; [;; Associativity
-       ;;  (== x `(,op ,a (,op ,b ,c)))
-       ;;  (== y `(,op (,op ,a ,b) ,c))
-       ;;  (membero op assoc-ops)
-       ;;  (== name 'assoc)]
-       ;; [;; Commutativity
-       ;;  (== x `(,op ,a ,b))
-       ;;  (== y `(,op ,b ,a))
-       ;;  (membero op commu-ops)
-       ;;  (== name 'commu)]
-       ;; [(== x `(c ,a 1))   (== y a)         (== name 'idr)]
-       ;; [(== x `(c 1 ,a))   (=/= a 1) (== y a) (== name 'idl)]
-       ;; [(== x `(,op ,a ,b))
-       ;;  (== y `(,op ,c ,b))
-       ;;  (fresh (n)
-       ;;    (== name (cons '< n))
-       ;;    (-> a c n))]
-       ;; [(== x `(,op ,a ,b))
-       ;;  (== y `(,op ,a ,c))
-       ;;  (fresh (n)
-       ;;    (== name (cons '> n))
-       ;;    (-> b c n))]
-
+       [;; Associativity
+        (== x `(,op ,a (,op ,b ,c)))
+        (== y `(,op (,op ,a ,b) ,c))
+        (membero op assoc-ops)
+        (== name 'assoc)]
+       [;; Commutativity
+        (== x `(,op ,a ,b))
+        (== y `(,op ,b ,a))
+        (membero op commu-ops)
+        (== name 'commu)]
+       [(== x `(c ,a 1))   (== y a)         (== name 'idr)]
+       [(== x `(c 1 ,a))   (=/= a 1) (== y a) (== name 'idl)]
+       [(== x `(,op ,a ,b))
+        (== y `(,op ,c ,b))
+        (fresh (n)
+          (== name (cons '< n))
+          (-> a c n))]
+       [(== x `(,op ,a ,b))
+        (== y `(,op ,a ,c))
+        (fresh (n)
+          (== name (cons '> n))
+          (-> b c n))]
 
        ;; Problem-specific
-       [(== x `(not (+ ,a ,b)))
+       [(== x `(not (+ (not (+ ,a ,b))
+                    (not (+ ,a (not ,b))))))
         (== y a)
-        (== name 'winker2)
+        (== name 'robbins)
         ]
        [(membero (list x y name) user-eqs)]
        ))))
@@ -50,22 +50,28 @@
 
 (arcs
  (lambda (tail)
-   (>> (run* (weight name head)
-         (== weight 1)
-         (<-> tail head name))
+   (>> (run-nore #f (weight name head)
+                 (== weight 1)
+                 (<-> tail head name))
        remove-duplicates)))
 
 (queue-insert greedy-insert)
 
+(define size
+  (lambda (x)
+    (cond [(var? x)   1]
+          [(pair? x)  (+ (size (car x))
+                         (size (cdr x)))]
+          [(null? x)  0]
+          [else       1])))
+
 (goal
  (lambda (s)
    (project (s)
-     (if (and (<= (size s) 5)
+     (if (and (<= (size s) 1)
             (not (occurs 1 s)))
          succeed
          fail))))
 
 (heuristic   size)
-(start-state '(not (+ j k)))
-;; (not (+ (not (+ j k))
-;;       (not (+ j (not k)))))
+(start-state 'x)
