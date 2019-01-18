@@ -10,19 +10,45 @@
           [else       1])))
 
 (define ->
-  (lambda (t1 t2)
-    (conde [(fresh (l r x y ny )
-              (== t1 `(not (+ ,l ,r)))
-              (fresh (y/ny)
-                (conde [(== y y/ny)       (== ny `(not y/ny))]
-                       [(== y `(not y/ny))  (== ny y/ny)]))
-              (== l `(not (+ ,x ,y)))
-              (== r `(not (+ ,x ,ny))))])))
+  ;; Encode rules: right now let's just use one
+  ;; T is the encompassing formula within which t transform to t+
+  ;; T+ is just T after the transformation
+  (lambda (t t+)
+    (fresh (l r y)
+      (;; dirty "conda": only return all answers from one branch
+       conda [(== t `(not (+ ,l ,r)))]
+             [(== t `(not (+ ,r ,l)))])
+      (conda [(== l `(not (+ ,t+ ,y)))]
+             [(== l `(not (+ ,y ,t+)))])
+      (conda [(== r `(not (+ ,t+ (not ,y))))]
+             [(== r `(not (+ (not ,y) ,t+)))]))))
 
-(define path
-  (lambda (start p end)
-    (conde [(== start end)  (nullo p)]
-           [(=/= start end)  (fresh (pa pd)
-                             (cro p pa pd)
-                             (-> start pa)
-                             (path pa pd end))])))
+(define micro
+  ;; Step* on all operands
+  (lambda (start end)
+    (conde [(symbolo start) (== start end)]
+           [(fresh (rator rands rands+)
+              (== start (cons rator rands))
+              (mapo macro rands rands+))])))
+
+(define macro
+  ;; Step* on the formula only
+  (lambda (start end)
+    (conde [(== start end)]
+           [(=/= start end)
+            (fresh (start+ t t+ t++)
+              (conde [;; Symbol & Negation
+                      (conde [(symbolo start)]
+                             [(fresh (x) (== start `(not ,x)))])
+                      (== t start)]
+                     [;; Disjunction
+                      (fresh (disj disj+ R)
+                        (== start (cons '+ disj))
+                        (select-disj t disj R)
+                        (add-disj t++ R disj+)
+                        (== start+ (cons '+ disj+)))])
+              (<-> t t+)
+              (micro t+ t++)
+              (;; Recursive search: we don't micro here, since we
+               ;; already did that on both old and new operands
+               macro start+ end))])))
