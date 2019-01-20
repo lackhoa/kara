@@ -12,5 +12,5 @@
 (define lpp (l> for-each pp))
 
 (lpp
- (run* (q)
-   (-> '(+ x 8 (* x y z)) q)))
+ (run 2 (x)
+   (ac x '(+ b))))

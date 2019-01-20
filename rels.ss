@@ -31,10 +31,10 @@
 (define select
   (lambda (x ls res)
     (fresh (a d)
-      (cro ls a d)
+      (== ls (cons a d))
       (conde [(== x a)  (== res d)]
              [(fresh (resd)
-                (cro res a resd)
+                (== res (cons a resd))
                 (select x d resd))]))))
 
 (define select-many
@@ -214,3 +214,22 @@
     [(_ goal)
      (conda [goal fail]
             [succeed])]))
+
+(define same-length
+  (lambda (l1 l2)
+    (conde [(nullo l1) (nullo l2)]
+           [(fresh (a1 d1 a2 d2)
+              (== l1 (cons a1 d1))
+              (== l2 (cons a2 d2))
+              (same-length d1 d2))])))
+
+(define permute
+  (lambda (l1 l2)
+    (fresh ()
+      (same-length l1 l2)
+      (let loop ([l1 l1] [l2 l2])
+        (conde [(nullo l1) (nullo l2)]
+               [(fresh (x l1+ l2+)
+                  (== l1 (cons x l1+))
+                  (select x l2 l2+)
+                  (loop l1+ l2+))])))))

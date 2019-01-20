@@ -9,46 +9,46 @@
           [(null? x)  0]
           [else       1])))
 
-(define ->
+(define rev
+  (lambda (fun) (lambda (x y) (fun y x))))
+
+(define robbins
   ;; Encode rules: right now let's just use one
   ;; T is the encompassing formula within which t transform to t+
   ;; T+ is just T after the transformation
   (lambda (t t+)
     (fresh (l r y)
-      (;; dirty "conda": only return all answers from one branch
-       conda [(== t `(not (+ ,l ,r)))]
-             [(== t `(not (+ ,r ,l)))])
-      (conda [(== l `(not (+ ,t+ ,y)))]
-             [(== l `(not (+ ,y ,t+)))])
-      (conda [(== r `(not (+ ,t+ (not ,y))))]
-             [(== r `(not (+ (not ,y) ,t+)))]))))
+      (ac t `(not (+ ,l ,r)))
+      (ac l `(not (+ ,t+ ,y)))
+      (ac r `(not (+ ,t+ (not ,y)))))))
 
-(define micro
-  ;; Step* on all operands
-  (lambda (start end)
-    (conde [(symbolo start) (== start end)]
-           [(fresh (rator rands rands+)
-              (== start (cons rator rands))
-              (mapo macro rands rands+))])))
+(define hun
+  (lambda (t t+)
+    (fresh (l r y)
+      (ac t `(+ ,l ,r))
+      (ac l `(not (+ (not ,t+) (not ,y))))
+      (ac r `(not (+ (not ,t+) ,y))))))
 
-(define macro
-  ;; Step* on the formula only
-  (lambda (start end)
-    (conde [(== start end)]
-           [(=/= start end)
-            (fresh (start+ t t+ t++)
-              (conde [;; Symbol & Negation
-                      (conde [(symbolo start)]
-                             [(fresh (x) (== start `(not ,x)))])
-                      (== t start)]
-                     [;; Disjunction
-                      (fresh (disj disj+ R)
-                        (== start (cons '+ disj))
-                        (select-disj t disj R)
-                        (add-disj t++ R disj+)
-                        (== start+ (cons '+ disj+)))])
-              (<-> t t+)
-              (micro t+ t++)
-              (;; Recursive search: we don't micro here, since we
-               ;; already did that on both old and new operands
-               macro start+ end))])))
+(define ac*
+  (lambda (l1 l2)
+    (conde [(nullo l1) (nullo l2)]
+           [(fresh (a1 d1 a2 d2)
+              (== l1 (cons a1 d1))
+              (== l2 (cons a2 d2))
+              (ac a1 a2)
+              (ac* d1 d2))])))
+
+(define ac
+  (lambda (t1 t2)
+    (conde [(== t1 t2)]
+           [(fresh (disj1 disj2)
+              (== t1 `(+ . ,disj1))
+              (== t2 `(+ . ,disj2))
+              (pairo disj1) (pairo disj2)
+              (fresh (disj3)
+                (permute disj1 disj3)
+                (ac* disj2 disj3)))]
+           [(fresh (body1 body2)
+              (== t1 `(not ,body1))
+              (== t2 `(not ,body2))
+              (ac body1 body2))])))
