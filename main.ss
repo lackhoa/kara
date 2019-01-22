@@ -6,11 +6,11 @@
 (load "kara-lang/main.ss")
 (load "rels.ss")
 (load "bfs.ss")
-(load "cate.ss")
+(load "net.ss")
 
 (define pp pretty-print)
 (define lpp (l> for-each pp))
 
 (lpp
- (run 2 (x)
-   (ac x '(+ b))))
+ (run* (x y z)
+   (acl-map x y z)))
