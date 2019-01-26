@@ -12,5 +12,6 @@
 (define lpp (l> for-each pp))
 
 (lpp
- (run* (x y z)
-   (acl-map x y z)))
+ (run 10 (p e)
+   (packet? p)
+   (acl-allow acl100 p e)))

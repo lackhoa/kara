@@ -122,10 +122,10 @@
 
 (define membero
   (lambda (mem ls)
-    (fresh (ls-car ls-cdr)
-      (cro ls ls-car ls-cdr)
-      (conde [(== ls-car mem)]
-             [(membero mem ls-cdr)]))))
+    (fresh (a d)
+      (== ls `(,a . ,d))
+      (conde [(== a mem)]
+             [(=/= a mem) (membero mem d)]))))
 
 (define reverseo
   (lambda (x y)
@@ -197,17 +197,6 @@
   (lambda (f1 f2)
     (lambda (x z)
       (fresh (y) (f1 x y) (f2 y z)))))
-
-(define mapo
-  ;; func needs to be a grounded
-  ;; goal construct taking two arguments
-  (lambda (func l^ l)
-    (conde [(nullo l^) (nullo l)]
-           [(fresh (l^a l^d ld v)
-              (cro l^ l^a l^d)
-              (func l^a v)
-              (mapo func l^d ld)
-              (cro l v ld))])))
 
 (define-syntax naf
   (syntax-rules ()

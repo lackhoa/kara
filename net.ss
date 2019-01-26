@@ -1,55 +1,76 @@
-;; Packet: (protocol src-adr src-port dst-adr dst-port flags)
-;; ACL entries: (deny/permit proto src-adr dst-adr dst-port flags)
+(define acl100
+  '([deny   tcp good-adr * * telnet  *]
+    [permit *   good-adr * * *       *]
+    [permit tcp ok-adr   * * 80      1]))
 
-(define acl-100
-  '[(permit ip any any any any)])
+(define mapo2
+  (lambda (f l1 l2 out)
+    (conde [(== l1 '()) (== out '())]
+           [(fresh (a1 d1 a2 d2 fa d-out)
+              (== l1 `(,a1 . ,d1))
+              (== l2 `(,a2 . ,d2))
+              (f a1 a2 fa)
+              (== out `(,fa . ,d-out))
+              (mapo2 f d1 d2 d-out))])))
 
-(define item-matched
-  (lambda (item value res)
-    (conde [(conde [(== item 'any)]
-                   [(== item y)])
-            (== res 'T)]
-           [(=/= 'any) (=/= item value)
-            (== res 'F)])))
+(define not-membero
+  (lambda (x ls)
+    (conde [(== ls '())]
+           [(fresh (a d)
+              (== ls `(,a . ,d))
+              (=/= x a)
+              (not-membero x d))])))
 
-(define entry-matched
-  (lambda (entry value res)
-    (fresh (eaction eproto eadr edst-adr edst-port eflags)
-      (== entry (list eaction eproto eadr edst-adr edst-port eflag))
-      (conde [(item-matched proto eproto 'T)
-              (item-matched src-adr esrc-adr 'T)
-              (item-matched dst-adr edst-adr 'T)
-              (item-matched dst-port edst-port 'T)
-              (item-matched flags eflags 'T)]
-             [(conde [(item-matched proto eproto 'F)]
-                     [(item-matched src-adr esrc-adr 'F)]
-                     [(item-matched dst-adr edst-adr 'F)]
-                     [(item-matched dst-port edst-port 'F)]
-                     [(item-matched flags eflags 'F)])]))))
+(define packet?
+  (lambda (p)
+    (fresh (protocol src-adr src-port dst-adr dst-port flags)
+      (== p `(,protocol ,src-adr ,src-port ,dst-adr ,dst-port ,flags))
+      (;; "*" is reserved for epackets
+       not-membero '* p))))
+
+(define entry?
+  ;; An entry is just a epacket with an action attached
+  (lambda (e)
+    (fresh (action proto src-adr dst-adr dst-port flags)
+      (== e `(,action ,proto ,src-adr ,dst-adr ,dst-port ,flags)))))
+
+(define acl?
+  (lambda (acl)
+    (conde [(== acl '())]
+           [(fresh (a d)
+              (== acl `(,a . ,d))
+              (entry? a) (acl? d))])))
+
+(define field-match?
+  (lambda (field value res)
+    (conde [(== field '*) (== res 'T)]
+           [(=/= field '*)
+            (conde [(== field value) (== res 'T)]
+                   [(=/= field value) (== res 'F)])])))
+
+(define entry-match?
+  (lambda (entry pkt res)
+    ;; ACL entries: (deny/permit proto src-adr dst-adr dst-port flags)
+    (fresh (eaction epkt fms)
+      (== entry `(,eaction . ,epkt))
+      (mapo2 field-match? epkt pkt fms)
+      (conde [(== fms '(T T T T T T)) (== res 'T)]
+             [(membero 'F fms)       (== res 'F)]))))
 
 (define acl-map
-  (lambda (acl pkt action matched-entry)
-    (fresh (proto src-adr dst-adr src-port dst-port flags)
-      (== pkt (list proto src-adr src-port dst-adr dst-port flags))
-      (let process ([acl acl])
-        (conde [(nullo acl) (== action 'deny)
-                (== matched-entry 'Implicit-deny)]
-               [(fresh (entry acl-rest)
-                  (== acl (cons entry acl-rest))
-                  (fresh (emat)
-                    (== entry-matched entry pkt emat)
-                    (conde [(== emat 'T)
-                            (== action eaction)
-                            (== matched-entry entry)]
-                           [(== emat 'F)
-                            (acl-map acl-rest pkt action matched-entry)])))])))))
+  (lambda (acl pkt matched-entry)
+    (conde [(== acl '())
+            (== matched-entry 'implicit-deny)]
+           [(fresh (entry acl-rest eres)
+              (== acl `(,entry . ,acl-rest))
+              (entry-match? entry pkt eres)
+              (conde [(== eres 'T)
+                      (== matched-entry entry)]
+                     [(== eres 'F)
+                      (acl-map acl-rest pkt matched-entry)]))])))
 
-(define tcp-connection
-  (lambda (src-adr dst-adr port)
-    (fresh (dst-int src-int acl)
-      (int-adr dst-int dst-adr)
-      (int-adr src-int src-adr)
-      (int-facing-acl src-int acl)
-      (=/= src-int dst-int)
-      (fresh (ignore)
-        (acl-map acl `(6 ,src-adr ,dst-adr ,ignore ,port 0) 'permit)))))
+(define acl-allow
+  (lambda (acl pkt allowed-entry)
+    (fresh (epkt)
+      (== allowed-entry `(permit . ,epkt))
+      (acl-map acl pkt allowed-entry))))
