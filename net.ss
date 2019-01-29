@@ -62,7 +62,7 @@
       (conde [(== range value) (== res #t)]
              [(=/= range value)
               (fresh (lu)
-                (lookup-hier range hier lu)
+                (lookup range hier lu)
                 (conde [(== lu #f) (== res #f)]
                        [(=/= lu #f) (any-covers? lu value res)]))])])))
 
@@ -109,24 +109,34 @@
       (acl-deny acl pkt e))))
 
 (define travel
-  (lambda (from path to)
-    (conde [(== from to) (== path '[])]
-           [(=/= from to) (;; convert to the correct format
-                         travel-core `(,from out) path `(,to in))])))
+  (lambda (from-int path to-int)
+    (conde [(== from-int to-int) (== path '[])]
+           [(=/= from-int to-int)
+            (;; commence the iterative deepening search
+             travel-deepening `(,from-int out) path `(,to-int in) 0)])))
+
+(define travel-deepening
+  (lambda (from path to cost-lim)
+    (conda [(travel-core from path to 0 cost-lim)]
+           [(travel-deepening from path to (1+ cost-lim))])))
 
 (define travel-core
-  (lambda (from path to)
-    (fresh (from-int from-dir to-int _to-dir)
-      (== from `(,from-int ,from-dir))
-      (== to   `(,to-int ,_to-dir))
-      (fresh (next-int next-dir rest-path)
-        (lookup from-int direct-connections next-int)
-        (conde [(== from-dir 'in)   (== next-dir 'out)]
-               [(== from-dir 'out) (== next-dir 'in)])
-        (conde [(== next-int to-int)  (== path '())]
-               [(=/= next-int to-int)
-                (== path `[(,next-int ,next-dir) . ,rest-path])
-                (travel-core `(,next-int ,next-dir) rest-path to)])))))
+  (lambda (from path to cost cost-lim)
+    (if (> cost cost-lim) fail
+        (fresh (from-int from-dir to-int _to-dir)
+          (== from `(,from-int ,from-dir))
+          (== to   `(,to-int ,_to-dir))
+          (fresh (next-int next-dir rest-path)
+            (;; The direct connection goes both ways
+             conde [(lookup from-int direct-connections next-int)]
+                   [(lookup next-int direct-connections from-int)])
+            (conde [(== from-dir 'in)   (== next-dir 'out)]
+                   [(== from-dir 'out) (== next-dir 'in)])
+            (conde [(== next-int to-int) (== path '())]
+                   [(=/= next-int to-int)
+                    (== path `[(,next-int ,next-dir) . ,rest-path])
+                    (travel-core `(,next-int ,next-dir) rest-path to
+                                 (1+ cost) cost-lim)]))))))
 
 (define tcp-connection
   (lambda (orig return min-allow)
@@ -141,10 +151,9 @@
       (== packet1 `(tcp ,orig-adr   * ,return-adr * 0))
       (== packet2 `(tcp ,return-adr * ,orig-adr   * 1))
       (travel orig path1^ return)
-      (appendo `[(,orig out) . path1^] `[(return in)] path1)
-      (reflect path1^)
       (travel return path2^ orig)
-      (appendo `[(,return out) . path2^] `[(orig in)] path2)
+      (appendo `[(,orig out)   . ,path1^] `[(,return in)] path1)
+      (appendo `[(,return out) . ,path2^] `[(,orig in)]   path2)
       (mapo (lambda (int out) (== out `(,int : allow . ,packet1)))
             path1 min-allow1)
       (mapo (lambda (int out) (== out `(,int : allow . ,packet2)))

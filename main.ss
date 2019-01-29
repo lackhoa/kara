@@ -2,6 +2,7 @@
 (load "faster-miniKanren/mk.scm")
 (load "faster-miniKanren/matche.scm")
 (load "faster-miniKanren/numbers.scm")
+;; (load "mini-kanren/mk.scm")
 
 (load "kara-lang/main.ss")
 (load "rels.ss")
@@ -11,12 +12,13 @@
 (define lpp (l> for-each pp))
 
 (define acl100
-  '([deny   tcp *        * * telnet  *]
-    [permit *   good-adr * * *       *]
-    [permit udp ok-adr   * * www     1]))
+  '([deny   tcp *        * * * *]
+    [permit *   good-adr * * * *]
+    [permit www ok-adr   * * * 1]))
 
 (define hier '([ip tcp udp icmp]
-               [30 pc-c]))
+               [tcp telnet www]
+               [udp dns]))
 
 (define direct-connections
   '([pc-a   . r1-g]
@@ -28,10 +30,10 @@
     [r3-g   . pc-c]))
 
 (define address-table
-  `([pc-a . 10] [pc-a . 30]))
+  `([pc-a . 10] [pc-c . 30]))
 
 (load "net.ss")
 
 (lpp
- (run 2 (x)
-   (tcp-connection 'pc-a 'pc-a x)))
+ (run* (x)
+   (tcp-connection 'pc-c 'pc-a x)))
