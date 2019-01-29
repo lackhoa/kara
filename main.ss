@@ -6,7 +6,6 @@
 (load "kara-lang/main.ss")
 (load "rels.ss")
 (load "bfs.ss")
-(load "net.ss")
 
 (define pp pretty-print)
 (define lpp (l> for-each pp))
@@ -16,10 +15,23 @@
     [permit *   good-adr * * *       *]
     [permit udp ok-adr   * * www     1]))
 
+(define hier '([ip tcp udp icmp]
+               [30 pc-c]))
+
+(define direct-connections
+  '([pc-a   . r1-g]
+    [r1-g   . r1-s]
+    [r1-s   . isp-s0]
+    [isp-s0 . isp-s1]
+    [isp-s1 . r3-s]
+    [r3-s   . r3-g]
+    [r3-g   . pc-c]))
+
+(define address-table
+  `([pc-a . 10] [pc-a . 30]))
+
+(load "net.ss")
+
 (lpp
- (run 1 (acl)
-   (lengtho acl (build-num 2))
-   (acl-allow acl '(10 * 20 * * *))
-   (acl-block acl '(10 * 30 * * *))
-   (acl-allow acl '(10 * pc-c * * *))
-   ))
+ (run 2 (x)
+   (tcp-connection 'pc-a 'pc-a x)))

@@ -1,5 +1,20 @@
-(define hier '([ip tcp udp icmp]
-               [30 pc-c]))
+(define lookup
+  (lambda (x ls res)
+    (conde [(== ls '()) (== res #f)]
+           [(fresh (a d y ys)
+              (== ls `(,a . ,d))
+              (== a `(,y . ,ys))
+              (conde [(== x y) (== res ys)]
+                     [(=/= x y) (lookup x d res)]))])))
+
+(define mapo
+  (lambda (f l out)
+    (conde [(== l '()) (== out '())]
+           [(fresh (a d fa d-out)
+              (== l `(,a . ,d))
+              (f a fa)
+              (== out `(,fa . ,d-out))
+              (mapo f d d-out))])))
 
 (define mapo2
   (lambda (f l1 l2 out)
@@ -29,15 +44,6 @@
            [(fresh (a d)
               (== acl `(,a . ,d))
               (entry? a) (acl? d))])))
-
-(define lookup-hier
-  (lambda (x hier-iter res)
-    (conde [(== hier-iter '()) (== res #f)]
-           [(fresh (a d y ys)
-              (== hier-iter `(,a . ,d))
-              (== a `(,y . ,ys))
-              (conde [(== x y) (== res ys)]
-                     [(=/= x y) (lookup-hier x d res)]))])))
 
 (define any-covers?
   (lambda (ranges value res)
@@ -102,14 +108,45 @@
     (fresh (e)
       (acl-deny acl pkt e))))
 
-'([pc-a   r1-g]
-  [r1-s   isp-s0]
-  [isp-s1 r3-s]
-  [r3-g   pc-c])
+(define travel
+  (lambda (from path to)
+    (conde [(== from to) (== path '[])]
+           [(=/= from to) (;; convert to the correct format
+                         travel-core `(,from out) path `(,to in))])))
 
-'([int-acl r1-g acl1 in]
-  [int-acl r3-g acl2 in])
+(define travel-core
+  (lambda (from path to)
+    (fresh (from-int from-dir to-int _to-dir)
+      (== from `(,from-int ,from-dir))
+      (== to   `(,to-int ,_to-dir))
+      (fresh (next-int next-dir rest-path)
+        (lookup from-int direct-connections next-int)
+        (conde [(== from-dir 'in)   (== next-dir 'out)]
+               [(== from-dir 'out) (== next-dir 'in)])
+        (conde [(== next-int to-int)  (== path '())]
+               [(=/= next-int to-int)
+                (== path `[(,next-int ,next-dir) . ,rest-path])
+                (travel-core `(,next-int ,next-dir) rest-path to)])))))
 
-'(path pc-a [r1-s isp-s0 isp-s1 r3-s r3-g] pc-c)
-;; User wants connection
-;; There should be a connection if there is a path, and every acl on the path allows the traffic
+(define tcp-connection
+  (lambda (orig return min-allow)
+    ;; orig and return are interfaces
+    ;; min-allow is the most restrictive rules that
+    ;; could be for each interface along the way
+    (fresh (orig-adr return-adr packet1 packet2
+                     path1^ path1 path2^ path2
+                     min-allow1 min-allow2)
+      (lookup orig   address-table orig-adr)
+      (lookup return address-table return-adr)
+      (== packet1 `(tcp ,orig-adr   * ,return-adr * 0))
+      (== packet2 `(tcp ,return-adr * ,orig-adr   * 1))
+      (travel orig path1^ return)
+      (appendo `[(,orig out) . path1^] `[(return in)] path1)
+      (reflect path1^)
+      (travel return path2^ orig)
+      (appendo `[(,return out) . path2^] `[(orig in)] path2)
+      (mapo (lambda (int out) (== out `(,int : allow . ,packet1)))
+            path1 min-allow1)
+      (mapo (lambda (int out) (== out `(,int : allow . ,packet2)))
+            path2 min-allow2)
+      (appendo min-allow1 min-allow2 min-allow))))
