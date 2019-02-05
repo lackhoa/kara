@@ -175,17 +175,18 @@
               (key-sorto l^2 l2)
               (key-mergeo l1 l2 l))])))
 
-(define rembero
+(define rember
+  ;; If x is in l, remove the first occurence of x in l -> res
+  ;; If x is not in l, res is #f
   (lambda (x l res)
-    (conde [(nullo l)  (nullo res)]
-           [(fresh (ld)
-              (cro l x ld)
-              (rembero x ld res))]
-           [(fresh (la ld resd)
-              (cro l la ld)
+    (conde [(== l '()) (== res #f)]
+           [(== l `(,x . ,res))]
+           [(fresh (la ld recur)
+              (== l `(,la . ,ld))
               (=/= x la)
-              (cro res la resd)
-              (rembero x ld resd))])))
+              (rember x ld recur)
+              (conde [(== recur #f) (== res #f)]
+                     [(=/= recur #f) (== res `(,la . ,recur))]))])))
 
 
 

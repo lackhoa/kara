@@ -32,8 +32,9 @@
 (define address-table
   `([pc-a . 10] [pc-c . 30]))
 
-(load "net.ss")
+;; (load "net.ss")
+(load "stick.ss")
 
 (lpp
- (run* (x)
-   (tcp-connection 'pc-c 'pc-a x)))
+ (run 20 (x y z)
+   (zpluso x y z)))
