@@ -1,22 +1,10 @@
 (define fish1
-  '([0 0 1 0]
-    [0 1 1 1]
-    [1 0 1 1]
-    [1 0 2 0]
-    [1 1 1 2]
-    [1 1 2 1]
-    [2 0 2 1]
-    [2 1 2 2]))
+  (map (lambda (c) (map build-num c))
+       '([0 0 1 0] [0 1 1 1] [1 0 1 1] [1 0 2 0] [1 1 1 2] [1 1 2 1] [2 0 2 1] [2 1 2 2])))
 
 (define fish2
-  '([0 0 0 1]
-    [0 1 0 2]
-    [0 1 1 1]
-    [0 2 1 2]
-    [1 0 1 1]
-    [1 1 1 2]
-    [1 1 2 1]
-    [1 2 2 2]))
+  (map (lambda (c) (map build-num c))
+       '([0 0 0 1] [0 1 0 2] [0 1 1 1] [0 2 1 2] [1 0 1 1] [1 1 1 2] [1 1 2 1] [1 2 2 2])))
 
 (define nat
   (lambda (x)
@@ -105,6 +93,46 @@
                         (== o `(,a . ,od))
                         (overlaps l+ od))]))])))
 
-;; (define translate
-;;   (lambda (s s+)
-;;     ))
+;; shape is a list of list of points
+;; a point is a list of four coordinates (numbers)
+(define shift-point
+  (lambda (p right up p+)
+    (fresh (x1 y1 x2 y2
+               x1+ y1+ x2+ y2+)
+      (== p  `[,x1 ,y1 ,x2 ,y2])
+      (== p+ `[,x1+ ,y1+ ,x2+ ,y2+])
+      (zpluso x1 right x1+) (zpluso x2 right x2+)
+      (zpluso y1 up y1+)    (zpluso y2 up y2+))))
+
+(define mapo
+  (lambda (f l out)
+    (conde [(== l '()) (== out '())]
+           [(fresh (a d fa d-out)
+              (== l `(,a . ,d))
+              (f a fa)
+              (== out `(,fa . ,d-out))
+              (mapo f d d-out))])))
+
+(define shift-shape
+  (lambda (shape right up shape+)
+    (mapo (lambda (p p+) (shift-point p right up p+))
+          shape
+          shape+)))
+
+(define shift-shape-freely
+  (lambda (shape shape+)
+    (fresh (right up)
+      (integer right) (integer up)
+      (shift-shape shape right up shape+))))
+
+(define shapes-overlaps
+  (lambda (s1 s2 o)
+    (fresh (s12)
+      (appendo s1 s2 s12)
+      (overlaps s12 o))))
+
+(define shapes-shift-overlaps
+  (lambda (s1 s2 o)
+    (fresh (s1+)
+      (shift-shape-freely s1 s1+)
+      (shapes-overlaps s1+ s2 o))))

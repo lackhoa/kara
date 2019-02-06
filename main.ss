@@ -36,5 +36,5 @@
 (load "stick.ss")
 
 (lpp
- (run 20 (x y z)
-   (zpluso x y z)))
+ (run 5 (o)
+   (shapes-shift-overlaps fish1 fish2 o)))
