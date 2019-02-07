@@ -36,5 +36,5 @@
 (load "stick.ss")
 
 (lpp
- (run 5 (o)
-   (shapes-shift-overlaps fish1 fish2 o)))
+ (run 10 (o)
+   (shapes-shift-overlaps pyramid1 pyramid2 o)))
