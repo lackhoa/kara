@@ -223,3 +223,22 @@
                   (== l1 (cons x l1+))
                   (select x l2 l2+)
                   (loop l1+ l2+))])))))
+
+(define mapo
+  (lambda (f l out)
+    (conde [(== l '()) (== out '())]
+           [(fresh (a d fa d-out)
+              (== l `(,a . ,d))
+              (f a fa)
+              (== out `(,fa . ,d-out))
+              (mapo f d d-out))])))
+
+(define mapo2
+  (lambda (f l1 l2 out)
+    (conde [(== l1 '()) (== out '())]
+           [(fresh (a1 d1 a2 d2 fa d-out)
+              (== l1 `(,a1 . ,d1))
+              (== l2 `(,a2 . ,d2))
+              (f a1 a2 fa)
+              (== out `(,fa . ,d-out))
+              (mapo2 f d1 d2 d-out))])))
