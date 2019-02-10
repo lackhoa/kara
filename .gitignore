@@ -8,3 +8,4 @@ log/
 db/
 mini-kanren/
 faster-miniKanren/
+cKanren/

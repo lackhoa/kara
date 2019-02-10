@@ -165,20 +165,20 @@
   (lambda (ls min)
     (fresh (a d)
       (== ls `(,a . ,d))
-      (fold-lefto (lambda (x y z)
-                    (conde [(z<=o x y) (== z x)]
-                           [(z<o y x)  (== z y)]))
-                  a d min))))
+      (fold-righto (lambda (x y z)
+                     (conde [(z<=o x y) (== z x)]
+                            [(z<o y x)  (== z y)]))
+                   a d min))))
 
 (define maxo
   ;; returns #f if the list is empty
   (lambda (ls max)
     (fresh (a d)
       (== ls `(,a . ,d))
-      (fold-lefto (lambda (x y z)
-                    (conde [(z<=o x y) (== z y)]
-                           [(z<o y x)  (== z x)]))
-                  a d max))))
+      (fold-righto (lambda (x y z)
+                     (conde [(z<=o x y) (== z y)]
+                            [(z<o y x)  (== z x)]))
+                   a d max))))
 
 (define shape-boundary-core
   (lambda (shape bottom   top   left   right

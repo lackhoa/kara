@@ -91,12 +91,29 @@
     (fresh (e)
       (acl-deny acl pkt e))))
 
-(define acl100
+
+
+;;; Example data
+
+(define acl101
   '([permit www ok-adr   * established]
     [deny   tcp *        * *]
     [permit *   good-adr * *]
     ))
 
-(define hier '([tcp telnet www]
-               [udp dns]
-               [icmp echo echo-reply]))
+(define hier
+  '([tcp telnet www]
+    [udp dns]
+    [icmp echo echo-reply]
+    [ten-net pc-a pc-c]))
+
+(define acl100
+  '([permit www        ten-net *          *]
+    [permit tcp        pc-a    r3-s       *]
+    [permit *          ten-net twenty-net *]
+    [permit echo       ten-net twenty-net *]
+    [permit echo-reply ten-net twenty-net *]))
+
+(define web-policy
+  '([permit www thirty-net r1-s    *]
+    [permit www thirty-net isp-net *]))

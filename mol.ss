@@ -1,4 +1,4 @@
-(import (kara-lang main))
+(load "kara-lang/main")
 
 ;; Molcules:
 (define var?

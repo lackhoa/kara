@@ -11,9 +11,9 @@
 (define pp pretty-print)
 (define lpp (l> for-each pp))
 
-(load "net.ss")
-;; (load "stick.ss")
+;; (load "net.ss")
+(load "stick.ss")
 
 (lpp
- (run* (p)
-   (acl-block acl100 p)))
+ (run 8 (o)
+   (shapes-shift-overlaps pyramid1 pyramid2 o)))
