@@ -74,19 +74,17 @@
   (lambda (x env t)
     (lambda (bound?)
       (condo [(==t empty-env env)
-              (fresh ()
-                (== bound? #f)
-                (== t 'not-bound))]
+              (== bound? #f)
+              (== t 'not-bound)]
              [else
               (fresh (y b rest)
                 (== `((,y . ,b) . ,rest) env)
                 (condo [(==t x y)
-                        (fresh ()
-                          (== bound? #t)
-                          (conde [(== `(val . ,t) b)]
-                                 [(fresh (lam-expr)
-                                    (== `(rec . ,lam-expr) b)
-                                    (== `(closure ,lam-expr ,env) t))]))]
+                        (== bound? #t)
+                        (conde [(== `(val . ,t) b)]
+                               [(fresh (lam-expr)
+                                  (== `(rec . ,lam-expr) b)
+                                  (== `(closure ,lam-expr ,env) t))])]
                        [else
                         ((lookupt x rest t) bound?)]))]))))
 
@@ -324,13 +322,13 @@
               (== penv penv-out)
               ((==t p mval) match?)]
              [((var-p-matcht p mval penv penv-out) match?)]
-             [(fresh (var pred val)
+             [(fresh (var pred val type)
                 (== `(? ,pred ,var) p)
                 (symbolo var)
-                (conde [(== 'symbol? pred)]
-                       [(== 'number? pred)])
+                (conde [(== 'symbol? pred) (== type 'symbol)]
+                       [(== 'number? pred) (== type 'number)])
                 ((fresht ()
-                   (typet mval pred)
+                   (typet mval type)
                    (var-p-matcht var mval penv penv-out))
                  match?))]
              [(fresh (quasi-p)
