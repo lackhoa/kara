@@ -12,8 +12,9 @@
 (define lpp (l> for-each pp))
 
 ;; (load "net.ss")
-(load "stick.ss")
+;; (load "stick.ss")
+(load "reif.ss")
 
 (lpp
- (run 8 (o)
-   (shapes-shift-overlaps pyramid1 pyramid2 o)))
+ (run 10 (x t)
+   ((tree-memberdt x t) #t)))
