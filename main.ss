@@ -14,7 +14,10 @@
 ;; (load "net.ss")
 ;; (load "stick.ss")
 (load "reif.ss")
+;; (load "full-interp.ss")
+(load "faster-miniKanren/full-interp.scm")
 
-(lpp
- (run 10 (x t)
-   ((tree-memberdt x t) #t)))
+(display (time (run 500 (_.0 _.1 _.2 _.3)
+                 (evalo
+                  `(match ,_.0 [`,_.0 ,_.1] . ,_.2)
+                  _.1))))

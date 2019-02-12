@@ -12,6 +12,7 @@
              [(=/= x y) (== t #f)]))))
 
 (define-syntax fresht
+  ;; A conjunction test
   (syntax-rules ()
     [(_ (idens ...) g)
      (lambda (t)
@@ -24,14 +25,23 @@
               (== t #f))))]))
 
 (define-syntax condt
+  ;; A disjunction test
   (syntax-rules ()
     [(_ [g gs ...])
      (fresht () g gs ...)]
-    [(_ [g1 g1s ...] [g2 g2s ...] ...)
+    [(_ [g gs ...] c cs ...)
      (lambda (t)
-       (ifo (fresht () g1 g1s ...) (== t #t)
-            ((condt [g2 g2s ...] ...) t)))]))
+       (ifo (fresht () g gs ...) (== t #t)
+            ((condt c cs ...) t)))]))
 
+(define-syntax condo
+  ;; Literally the relational version of 'cond'
+  (syntax-rules (else)
+    [(_ [else g gs ...])
+     (fresh () g gs ...)]
+    [(_ [test g gs ...] c cs ...)
+     (ifo test (fresh () g gs ...)
+          (condo c cs ...))]))
 
 
 ;;; Test functions!
@@ -55,8 +65,8 @@
   (lambda (x ees)
     (fresh (e es)
       (== ees `(,e . ,es))
-      (ifo (==t x e) succeed
-           (memberd x es)))))
+      (condo [(==t x e) succeed]
+             [else (memberd x es)]))))
 
 (define memberdt
   (lambda (x es)
@@ -71,8 +81,8 @@
   (lambda (x ees)
     (fresh (e es)
       (== ees `(,e . ,es))
-      (ifo (memberdt e es) (== x e)
-           (first-duplicate x es)))))
+      (condo [(memberdt e es) (== x e)]
+             [else (first-duplicate x es)]))))
 
 (define tree-memberdt
   (lambda (e tree)
