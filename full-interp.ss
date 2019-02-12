@@ -1,4 +1,4 @@
-;; The definition of 'letrec' is based based on Dan Friedman's code,
+;; The definition of 'letrec' is based on Dan Friedman's code,
 ;; using the "half-closure" approach from Reynold's definitional
 ;; interpreters.
 
@@ -11,21 +11,20 @@
     (conde [(== `(quote ,val) expr)
             (absento 'closure val)
             (absento 'prim val)
-            (not-in-envo 'quote env)]
+            (lookupo 'quote env 'unbound #f)]
 
            [(numbero expr) (== expr val)]
 
-           [(symbolo expr) (lookupo expr env val)]
+           [(symbolo expr) (lookupo expr env val #t)]
 
            [(fresh (x body)
               (== `(lambda ,x ,body) expr)
               (== `(closure (lambda ,x ,body) ,env) val)
-              (conde
-               ;; Variadic
-               [(symbolo x)]
-               ;; Multi-argument
-               [(list-of-symbolso x)])
-              (not-in-envo 'lambda env))]
+              (conde [;; Variadic
+                      (symbolo x)]
+                     [;; Multi-argument
+                      (list-of-symbolso x)])
+              (lookupo 'lambda env 'unbound #f))]
 
            [(fresh (rator x rands body env^ a* res)
               (== `(,rator . ,rands) expr)
@@ -57,12 +56,11 @@
               (== `(letrec ((,p-name (lambda ,x ,body)))
                     ,letrec-body)
                  expr)
-              (conde
-               ;; Variadic
-               [(symbolo x)]
-               ;; Multiple argument
-               [(list-of-symbolso x)])
-              (not-in-envo 'letrec env)
+              (conde [;; Variadic
+                      (symbolo x)]
+                     [;; Multiple argument
+                      (list-of-symbolso x)])
+              (lookupo 'letrec env 'unbound #f)
               (eval-expo letrec-body
                          `((,p-name . (rec . (lambda ,x ,body))) . ,env)
                          val))]
@@ -72,26 +70,21 @@
 (define empty-env '())
 
 (define lookupo
-  (lambda (x env t)
-    (fresh (y b rest)
-      (== `((,y . ,b) . ,rest) env)
-      (conde [(== x y)
-              (conde
-               ((== `(val . ,t) b))
-               ((fresh (lam-expr)
-                  (== `(rec . ,lam-expr) b)
-                  (== `(closure ,lam-expr ,env) t))))]
-             [(=/= x y)
-              (lookupo x rest t)]))))
-
-(define not-in-envo
-  (lambda (x env)
-    (conde
-     [(== empty-env env)]
-     [(fresh (y b rest)
-        (== `((,y . ,b) . ,rest) env)
-        (=/= y x)
-        (not-in-envo x rest))])))
+  ;; bound? tells whether the variable is bound
+  (lambda (x env t bound?)
+    (conde [(== bound? #f)
+            (== t 'unbound)
+            (== empty-env env)]
+           [(fresh (y b rest)
+              (== `((,y . ,b) . ,rest) env)
+              (conde [(== bound? #t)
+                      (== x y)
+                      (conde [(== `(val . ,t) b)]
+                             [(fresh (lam-expr)
+                                (== `(rec . ,lam-expr) b)
+                                (== `(closure ,lam-expr ,env) t))])]
+                     [(=/= x y)
+                      (lookupo x rest t bound?)]))])))
 
 (define eval-listo
   (lambda (expr env val)
@@ -142,31 +135,24 @@
      [(== prim-id 'not)
       (fresh (b)
         (== `(,b) a*)
-        (conde
-         ((=/= #f b) (== #f val))
-         ((== #f b) (== #t val))))]
+        (conde ((=/= #f b) (== #f val))
+               ((== #f b) (== #t val))))]
      [(== prim-id 'equal?)
       (fresh (v1 v2)
         (== `(,v1 ,v2) a*)
-        (conde
-         ((== v1 v2) (== #t val))
-         ((=/= v1 v2) (== #f val))))]
-     ;; FIXME (webyrd) -- symbol?, and perhaps other type predicates, doesn't handle booleans (fails)
+        (conde [(== v1 v2) (== #t val)]
+               [(=/= v1 v2) (== #f val)]))]
      [(== prim-id 'symbol?)
-      (fresh (v)
+      (fresh (v sort)
         (== `(,v) a*)
-        (conde
-         ((symbolo v) (== #t val))
-         ((numbero v) (== #f val))
-         ((fresh (a d)
-            (== `(,a . ,d) v)
-            (== #f val)))))]
+        (conde [(== sort 'symbol) (== #t val)]
+               [(=/= sort 'symbol) (== #f val)])
+        (exp-sorto v sort))]
      [(== prim-id 'null?)
       (fresh (v)
         (== `(,v) a*)
-        (conde
-         ((== '() v) (== #t val))
-         ((=/= '() v) (== #f val))))])))
+        (conde [(== '() v) (== #t val)]
+               [(=/= '() v) (== #f val)]))])))
 
 (define prim-expo
   (lambda (expr env val)
@@ -177,15 +163,14 @@
 
 (define boolean-primo
   (lambda (expr env val)
-    (conde
-     [(== #t expr) (== #t val)]
-     [(== #f expr) (== #f val)])))
+    (conde [(== #t expr) (== #t val)]
+           [(== #f expr) (== #f val)])))
 
 (define and-primo
   (lambda (expr env val)
     (fresh (e*)
       (== `(and . ,e*) expr)
-      (not-in-envo 'and env)
+      (lookupo 'and env 'unbound #f)
       (ando e* env val))))
 
 (define ando
@@ -197,19 +182,18 @@
         (eval-expo e env val))]
      [(fresh (e1 e2 e-rest v)
         (== `(,e1 ,e2 . ,e-rest) e*)
-        (conde
-         ((== #f v)
-          (== #f val)
-          (eval-expo e1 env v))
-         ((=/= #f v)
-          (eval-expo e1 env v)
-          (ando `(,e2 . ,e-rest) env val))))])))
+        (conde [(== #f v)
+                (== #f val)
+                (eval-expo e1 env v)]
+               [(=/= #f v)
+                (eval-expo e1 env v)
+                (ando `(,e2 . ,e-rest) env val)]))])))
 
 (define or-primo
   (lambda (expr env val)
     (fresh (e*)
       (== `(or . ,e*) expr)
-      (not-in-envo 'or env)
+      (lookupo 'or env 'unbound #f)
       (oro e* env val))))
 
 (define oro
@@ -220,32 +204,30 @@
               (eval-expo e env val))]
            [(fresh (e1 e2 e-rest v)
               (== `(,e1 ,e2 . ,e-rest) e*)
-              (conde
-               ((=/= #f v)
-                (== v val)
-                (eval-expo e1 env v))
-               ((== #f v)
-                (eval-expo e1 env v)
-                (oro `(,e2 . ,e-rest) env val))))])))
+              (conde [(=/= #f v)
+                      (== v val)
+                      (eval-expo e1 env v)]
+                     [(== #f v)
+                      (eval-expo e1 env v)
+                      (oro `(,e2 . ,e-rest) env val)]))])))
 
 (define if-primo
   (lambda (expr env val)
     (fresh (e1 e2 e3 t)
       (== `(if ,e1 ,e2 ,e3) expr)
-      (not-in-envo 'if env)
+      (lookupo 'if env 'unbound #f)
       (eval-expo e1 env t)
-      (conde
-       [(=/= #f t) (eval-expo e2 env val)]
-       [(== #f t) (eval-expo e3 env val)]))))
+      (conde [(=/= #f t) (eval-expo e2 env val)]
+             [(== #f t) (eval-expo e3 env val)]))))
 
-(define initial-env `((list . (val . (closure (lambda x x) ,empty-env)))
-                      (not . (val . (prim . not)))
-                      (equal? . (val . (prim . equal?)))
+(define initial-env `((list    . (val . (closure (lambda x x) ,empty-env)))
+                      (not       . (val . (prim . not)))
+                      (equal?  . (val . (prim . equal?)))
                       (symbol? . (val . (prim . symbol?)))
-                      (cons . (val . (prim . cons)))
-                      (null? . (val . (prim . null?)))
-                      (car . (val . (prim . car)))
-                      (cdr . (val . (prim . cdr)))
+                      (cons    . (val . (prim . cons)))
+                      (null?   . (val . (prim . null?)))
+                      (car     . (val . (prim . car)))
+                      (cdr     . (val . (prim . cdr)))
                       . ,empty-env))
 
 ;;; Pattern matching business
@@ -254,24 +236,19 @@
   (lambda (expr env val)
     (fresh (against-expr mval clause clauses)
       (== `(match ,against-expr ,clause . ,clauses) expr)
-      (not-in-envo 'match env)
+      (lookupo 'match env 'unbound #f)
       (eval-expo against-expr env mval)
       (match-clauses mval `(,clause . ,clauses) env val))))
 
 ;; To fix not-symbolo and not-numbero
 (define exp-sorto
   (lambda (t sort)
-    (conde [(== sort 'symbol)
-            (symbolo t)]
-           [(== sort 'boolean)
-            (conde [(== t #t) (== t #f)])]
-           [(== sort 'number)
-            (numbero t)]
-           [(== sort 'null)
-            (== '() t)]
-           [(== sort 'pair)
-            (fresh (a d)
-              (== `(,a . ,d) t))])))
+    (conde [(== sort 'symbol)  (symbolo t)]
+           [(== sort 'boolean) (conde [(== t #t)] [(== t #f)])]
+           [(== sort 'number)  (numbero t)]
+           [(== sort 'null)    (== '() t)]
+           [(== sort 'pair)    (fresh (a d)
+                                (== `(,a . ,d) t))])))
 
 (define not-symbolo
   (lambda (t)
@@ -314,13 +291,12 @@
   (lambda (mval clauses env val)
     (fresh (p result-expr d penv)
       (== `((,p ,result-expr) . ,d) clauses)
-      (conde
-       [(fresh (env^)
-          (p-match p mval '() penv)
-          (regular-env-appendo penv env env^)
-          (eval-expo result-expr env^ val))]
-       [(p-no-match p mval '() penv)
-        (match-clauses mval d env val)]))))
+      (conde [(fresh (env^)
+                (p-match p mval '() penv)
+                (regular-env-appendo penv env env^)
+                (eval-expo result-expr env^ val))]
+             [(p-no-match p mval '() penv)
+              (match-clauses mval d env val)]))))
 
 (define var-p-match
   (lambda (var mval penv penv-out)
@@ -329,9 +305,9 @@
       (=/= 'closure mval)
       (conde [(== mval val)
               (== penv penv-out)
-              (lookupo var penv val)]
+              (lookupo var penv val #t)]
              [(== `((,var . (val . ,mval)) . ,penv) penv-out)
-              (not-in-envo var penv)]))))
+              (lookupo var penv 'unbound #f)]))))
 
 (define var-p-no-match
   (lambda (var mval penv penv-out)
@@ -339,7 +315,7 @@
       (symbolo var)
       (=/= mval val)
       (== penv penv-out)
-      (lookupo var penv val))))
+      (lookupo var penv val #t))))
 
 (define p-match
   (lambda (p mval penv penv-out)
