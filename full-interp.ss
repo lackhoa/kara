@@ -119,40 +119,39 @@
 
 (define eval-primo
   (lambda (prim-id a* val)
-    (conde
-     [(== prim-id 'cons)
-      (fresh (a d)
-        (== `(,a ,d) a*)
-        (== `(,a . ,d) val))]
-     [(== prim-id 'car)
-      (fresh (d)
-        (== `((,val . ,d)) a*)
-        (=/= 'closure val))]
-     [(== prim-id 'cdr)
-      (fresh (a)
-        (== `((,a . ,val)) a*)
-        (=/= 'closure a))]
-     [(== prim-id 'not)
-      (fresh (b)
-        (== `(,b) a*)
-        (conde ((=/= #f b) (== #f val))
-               ((== #f b) (== #t val))))]
-     [(== prim-id 'equal?)
-      (fresh (v1 v2)
-        (== `(,v1 ,v2) a*)
-        (conde [(== v1 v2) (== #t val)]
-               [(=/= v1 v2) (== #f val)]))]
-     [(== prim-id 'symbol?)
-      (fresh (v sort)
-        (== `(,v) a*)
-        (conde [(== sort 'symbol) (== #t val)]
-               [(=/= sort 'symbol) (== #f val)])
-        (exp-sorto v sort))]
-     [(== prim-id 'null?)
-      (fresh (v)
-        (== `(,v) a*)
-        (conde [(== '() v) (== #t val)]
-               [(=/= '() v) (== #f val)]))])))
+    (conde [(== prim-id 'cons)
+            (fresh (a d)
+              (== `(,a ,d) a*)
+              (== `(,a . ,d) val))]
+           [(== prim-id 'car)
+            (fresh (d)
+              (== `((,val . ,d)) a*)
+              (=/= 'closure val))]
+           [(== prim-id 'cdr)
+            (fresh (a)
+              (== `((,a . ,val)) a*)
+              (=/= 'closure a))]
+           [(== prim-id 'not)
+            (fresh (b)
+              (== `(,b) a*)
+              (conde ((=/= #f b) (== #f val))
+                     ((== #f b) (== #t val))))]
+           [(== prim-id 'equal?)
+            (fresh (v1 v2)
+              (== `(,v1 ,v2) a*)
+              (conde [(== v1 v2) (== #t val)]
+                     [(=/= v1 v2) (== #f val)]))]
+           [(== prim-id 'symbol?)
+            (fresh (v sort)
+              (== `(,v) a*)
+              (conde [(== sort 'symbol) (== #t val)]
+                     [(=/= sort 'symbol) (== #f val)])
+              (exp-sorto v sort))]
+           [(== prim-id 'null?)
+            (fresh (v)
+              (== `(,v) a*)
+              (conde [(== '() v) (== #t val)]
+                     [(=/= '() v) (== #f val)]))])))
 
 (define prim-expo
   (lambda (expr env val)
@@ -292,104 +291,88 @@
     (fresh (p result-expr d penv)
       (== `((,p ,result-expr) . ,d) clauses)
       (conde [(fresh (env^)
-                (p-match p mval '() penv)
+                (p-match p mval '() penv #t)
                 (regular-env-appendo penv env env^)
                 (eval-expo result-expr env^ val))]
-             [(p-no-match p mval '() penv)
+             [(p-match p mval '() penv #f)
               (match-clauses mval d env val)]))))
 
 (define var-p-match
-  (lambda (var mval penv penv-out)
+  (lambda (var mval penv penv-out match?)
     (fresh (val)
       (symbolo var)
       (=/= 'closure mval)
-      (conde [(== mval val)
+      (conde [(== match? #t)
+              (== mval val)
               (== penv penv-out)
               (lookupo var penv val #t)]
-             [(== `((,var . (val . ,mval)) . ,penv) penv-out)
-              (lookupo var penv 'unbound #f)]))))
-
-(define var-p-no-match
-  (lambda (var mval penv penv-out)
-    (fresh (val)
-      (symbolo var)
-      (=/= mval val)
-      (== penv penv-out)
-      (lookupo var penv val #t))))
+             [(== match? #t)
+              (== `((,var . (val . ,mval)) . ,penv) penv-out)
+              (lookupo var penv 'unbound #f)]
+             [(== match? #f)
+              (=/= mval val)
+              (== penv penv-out)
+              (lookupo var penv val #t)]))))
 
 (define p-match
-  (lambda (p mval penv penv-out)
+  (lambda (p mval penv penv-out match?)
     (conde [(self-eval-literalo p)
-            (== p mval)
-            (== penv penv-out)]
-           [(var-p-match p mval penv penv-out)]
+            (== penv penv-out)
+            (conde [(== match? #t) (== p mval)]
+                   [(== match? #f) (=/= p mval)])]
+           [(== match? #t)
+            (var-p-match p mval penv penv-out #t)]
+           [(== match? #f)
+            (var-p-match p mval penv penv-out #f)]
            [(fresh (var pred val)
               (== `(? ,pred ,var) p)
-              (conde
-               ((== 'symbol? pred)
-                (symbolo mval))
-               ((== 'number? pred)
-                (numbero mval)))
-              (var-p-match var mval penv penv-out))]
+              (conde [(== match? #t)
+                      (conde [(== 'symbol? pred) (symbolo mval)]
+                             [(== 'number? pred) (numbero mval)])
+                      (var-p-match var mval penv penv-out #t)]
+                     [(== match? #f)
+                      (conde [(== 'symbol? pred)
+                              (conde [(not-symbolo mval)]
+                                     [(symbolo mval)
+                                      (var-p-match var mval penv penv-out #f)])]
+                             [(== 'number? pred)
+                              (conde [(not-numbero mval)]
+                                     [(numbero mval)
+                                      (var-p-match var mval penv penv-out #f)])]
+                             [(== penv penv-out)
+                              (symbolo var)])]))]
            [(fresh (quasi-p)
               (== (list 'quasiquote quasi-p) p)
-              (quasi-p-match quasi-p mval penv penv-out))])))
-
-(define p-no-match
-  (lambda (p mval penv penv-out)
-    (conde [(self-eval-literalo p)
-            (=/= p mval)
-            (== penv penv-out)]
-           [(var-p-no-match p mval penv penv-out)]
-           [(fresh (var pred val)
-              (== `(? ,pred ,var) p)
-              (== penv penv-out)
-              (symbolo var)
-              (conde [(== 'symbol? pred)
-                      (conde [(not-symbolo mval)]
-                             [(symbolo mval)
-                              (var-p-no-match var mval penv penv-out)])]
-                     [(== 'number? pred)
-                      (conde [(not-numbero mval)]
-                             [(numbero mval)
-                              (var-p-no-match var mval penv penv-out)])]))]
-           [(fresh (quasi-p)
-              (== (list 'quasiquote quasi-p) p)
-              (quasi-p-no-match quasi-p mval penv penv-out))])))
+              (conde [(== match #t)
+                      (quasi-p-match quasi-p mval penv penv-out #t)]
+                     [(quasi-p-match quasi-p mval penv penv-out #f)]))])))
 
 (define quasi-p-match
-  (lambda (quasi-p mval penv penv-out)
-    (conde [(== quasi-p mval)
-            (== penv penv-out)
-            (literalo quasi-p)]
+  (lambda (quasi-p mval penv penv-out match?)
+    (conde [(== penv penv-out)
+            (literalo quasi-p)
+            (conde [(== match? #t) (== quasi-p mval)]
+                   [(== match? #f) (=/= quasi-p mval)])]
            [(fresh (p)
               (== (list 'unquote p) quasi-p)
-              (p-match p mval penv penv-out))]
-           [(fresh (a d v1 v2 penv^)
-              (== `(,a . ,d) quasi-p)
-              (== `(,v1 . ,v2) mval)
-              (=/= 'unquote a)
-              (quasi-p-match a v1 penv penv^)
-              (quasi-p-match d v2 penv^ penv-out))])))
-
-(define quasi-p-no-match
-  (lambda (quasi-p mval penv penv-out)
-    (conde [(=/= quasi-p mval)
-            (== penv penv-out)
-            (literalo quasi-p)]
-           [(fresh (p)
-              (== (list 'unquote p) quasi-p)
-              (=/= 'closure mval)
-              (p-no-match p mval penv penv-out))]
+              (conde [(== match? #t)
+                      (p-match p mval penv penv-out #t)]
+                     [(== match? #f)
+                      (=/= 'closure mval)
+                      (p-match p mval penv penv-out #f)]))]
            [(fresh (a d)
               (== `(,a . ,d) quasi-p)
               (=/= 'unquote a)
-              (== penv penv-out)
-              (literalo mval))]
-           [(fresh (a d v1 v2 penv^)
-              (== `(,a . ,d) quasi-p)
-              (=/= 'unquote a)
-              (== `(,v1 . ,v2) mval)
-              (conde [(quasi-p-no-match a v1 penv penv^)]
-                     [(quasi-p-match a v1 penv penv^)
-                      (quasi-p-no-match d v2 penv^ penv-out)]))])))
+              (conde [(== match #f)
+                      (== penv penv-out)
+                      (literalo mval)]
+                     [(fresh (v1 v2 penv^)
+                        (== `(,v1 . ,v2) mval)
+                        (conde [(== match #t)
+                                (quasi-p-match a v1 penv penv^ #t)
+                                (quasi-p-match d v2 penv^ penv-out #t)]
+                               [(== match #f)
+                                (quasi-p-match a v1 penv penv^ #f)]
+                               [(== match #f)
+                                (quasi-p-match a v1 penv penv^ #t)
+                                (quasi-p-match d v2 penv^ penv-out #f)]))]))])))
