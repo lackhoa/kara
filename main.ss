@@ -8,6 +8,10 @@
 
 (define pp (lambda (ls) (for-each pretty-print ls)))
 
+(define repeat
+  (lambda (i f)
+    (unless (= i 0) f (repeat (- i 1) f))))
+
 (define-syntax ifa
   (syntax-rules ()
     ((_) (mzero))
@@ -47,23 +51,12 @@
 (define a-z
   '(a b c d e f g h i j k l m n o p q r s t u v w z y z))
 
-;; (time
-;;  (let loop [(i 100000)]
-;;    (unless (= i 0)
-;;      (run* (q)
-;;        (memberd-impure 'z a-z))
-;;      (loop (- i 1)))))
-
-;; (time
-;;  (let loop [(i 100000)]
-;;    (unless (= i 0)
-;;      (run* (q)
-;;        (memberd 'z a-z))
-;;      (loop (- i 1)))))
+;; (time (repeat 100000 (run* (q) (memberd-impure 'z a-z))))
+;; (time (repeat 100000 (run* (q) (memberd 'z a-z))))
 
 ;; Tests for the full interpreter
-(;; This is my version
- load "full-interp.ss")
+;; (;; This is my version
+;;  load "full-interp.ss")
 ;; (;; This is the one in faster-mk
 ;;  load "faster-miniKanren/full-interp.scm")
 
@@ -75,54 +68,53 @@
 ;;     _.1)))
 
 ;; Summary of reif interp vs the original
-;; lambda: no big differences
+;; quote: no big difference (there's only one answer, though)
+;; lambda: no big difference
 ;; letrec: 2x faster
 ;; pattern matching: 2x slower
 ;; Free-form evalo: 2x faster
-;; quote: 2x slower
 
 (time
- (run 1000 (x y)
-   ;; (fresh (e)
-   ;;   (== x `(letrec . ,e)))
-   (evalo x y)))
+ (repeat 1000000000
+         (run* (x y)
+           (fresh (e)
+             (== x `(quote . ,e)))
+           (evalo x y))))
 
 ;; (time
 ;;  ;; Something really complicated: 1.5x slower
-;;  (let loop [(i 100)]
-;;    (unless (= i 0)
-;;      (equal?
-;;       (run 1 (q)
-;;         (== q '((lambda (x) `(,x ',x)) '(lambda (x) `(,x ',x))))
-;;         (evalo
-;;          `(letrec ((eval-quasi (lambda (q eval)
-;;                                  (match q
-;;                                    [(? symbol? x) x]
-;;                                    [`() '()]
-;;                                    [`(,`unquote ,exp) (eval exp)]
-;;                                    [`(quasiquote ,datum) ('error)]
-;;                                    [`(,a . ,d)
-;;                                     (cons (eval-quasi a eval)
-;;                                           (eval-quasi d eval))]))))
-;;             (letrec ((eval-expr
-;;                       (lambda (expr env)
-;;                         (match expr
-;;                           [`(quote ,datum) datum]
-;;                           [`(lambda (,(? symbol? x)) ,body)
-;;                            (lambda (a)
-;;                              (eval-expr body (lambda (y)
-;;                                                (if (equal? x y)
-;;                                                    a
-;;                                                    (env y)))))]
-;;                           [(? symbol? x) (env x)]
-;;                           [`(quasiquote ,datum)
-;;                            (eval-quasi datum (lambda (exp) (eval-expr
-;;                                                        exp env)))]
-;;                           [`(,rator ,rand)
-;;                            ((eval-expr rator env) (eval-expr rand env))]
-;;                           ))))
-;;               (eval-expr ',q
-;;                          'initial-env)))
-;;          q))
-;;       (list '((lambda (x) `(,x ',x)) '(lambda (x) `(,x ',x)))))
-;;      (loop (- i 1)))))
+;;  (repeat 100
+;;          (equal?
+;;           (run 1 (q)
+;;             (== q '((lambda (x) `(,x ',x)) '(lambda (x) `(,x ',x))))
+;;             (evalo
+;;              `(letrec ((eval-quasi (lambda (q eval)
+;;                                      (match q
+;;                                        [(? symbol? x) x]
+;;                                        [`() '()]
+;;                                        [`(,`unquote ,exp) (eval exp)]
+;;                                        [`(quasiquote ,datum) ('error)]
+;;                                        [`(,a . ,d)
+;;                                         (cons (eval-quasi a eval)
+;;                                               (eval-quasi d eval))]))))
+;;                 (letrec ((eval-expr
+;;                           (lambda (expr env)
+;;                             (match expr
+;;                               [`(quote ,datum) datum]
+;;                               [`(lambda (,(? symbol? x)) ,body)
+;;                                (lambda (a)
+;;                                  (eval-expr body (lambda (y)
+;;                                                    (if (equal? x y)
+;;                                                        a
+;;                                                        (env y)))))]
+;;                               [(? symbol? x) (env x)]
+;;                               [`(quasiquote ,datum)
+;;                                (eval-quasi datum (lambda (exp) (eval-expr
+;;                                                            exp env)))]
+;;                               [`(,rator ,rand)
+;;                                ((eval-expr rator env) (eval-expr rand env))]
+;;                               ))))
+;;                   (eval-expr ',q
+;;                              'initial-env)))
+;;              q))
+;;           (list '((lambda (x) `(,x ',x)) '(lambda (x) `(,x ',x)))))))
