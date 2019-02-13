@@ -338,15 +338,14 @@
 (define quasi-p-matcht
   (lambda (quasi-p mval penv penv-out)
     (lambda (match?)
-      (conde [(literalo quasi-p)
+      (conde [((==t quasi-p mval) match?)
               (== penv penv-out)
-              ((==t quasi-p mval) match?)]
+              (literalo quasi-p)]
              [(fresh (p)
                 (== (list 'unquote p) quasi-p)
-                (condo [(p-matcht p mval penv penv-out)
-                        (== match? #t)]
-                       [else
-                        (== match? #f) (=/= 'closure mval)]))]
+                (ifo (==t match? #t) succeed
+                     (=/= 'closure mval))
+                ((p-matcht p mval penv penv-out) match?))]
              [(fresh (a d)
                 (== `(,a . ,d) quasi-p)
                 (=/= 'unquote a)
