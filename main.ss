@@ -47,66 +47,82 @@
 (define a-z
   '(a b c d e f g h i j k l m n o p q r s t u v w z y z))
 
-(time
- (let loop [(i 100000)]
-   (unless (= i 0)
-     (run* (q)
-       (memberd-impure 'z a-z))
-     (loop (- i 1)))))
+;; (time
+;;  (let loop [(i 100000)]
+;;    (unless (= i 0)
+;;      (run* (q)
+;;        (memberd-impure 'z a-z))
+;;      (loop (- i 1)))))
 
-(time
- (let loop [(i 100000)]
-   (unless (= i 0)
-     (run* (q)
-       (memberd 'z a-z))
-     (loop (- i 1)))))
+;; (time
+;;  (let loop [(i 100000)]
+;;    (unless (= i 0)
+;;      (run* (q)
+;;        (memberd 'z a-z))
+;;      (loop (- i 1)))))
 
 ;; Tests for the full interpreter
-;; (;; This is my version
-;;  load "full-interp.ss")
+(;; This is my version
+ load "full-interp.ss")
+;; (;; This is the one in faster-mk
+;;  load "faster-miniKanren/full-interp.scm")
+
 ;; (time
-;;  ;; Something random
+;;  ;; Something random: runs 4x slower on my interp
 ;;  (run 500 (_.0 _.1 _.2 _.3)
 ;;    (evalo
 ;;     `(match ,_.0 [`,_.0 ,_.1] . ,_.2)
 ;;     _.1)))
 
-;; (display
-;;  ;; Something really complicated
-;;  (equal?
-;;   (run 1 (q)
-;;     (== q '((lambda (x) `(,x ',x)) '(lambda (x) `(,x ',x))))
-;;     (evalo
-;;      `(letrec ((eval-quasi (lambda (q eval)
-;;                              (match q
-;;                                [(? symbol? x) x]
-;;                                [`() '()]
-;;                                [`(,`unquote ,exp) (eval exp)]
-;;                                [`(quasiquote ,datum) ('error)]
-;;                                [`(,a . ,d)
-;;                                 (cons (eval-quasi a eval)
-;;                                       (eval-quasi d eval))]))))
-;;         (letrec ((eval-expr
-;;                   (lambda (expr env)
-;;                     (match expr
-;;                       [`(quote ,datum) datum]
-;;                       [`(lambda (,(? symbol? x)) ,body)
-;;                        (lambda (a)
-;;                          (eval-expr body (lambda (y)
-;;                                            (if (equal? x y)
-;;                                                a
-;;                                                (env y)))))]
-;;                       [(? symbol? x) (env x)]
-;;                       [`(quasiquote ,datum)
-;;                        (eval-quasi datum (lambda (exp) (eval-expr
-;;                                                    exp env)))]
-;;                       [`(,rator ,rand)
-;;                        ((eval-expr rator env) (eval-expr rand env))]
-;;                       ))))
-;;           (eval-expr ',q
-;;                      'initial-env)))
-;;      q))
-;;   (list '((lambda (x) `(,x ',x)) '(lambda (x) `(,x ',x))))))
+;; Summary of reif interp vs the original
+;; lambda: no big differences
+;; letrec: 2x faster
+;; pattern matching: 2x slower
+;; Free-form evalo: 2x faster
+;; quote: 2x slower
 
-(;; This is the one in faster-mk
- load "faster-miniKanren/full-interp.scm")
+(time
+ (run 1000 (x y)
+   ;; (fresh (e)
+   ;;   (== x `(letrec . ,e)))
+   (evalo x y)))
+
+;; (time
+;;  ;; Something really complicated: 1.5x slower
+;;  (let loop [(i 100)]
+;;    (unless (= i 0)
+;;      (equal?
+;;       (run 1 (q)
+;;         (== q '((lambda (x) `(,x ',x)) '(lambda (x) `(,x ',x))))
+;;         (evalo
+;;          `(letrec ((eval-quasi (lambda (q eval)
+;;                                  (match q
+;;                                    [(? symbol? x) x]
+;;                                    [`() '()]
+;;                                    [`(,`unquote ,exp) (eval exp)]
+;;                                    [`(quasiquote ,datum) ('error)]
+;;                                    [`(,a . ,d)
+;;                                     (cons (eval-quasi a eval)
+;;                                           (eval-quasi d eval))]))))
+;;             (letrec ((eval-expr
+;;                       (lambda (expr env)
+;;                         (match expr
+;;                           [`(quote ,datum) datum]
+;;                           [`(lambda (,(? symbol? x)) ,body)
+;;                            (lambda (a)
+;;                              (eval-expr body (lambda (y)
+;;                                                (if (equal? x y)
+;;                                                    a
+;;                                                    (env y)))))]
+;;                           [(? symbol? x) (env x)]
+;;                           [`(quasiquote ,datum)
+;;                            (eval-quasi datum (lambda (exp) (eval-expr
+;;                                                        exp env)))]
+;;                           [`(,rator ,rand)
+;;                            ((eval-expr rator env) (eval-expr rand env))]
+;;                           ))))
+;;               (eval-expr ',q
+;;                          'initial-env)))
+;;          q))
+;;       (list '((lambda (x) `(,x ',x)) '(lambda (x) `(,x ',x)))))
+;;      (loop (- i 1)))))
