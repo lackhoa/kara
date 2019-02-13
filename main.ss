@@ -6,14 +6,28 @@
 (define pp (lambda (ls) (for-each pretty-print ls)))
 
 (load "reif.ss")
-(;; This is my version
- load "full-interp.ss")
-(time
- ;; Something random
- (run 500 (_.0 _.1 _.2 _.3)
-   (evalo
-    `(match ,_.0 [`,_.0 ,_.1] . ,_.2)
-    _.1)))
+
+
+;; Test for the reif functionalities
+(define a-z
+  '(a b c d e f g h i j k l m n o p q r s t u v w z y z))
+
+(run* (x) (conde [(== #t #t)] ))
+
+;; (time
+;;  (run* (q)
+;;    (memberd 'z a-z)))
+
+
+;; Tests for the full interpreter
+;; (;; This is my version
+;;  load "full-interp.ss")
+;; (time
+;;  ;; Something random
+;;  (run 500 (_.0 _.1 _.2 _.3)
+;;    (evalo
+;;     `(match ,_.0 [`,_.0 ,_.1] . ,_.2)
+;;     _.1)))
 
 ;; (display
 ;;  ;; Something really complicated

@@ -71,6 +71,13 @@
       (condo [(==t x e) succeed]
              [else (memberd x es)]))))
 
+(define memberd-impure
+  (lambda (x ees)
+    (fresh (e es)
+      (== ees `(,e . ,es))
+      (conda [(== x e) succeed]
+             [succeed (memberd-impure x es)]))))
+
 (define memberdt
   (lambda (x es)
     (lambda (t)
