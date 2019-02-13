@@ -1,23 +1,65 @@
 (load "faster-miniKanren/mk-vicare.scm")
 (load "faster-miniKanren/mk.scm")
-(load "faster-miniKanren/matche.scm")
-(load "faster-miniKanren/numbers.scm")
-
-(define pp (lambda (ls) (for-each pretty-print ls)))
+;; (load "faster-miniKanren/matche.scm")
+;; (load "faster-miniKanren/numbers.scm")
+;; (load "miniKanren/mk.scm")
 
 (load "reif.ss")
 
+(define pp (lambda (ls) (for-each pretty-print ls)))
+
+(define-syntax ifa
+  (syntax-rules ()
+    ((_) (mzero))
+    ((_ (e g ...) b ...)
+     (let loop ((c-inf e))
+       (case-inf c-inf
+                 (() (ifa b ...))
+                 ((f) (inc (loop (f))))
+                 ((a) (bind* c-inf g ...))
+                 ((a f) (bind* c-inf g ...)))))))
+(define-syntax conda
+  (syntax-rules ()
+    ((_ (g0 g ...) (g1 g^ ...) ...)
+     (lambdag@ (c)
+       (inc
+        (ifa ((g0 c) g ...)
+             ((g1 c) g^ ...) ...))))))
+(define-syntax ifu
+  (syntax-rules ()
+    ((_) (mzero))
+    ((_ (e g ...) b ...)
+     (let loop ((c-inf e))
+       (case-inf c-inf
+                 (() (ifu b ...))
+                 ((f) (inc (loop (f))))
+                 ((c) (bind* c-inf g ...))
+                 ((c f) (bind* (unit c) g ...)))))))
+(define-syntax condu
+  (syntax-rules ()
+    ((_ (g0 g ...) (g1 g^ ...) ...)
+     (lambdag@ (c)
+       (inc
+        (ifu ((g0 c) g ...)
+             ((g1 c) g^ ...) ...))))))
 
 ;; Test for the reif functionalities
 (define a-z
   '(a b c d e f g h i j k l m n o p q r s t u v w z y z))
 
-(run* (x) (conde [(== #t #t)] ))
+(time
+ (let loop [(i 100000)]
+   (unless (= i 0)
+     (run* (q)
+       (memberd-impure 'z a-z))
+     (loop (- i 1)))))
 
-;; (time
-;;  (run* (q)
-;;    (memberd 'z a-z)))
-
+(time
+ (let loop [(i 100000)]
+   (unless (= i 0)
+     (run* (q)
+       (memberd 'z a-z))
+     (loop (- i 1)))))
 
 ;; Tests for the full interpreter
 ;; (;; This is my version
