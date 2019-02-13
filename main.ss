@@ -57,15 +57,22 @@
 ;; Tests for the full interpreter
 ;; (;; This is my version
 ;;  load "full-interp.ss")
-;; (;; This is the one in faster-mk
-;;  load "faster-miniKanren/full-interp.scm")
+(;; This is the one in faster-mk
+ load "faster-miniKanren/full-interp.scm")
 
 ;; (time
-;;  ;; Something random: runs 4x slower on my interp
-;;  (run 500 (_.0 _.1 _.2 _.3)
-;;    (evalo
-;;     `(match ,_.0 [`,_.0 ,_.1] . ,_.2)
-;;     _.1)))
+;;  ;; Quine: can't do anything 'bout it
+;;  (run 4 (x y)
+;;    (fresh (_.0 _.1 _.2)
+;;      (== x y)
+;;      (evalo x y))))
+
+(time
+ ;; Something random: 4x slower
+ (run 500 (_.0 _.1 _.2 _.3)
+   (evalo
+    `(match ,_.0 [`,_.0 ,_.1] . ,_.2)
+    _.1)))
 
 ;; Summary of reif interp vs the original
 ;; quote: no big difference (there's only one answer, though)
@@ -74,16 +81,11 @@
 ;; pattern matching: 2x slower
 ;; Free-form evalo: 2x faster
 
-(time
- (repeat 1000000000
-         (run* (x y)
-           (fresh (e)
-             (== x `(quote . ,e)))
-           (evalo x y))))
+
 
 ;; (time
 ;;  ;; Something really complicated: 1.5x slower
-;;  (repeat 100
+;;  (repeat 1000
 ;;          (equal?
 ;;           (run 1 (q)
 ;;             (== q '((lambda (x) `(,x ',x)) '(lambda (x) `(,x ',x))))

@@ -320,9 +320,9 @@
                 (symbolo var)
                 (conde [(== 'symbol? pred) (== type 'symbol)]
                        [(== 'number? pred) (== type 'number)])
-                ((fresht ()
-                   (typet mval type)
-                   (var-p-matcht var mval penv penv-out))
+                ((conjt
+                  (typet mval type)
+                  (var-p-matcht var mval penv penv-out))
                  match?))]
              [(fresh (quasi-p)
                 (== (list 'quasiquote quasi-p) p)
@@ -347,7 +347,7 @@
                         (literalo mval)]
                        [(fresh (v1 v2 penv^)
                           (== `(,v1 . ,v2) mval)
-                          ((fresht ()
-                             (quasi-p-matcht a v1 penv  penv^)
-                             (quasi-p-matcht d v2 penv^ penv-out))
+                          ((conjt
+                            (quasi-p-matcht a v1 penv  penv^)
+                            (quasi-p-matcht d v2 penv^ penv-out))
                            match?))]))]))))

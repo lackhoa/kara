@@ -11,40 +11,53 @@
       (conde [(== x y) (== t #t)]
              [(=/= x y) (== t #f)]))))
 
-(define-syntax fresht
+;; Do I really need this stuff?
+;; (define-syntax fresht
+;;   ;; A conjunction test
+;;   (syntax-rules ()
+;;     [(_ (idens ...) g)
+;;      (lambda (t)
+;;        (fresh (idens ...)
+;;          (g t)))]
+;;     [(_ (idens ...) g1 g2 gs ...)
+;;      (lambda (t)
+;;        (fresh (idens ...)
+;;          (ifo g1 ((fresht () g2 gs ...) t)
+;;               (== t #f))))]))
+
+(define-syntax conjt
   ;; A conjunction test
   (syntax-rules ()
-    [(_ (idens ...) g)
+    [(_ g)
+     (lambda (t) (g t))]
+    [(_ g1 g2 gs ...)
      (lambda (t)
-       (fresh (idens ...)
-         (g t)))]
-    [(_ (idens ...) g1 g2 gs ...)
-     (lambda (t)
-       (fresh (idens ...)
-         (ifo g1 ((fresht () g2 gs ...) t)
-              (== t #f))))]))
+       (ifo g1 ((conjt g2 gs ...) t)
+            (== t #f)))]))
 
 (define-syntax condt
   ;; A disjunction test
   (syntax-rules ()
     [(_ [g gs ...])
-     (fresht () g gs ...)]
+     (conjt g gs ...)]
     [(_ [g gs ...] c cs ...)
      (lambda (t)
-       (ifo (fresht () g gs ...) (== t #t)
+       (ifo (conjt g gs ...) (== t #t)
             ((condt c cs ...) t)))]))
 
 (define-syntax condo
   ;; Literally the relational version of 'cond'
   ;; Fails if no clauses match
   (syntax-rules (else)
-    [(_ [else g gs ...])
-     (fresh () g gs ...)]
-    [(_ [test g gs ...] cs ...)
-     (ifo test (fresh () g gs ...)
+    [(_ [else g]) g]
+    [(_ [else g1 g2 gs ...])
+     (fresh () g1 g2 gs ...)]
+    [(_ [test g] cs ...)
+     (ifo test g (condo cs ...))]
+    [(_ [test g1 g2 gs ...] cs ...)
+     (ifo test (fresh () g1 g2 gs ...)
           (condo cs ...))]
-    [(_)
-     fail]))
+    [(_) fail]))
 
 
 ;;; Test functions!
