@@ -36,12 +36,15 @@
 
 (define-syntax condo
   ;; Literally the relational version of 'cond'
+  ;; Fails if no clauses match
   (syntax-rules (else)
     [(_ [else g gs ...])
      (fresh () g gs ...)]
-    [(_ [test g gs ...] c cs ...)
+    [(_ [test g gs ...] cs ...)
      (ifo test (fresh () g gs ...)
-          (condo c cs ...))]))
+          (condo cs ...))]
+    [(_)
+     fail]))
 
 
 ;;; Test functions!

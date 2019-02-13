@@ -271,8 +271,7 @@
 
 (define booleano
   (lambda (t)
-    (conde [(== #f t)]
-           [(== #t t)])))
+    (conde [(== #f t)] [(== #t t)])))
 
 (define regular-env-appendo
   (lambda (env1 env2 env-out)
@@ -298,22 +297,16 @@
     (lambda (match?)
       (fresh (val)
         (symbolo var)
-        (=/= 'closure mval)
         (condo [;; `var` is bound in `penv`
                 (lookupt var penv val)
-                (condo [;; mval matches
-                        (==t mval val)
-                        (== match? #t)
-                        (== penv penv-out)]
-                       [;; mval doesn't match -> fail
-                        else
-                        (=/= mval val)
-                        (== penv penv-out)])]
+                ((==t mval val) match?)
+                (ifo (==t match? #t) (=/= 'closure mval)
+                     succeed)
+                (== penv penv-out)]
                [;; `var` is not bound
-                else
-                (== match? #t)
-                (== penv-out `((,var . (val . ,mval)) . ,penv))
-                ((lookupt var penv 'not-bound) #f)])))))
+                (==t match? #t)
+                ((lookupt var penv 'not-bound) #f)
+                (== penv-out `((,var . (val . ,mval)) . ,penv))])))))
 
 (define p-matcht
   (lambda (p mval penv penv-out)
