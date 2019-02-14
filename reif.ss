@@ -2,28 +2,15 @@
   (lambda (test then else)
     (fresh (t)
       (test t)
-      (conde [(== t #t) then]
-             [(== t #f) else]))))
+      (conde
+       [(== t #t) then]
+       [(== t #f) else]))))
 
 (define ==t
   (lambda (x y)
     (lambda (t)
-      (conde [(== x y) (== t #t)]
-             [(=/= x y) (== t #f)]))))
-
-;; Do I really need this stuff?
-;; (define-syntax fresht
-;;   ;; A conjunction test
-;;   (syntax-rules ()
-;;     [(_ (idens ...) g)
-;;      (lambda (t)
-;;        (fresh (idens ...)
-;;          (g t)))]
-;;     [(_ (idens ...) g1 g2 gs ...)
-;;      (lambda (t)
-;;        (fresh (idens ...)
-;;          (ifo g1 ((fresht () g2 gs ...) t)
-;;               (== t #f))))]))
+      (conde [(== t #t) (== x y)]
+             [(== t #f) (=/= x y)]))))
 
 (define-syntax conjt
   ;; A conjunction test
@@ -80,42 +67,47 @@
   (lambda (x ees)
     (fresh (e es)
       (== ees `(,e . ,es))
-      (condo [(==t x e) succeed]
-             [else (memberd x es)]))))
+      (condo
+       [(==t x e) succeed]
+       [else (memberd x es)]))))
 
 (define memberd-impure
   (lambda (x ees)
     (fresh (e es)
       (== ees `(,e . ,es))
-      (conda [(== x e) succeed]
-             [succeed (memberd-impure x es)]))))
+      (conda
+       [(== x e) succeed]
+       [succeed (memberd-impure x es)]))))
 
 (define memberdt
   (lambda (x es)
     (lambda (t)
-      (conde [(== t #t) (memberd x es)]
-             [(== t #f) (fresh (_0)
-                         (mapo (lambda (in _out) (fresh () (== in _out) (=/= in x)))
-                               es
-                               _0))]))))
+      (conde
+       [(== t #t) (memberd x es)]
+       [(== t #f) (fresh (_0)
+                   (mapo (lambda (in _out) (fresh () (== in _out) (=/= in x)))
+                         es
+                         _0))]))))
 
 (define first-duplicate
   (lambda (x ees)
     (fresh (e es)
       (== ees `(,e . ,es))
-      (condo [(memberdt e es) (== x e)]
-             [else (first-duplicate x es)]))))
+      (condo
+       [(memberdt e es) (== x e)]
+       [else (first-duplicate x es)]))))
 
 (define tree-memberdt
   (lambda (e tree)
     (lambda (t)
-      (conde [(== tree '()) (== t #f)]
-             [(fresh (f l r)
-                (== tree `(,f ,l ,r))
-                ((condt [(==t e f)]
-                        [(tree-memberdt e l)]
-                        [(tree-memberdt e r)])
-                 t))]))))
+      (conde
+       [(== tree '()) (== t #f)]
+       [(fresh (f l r)
+          (== tree `(,f ,l ,r))
+          ((condt [(==t e f)]
+                  [(tree-memberdt e l)]
+                  [(tree-memberdt e r)])
+           t))]))))
 
 ;; Test cases!
 ;; (tfilter (lambda (item) (condt [(==t x item)] [(==t y item)]))

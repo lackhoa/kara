@@ -10,7 +10,7 @@
 
 (define repeat
   (lambda (i f)
-    (unless (= i 0) f (repeat (- i 1) f))))
+    (unless (= i 0) (f) (repeat (- i 1) f))))
 
 (define-syntax ifa
   (syntax-rules ()
@@ -55,15 +55,19 @@
 ;; (time (repeat 100000 (run* (q) (memberd 'z a-z))))
 
 ;; Tests for the full interpreter
-(;; This is my version
- load "full-interp.ss")
+;; (;; This is my version
+;;  load "full-interp.ss")
+
 ;; (;; This is the one in faster-mk
 ;;  load "faster-miniKanren/full-interp.scm")
 
-(time
- (run 1000 (x y)
+(;; This is the test version, when I mix things in between
+ load "test-interp.ss")
+
+(pp
+ (run 4 (x y)
    (fresh (_.0 _.1 _.2)
-     (== x `(letrec . ,_.0 ))
+     (== x y)
      (evalo x y))))
 
 ;; (time
@@ -79,7 +83,7 @@
 ;; letrec: 2x faster
 ;; pattern matching: 2x slower
 ;; Free-form evalo: 2x faster
-;; Quine: can't do anything 'bout it
+;; Quine: can't do anything 'bout it (unless with minor hinting, still slower)
 
 
 
