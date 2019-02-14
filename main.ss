@@ -55,24 +55,23 @@
 ;; (time (repeat 100000 (run* (q) (memberd 'z a-z))))
 
 ;; Tests for the full interpreter
-;; (;; This is my version
-;;  load "full-interp.ss")
-(;; This is the one in faster-mk
- load "faster-miniKanren/full-interp.scm")
-
-;; (time
-;;  ;; Quine: can't do anything 'bout it
-;;  (run 4 (x y)
-;;    (fresh (_.0 _.1 _.2)
-;;      (== x y)
-;;      (evalo x y))))
+(;; This is my version
+ load "full-interp.ss")
+;; (;; This is the one in faster-mk
+;;  load "faster-miniKanren/full-interp.scm")
 
 (time
- ;; Something random: 4x slower
- (run 500 (_.0 _.1 _.2 _.3)
-   (evalo
-    `(match ,_.0 [`,_.0 ,_.1] . ,_.2)
-    _.1)))
+ (run 1000 (x y)
+   (fresh (_.0 _.1 _.2)
+     (== x `(letrec . ,_.0 ))
+     (evalo x y))))
+
+;; (time
+;;  ;; Something random: 4x slower
+;;  (run 500 (_.0 _.1 _.2 _.3)
+;;    (evalo
+;;     `(match ,_.0 [`,_.0 ,_.1] . ,_.2)
+;;     _.1)))
 
 ;; Summary of reif interp vs the original
 ;; quote: no big difference (there's only one answer, though)
@@ -80,6 +79,7 @@
 ;; letrec: 2x faster
 ;; pattern matching: 2x slower
 ;; Free-form evalo: 2x faster
+;; Quine: can't do anything 'bout it
 
 
 

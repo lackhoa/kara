@@ -74,8 +74,7 @@
   (lambda (x env t)
     (lambda (bound?)
       (condo [(==t empty-env env)
-              (== bound? #f)
-              (== t 'not-bound)]
+              (== bound? #f) (== t 'not-bound)]
              [else
               (fresh (y b rest)
                 (== `((,y . ,b) . ,rest) env)

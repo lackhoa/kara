@@ -28,22 +28,20 @@
 (define-syntax conjt
   ;; A conjunction test
   (syntax-rules ()
-    [(_ g)
-     (lambda (t) (g t))]
+    [(_ g) g]
     [(_ g1 g2 gs ...)
      (lambda (t)
        (ifo g1 ((conjt g2 gs ...) t)
             (== t #f)))]))
 
-(define-syntax condt
+(define-syntax disjt
   ;; A disjunction test
   (syntax-rules ()
-    [(_ [g gs ...])
-     (conjt g gs ...)]
-    [(_ [g gs ...] c cs ...)
+    [(_ g) g]
+    [(_ g1 g2 gs ...)
      (lambda (t)
-       (ifo (conjt g gs ...) (== t #t)
-            ((condt c cs ...) t)))]))
+       (ifo g1 (== t #t)
+            ((disjt g2 gs ...) t)))]))
 
 (define-syntax condo
   ;; Literally the relational version of 'cond'
@@ -53,7 +51,8 @@
     [(_ [else g1 g2 gs ...])
      (fresh () g1 g2 gs ...)]
     [(_ [test g] cs ...)
-     (ifo test g (condo cs ...))]
+     (ifo test g
+          (condo cs ...))]
     [(_ [test g1 g2 gs ...] cs ...)
      (ifo test (fresh () g1 g2 gs ...)
           (condo cs ...))]
