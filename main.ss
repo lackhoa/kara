@@ -55,14 +55,14 @@
 ;; (time (repeat 100000 (run* (q) (memberd 'z a-z))))
 
 ;; Tests for the full interpreter
-;; (;; This is my version
-;;  load "full-interp.ss")
+(;; This is my version
+ load "full-interp.ss")
 
 ;; (;; This is the one in faster-mk
 ;;  load "faster-miniKanren/full-interp.scm")
 
-(;; This is the test version, when I mix things in between
- load "test-interp.ss")
+;; (;; This is the test version, when I mix things in between
+;;  load "test-interp.ss")
 
 (pp
  (run 4 (x y)
@@ -87,40 +87,39 @@
 
 
 
-;; (time
+;; (display
 ;;  ;; Something really complicated: 1.5x slower
-;;  (repeat 1000
-;;          (equal?
-;;           (run 1 (q)
-;;             (== q '((lambda (x) `(,x ',x)) '(lambda (x) `(,x ',x))))
-;;             (evalo
-;;              `(letrec ((eval-quasi (lambda (q eval)
-;;                                      (match q
-;;                                        [(? symbol? x) x]
-;;                                        [`() '()]
-;;                                        [`(,`unquote ,exp) (eval exp)]
-;;                                        [`(quasiquote ,datum) ('error)]
-;;                                        [`(,a . ,d)
-;;                                         (cons (eval-quasi a eval)
-;;                                               (eval-quasi d eval))]))))
-;;                 (letrec ((eval-expr
-;;                           (lambda (expr env)
-;;                             (match expr
-;;                               [`(quote ,datum) datum]
-;;                               [`(lambda (,(? symbol? x)) ,body)
-;;                                (lambda (a)
-;;                                  (eval-expr body (lambda (y)
-;;                                                    (if (equal? x y)
-;;                                                        a
-;;                                                        (env y)))))]
-;;                               [(? symbol? x) (env x)]
-;;                               [`(quasiquote ,datum)
-;;                                (eval-quasi datum (lambda (exp) (eval-expr
-;;                                                            exp env)))]
-;;                               [`(,rator ,rand)
-;;                                ((eval-expr rator env) (eval-expr rand env))]
-;;                               ))))
-;;                   (eval-expr ',q
-;;                              'initial-env)))
-;;              q))
-;;           (list '((lambda (x) `(,x ',x)) '(lambda (x) `(,x ',x)))))))
+;;  (equal?
+;;   (run 1 (q)
+;;     (== q '((lambda (x) `(,x ',x)) '(lambda (x) `(,x ',x))))
+;;     (evalo
+;;      `(letrec ((eval-quasi (lambda (q eval)
+;;                              (match q
+;;                                [(? symbol? x) x]
+;;                                [`() '()]
+;;                                [`(,`unquote ,exp) (eval exp)]
+;;                                [`(quasiquote ,datum) ('error)]
+;;                                [`(,a . ,d)
+;;                                 (cons (eval-quasi a eval)
+;;                                       (eval-quasi d eval))]))))
+;;         (letrec ((eval-expr
+;;                   (lambda (expr env)
+;;                     (match expr
+;;                       [`(quote ,datum) datum]
+;;                       [`(lambda (,(? symbol? x)) ,body)
+;;                        (lambda (a)
+;;                          (eval-expr body (lambda (y)
+;;                                            (if (equal? x y)
+;;                                                a
+;;                                                (env y)))))]
+;;                       [(? symbol? x) (env x)]
+;;                       [`(quasiquote ,datum)
+;;                        (eval-quasi datum (lambda (exp) (eval-expr
+;;                                                    exp env)))]
+;;                       [`(,rator ,rand)
+;;                        ((eval-expr rator env) (eval-expr rand env))]
+;;                       ))))
+;;           (eval-expr ',q
+;;                      'initial-env)))
+;;      q))
+;;   (list '((lambda (x) `(,x ',x)) '(lambda (x) `(,x ',x))))))
