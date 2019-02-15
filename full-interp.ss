@@ -7,68 +7,89 @@
     (eval-expo expr initial-env val)))
 
 (define eval-expo
+  ;; Keywords: quote, lambda, letrec, match, and, or, if,
   (lambda (expr env val)
-    (conde
-     [(== `(quote ,val) expr)
-      (absento 'closure val)
-      (absento 'prim val)
-      ((lookupt 'quote env 'unbound) #f)]
-
-     [(numbero expr) (== expr val)]
-
-     [(symbolo expr) ((lookupt expr env val) #t)]
-
-     [(fresh (x body)
-        (== `(lambda ,x ,body) expr)
-        (== `(closure (lambda ,x ,body) ,env) val)
-        (conde
-         [;; Variadic
-          (symbolo x)]
-         [;; Multi-argument
-          (list-of-symbolso x)])
-        ((lookupt 'lambda env 'unbound) #f))]
-
-     [(fresh (rator x rands body env^ a* res)
-        (== `(,rator . ,rands) expr)
-        ;; variadic
-        (symbolo x)
-        (== `((,x . (val . ,a*)) . ,env^) res)
-        (eval-expo rator env `(closure (lambda ,x ,body) ,env^))
-        (eval-expo body res val)
-        (eval-listo rands env a*))]
-
-     [(fresh (rator x* rands body env^ a* res)
-        (== `(,rator . ,rands) expr)
-        ;; Multi-argument
-        (eval-expo rator env `(closure (lambda ,x* ,body) ,env^))
-        (eval-listo rands env a*)
-        (ext-env*o x* a* env^ res)
-        (eval-expo body res val))]
-
-     [(fresh (rator x* rands a* prim-id)
-        (== `(,rator . ,rands) expr)
-        (eval-expo rator env `(prim . ,prim-id))
-        (eval-primo prim-id a* val)
-        (eval-listo rands env a*))]
-
-     [(handle-matcho expr env val)]
-
-     [(fresh (p-name x body letrec-body)
-        ;; single-function variadic letrec version
-        (== `(letrec ((,p-name (lambda ,x ,body)))
-              ,letrec-body)
-           expr)
-        (conde
-         [;; Variadic
-          (symbolo x)]
-         [;; Multiple argument
-          (list-of-symbolso x)])
-        ((lookupt 'letrec env 'unbound) #f)
-        (eval-expo letrec-body
-                   `((,p-name . (rec . (lambda ,x ,body))) . ,env)
-                   val))]
-
-     [(prim-expo expr env val)])))
+    (condo
+     [;; Self-eval: boolean, number
+      (self-eval-literalt expr)
+      (== expr val)]
+     ;; [;; Variable lookup
+     ;;  (typet expr 'symbol)
+     ;;  ((lookupt expr env val) #t)]
+     ;; [;; Pairs
+     ;;  else
+     ;;  (fresh (tag expr-d function)
+     ;;    (== expr `(,tag . ,expr-d))
+     ;;    (condo
+     ;;     [(typet tag 'symbol)
+     ;;      (condo
+     ;;       [(lookupt tag env function) succeed]
+     ;;       [;; Special forms and macros
+     ;;        else
+     ;;        (;; Signal to the code below
+     ;;         == function #f)
+     ;;        (condo
+     ;;         [;; Quotation: cannot create funval
+     ;;          (==t tag 'quote)
+     ;;          (== expr-d `(,val))
+     ;;          ((typet val 'pair) #t)]
+     ;;         [;; Lambda
+     ;;          (==t tag 'lambda)
+     ;;          (fresh (x body)
+     ;;            (== `(,x ,body) expr-d)
+     ;;            (== `(closure (lambda ,x ,body) ,env) val)
+     ;;            (conde
+     ;;             [;; Variadic
+     ;;              (symbolo x)]
+     ;;             [;; Multi-argument
+     ;;              (list-of-symbolso x)]))]
+     ;;         [;; Pattern matching
+     ;;          (==t tag 'match)
+     ;;          (handle-matcho expr env val)]
+     ;;         [;; Single-function variadic letrec version
+     ;;          (==t tag 'letrec)
+     ;;          (fresh (p-name x body letrec-body)
+     ;;            (== `(letrec [(,p-name (lambda ,x ,body))]
+     ;;                  ,letrec-body)
+     ;;               expr)
+     ;;            (conde
+     ;;             [;; Variadic
+     ;;              (symbolo x)]
+     ;;             [;; Multi-argument
+     ;;              (list-of-symbolso x)])
+     ;;            (eval-expo letrec-body
+     ;;                       `((,p-name . (rec . (lambda ,x ,body))) . ,env)
+     ;;                       val))]
+     ;;         [;; Macros
+     ;;          else (prim-expo expr env val)])])]
+     ;;     [(typet tag 'pair)
+     ;;      ;; Definitely application
+     ;;      (eval-expo tag env function)])
+     ;;    (;; Do function application if needed
+     ;;     ifo (==t #f function) succeed
+     ;;         (let ([rands expr-d])
+     ;;           (fresh (fun-tag fun-d a* x)
+     ;;             (== function `(,fun-tag . ,fun-d))
+     ;;             (eval-listo rands env a*)
+     ;;             (condo
+     ;;              [(==t fun-tag 'closure)
+     ;;               (fresh (body env^ env-res)
+     ;;                 (== `((lambda ,x ,body) ,env^) fun-d)
+     ;;                 (condo
+     ;;                  [;; Variadic
+     ;;                   (typet x 'symbol)
+     ;;                   (== `((,x . (val . ,a*)) . ,env^) env-res)
+     ;;                   (eval-expo body env-res val)]
+     ;;                  [;; Multi-argument
+     ;;                   else
+     ;;                   (let ([x* x])
+     ;;                     (ext-env*o x* a* env^ env-res))
+     ;;                   (eval-expo body env-res val)]))]
+     ;;              [;; Primitive
+     ;;               (==t fun-tag 'prim)
+     ;;               (let ([prim-id fun-d])
+     ;;                 (eval-primo prim-id a* val))])))))]
+     )))
 
 (define empty-env '())
 
@@ -91,7 +112,18 @@
            [else
             ((lookupt x rest t) bound?)]))]))))
 
+(define list-of-symbolso
+  (lambda (los)
+    (conde
+     [(== '() los)]
+     [(symbolo los)]
+     [(fresh (a d)
+        (== `(,a . ,d) los)
+        (symbolo a)
+        (list-of-symbolso d))])))
+
 (define eval-listo
+  ;; To handle variadic case
   (lambda (expr env val)
     (conde
      [(== '() expr)
@@ -102,68 +134,51 @@
         (eval-expo a env v-a)
         (eval-listo d env v-d))])))
 
-;; need to make sure lambdas are well formed.
-;; grammar constraints would be useful here!!!
-(define list-of-symbolso
-  (lambda (los)
-    (conde
-     [(== '() los)]
-     [(fresh (a d)
-        (== `(,a . ,d) los)
-        (symbolo a)
-        (list-of-symbolso d))])))
-
 (define ext-env*o
-  (lambda (x* a* env out)
+  (lambda (x* a* env env-out)
     (conde
-     [(== '() x*) (== '() a*) (== env out)]
+     [(== '() x*) (== '() a*) (== env env-out)]
+     [;; Handles rest-arg case
+      (symbolo x*)
+      (== `((,x* . (val . ,a*)) . ,env) env-out)]
      [(fresh (x a dx* da* env2)
         (== `(,x . ,dx*) x*)
         (== `(,a . ,da*) a*)
         (== `((,x . (val . ,a)) . ,env) env2)
         (symbolo x)
-        (ext-env*o dx* da* env2 out))])))
+        (ext-env*o dx* da* env2 env-out))])))
 
 (define eval-primo
   (lambda (prim-id a* val)
-    (conde
-     [(== prim-id 'cons)
+    (condo
+     [(==t prim-id 'cons)
       (fresh (a d)
         (== `(,a ,d) a*)
-        (== `(,a . ,d) val))]
-     [(== prim-id 'car)
+        (== `(,a . ,d) val))
+      (;; Cannot create funvar
+       (typet val 'pair) #t)]
+     [(==t prim-id 'car)
       (fresh (d)
-        (== `((,val . ,d)) a*)
-        (=/= 'closure val))]
-     [(== prim-id 'cdr)
+        (== `((,val . ,d)) a*))]
+     [(==t prim-id 'cdr)
       (fresh (a)
-        (== `((,a . ,val)) a*)
-        (=/= 'closure a))]
-     [(== prim-id 'not)
+        (== `((,a . ,val)) a*))]
+     [(==t prim-id 'not)
       (fresh (b)
         (== `(,b) a*)
-        (conde
-         [(=/= #f b) (== #f val)]
-         [(== #f b) (== #t val)]))]
-     [(== prim-id 'equal?)
+        ((==t #f b) val))]
+     [(==t prim-id 'equal?)
       (fresh (v1 v2)
         (== `(,v1 ,v2) a*)
-        (conde
-         [(== v1 v2) (== #t val)]
-         [(=/= v1 v2) (== #f val)]))]
-     [(== prim-id 'symbol?)
+        ((==t v1 v2) val))]
+     [(==t prim-id 'symbol?)
       (fresh (v sort)
         (== `(,v) a*)
-        (conde
-         [(== sort 'symbol) (== #t val)]
-         [(=/= sort 'symbol) (== #f val)])
-        (typeo v sort))]
-     [(== prim-id 'null?)
+        ((typet v 'symbol) val))]
+     [(==t prim-id 'null?)
       (fresh (v)
         (== `(,v) a*)
-        (conde
-         [(== '() v) (== #t val)]
-         [(=/= '() v) (== #f val)]))])))
+        ((==t '() v) val))])))
 
 (define prim-expo
   (lambda (expr env val)
@@ -183,7 +198,6 @@
   (lambda (expr env val)
     (fresh (e*)
       (== `(and . ,e*) expr)
-      ((lookupt 'and env 'unbound) #f)
       (ando e* env val))))
 
 (define ando
@@ -195,11 +209,11 @@
         (eval-expo e env val))]
      [(fresh (e1 e2 e-rest v)
         (== `(,e1 ,e2 . ,e-rest) e*)
-        (conde
-         [(== #f v)
+        (condo
+         [(==t #f v)
           (== #f val)
           (eval-expo e1 env v)]
-         [(=/= #f v)
+         [else
           (eval-expo e1 env v)
           (ando `(,e2 . ,e-rest) env val)]))])))
 
@@ -207,7 +221,6 @@
   (lambda (expr env val)
     (fresh (e*)
       (== `(or . ,e*) expr)
-      ((lookupt 'or env 'unbound) #f)
       (oro e* env val))))
 
 (define oro
@@ -219,23 +232,21 @@
         (eval-expo e env val))]
      [(fresh (e1 e2 e-rest v)
         (== `(,e1 ,e2 . ,e-rest) e*)
-        (conde
-         [(=/= #f v)
-          (== v val)
-          (eval-expo e1 env v)]
-         [(== #f v)
+        (condo
+         [(==t #f v)
           (eval-expo e1 env v)
-          (oro `(,e2 . ,e-rest) env val)]))])))
+          (oro `(,e2 . ,e-rest) env val)]
+         [else
+          (== v val)
+          (eval-expo e1 env v)]))])))
 
 (define if-primo
   (lambda (expr env val)
     (fresh (e1 e2 e3 t)
       (== `(if ,e1 ,e2 ,e3) expr)
-      ((lookupt 'if env 'unbound) #f)
       (eval-expo e1 env t)
-      (conde
-       [(=/= #f t) (eval-expo e2 env val)]
-       [(== #f t) (eval-expo e3 env val)]))))
+      (if (==t #f t) (eval-expo e3 env val)
+          (eval-expo e2 env val)))))
 
 (define initial-env
   `((list    . (val . (closure (lambda x x) ,empty-env)))
@@ -254,44 +265,34 @@
   (lambda (expr env val)
     (fresh (against-expr mval clause clauses)
       (== `(match ,against-expr ,clause . ,clauses) expr)
-      ((lookupt 'match env 'unbound) #f)
       (eval-expo against-expr env mval)
       (match-clauses mval `(,clause . ,clauses) env val))))
 
-(define typeo
-  ;; Works in this context at least
-  (lambda (term type)
-    (conde
-     [(== type 'symbol)  (symbolo term)]
-     [(== type 'boolean) (booleano term)]
-     [(== type 'number)  (numbero term)]
-     [(== type 'null)    (== '() term)]
-     [(== type 'pair)    (fresh (a d) (== `(,a . ,d) term))])))
-
 (define typet
+  ;; Complete classification of recognized terms
+  ;; also able to determine if a term is of some type
   (lambda (term type)
     (lambda (same?)
       (fresh (T)
         ((==t type T) same?)
-        (typeo term T)))))
+        (condo
+         [(==t 'symbol  T) (symbolo term)]
+         [(==t 'boolean T) (conde [(== term #t)]
+                                  [(== term #f)])]
+         [(==t 'number  T) (numbero term)]
+         [(==t 'null    T) (== '() term)]
+         [else
+          (fresh (a _d)
+            (== `(,a . ,_d) term)
+            (condo
+             [(disjt (==t a 'prim) (==t a 'closure))
+              (== 'funval T)]
+             [else (== 'pair T)]))])))))
 
-(define self-eval-literalo
-  (lambda (t)
-    (conde
-     [(numbero t)]
-     [(booleano t)])))
-
-(define literalo
-  (lambda (t)
-    (conde
-     [(numbero t)]
-     [(symbolo t) (=/= 'closure t)]
-     [(booleano t)]
-     [(== '() t)])))
-
-(define booleano
-  (lambda (t)
-    (conde [(== #f t)] [(== #t t)])))
+(define self-eval-literalt
+  (lambda (term)
+    (disjt (typet term 'boolean)
+           (typet term 'number))))
 
 (define regular-env-appendo
   (lambda (env1 env2 env-out)
@@ -326,7 +327,7 @@
           (ifo (==t match? #t) (=/= 'closure mval)
                succeed)
           (== penv penv-out)]
-         [;; `var` is not bound
+         [;; `var` is not bound -> auto match
           (==t match? #t)
           ((lookupt var penv 'unbound) #f)
           (== penv-out `((,var . (val . ,mval)) . ,penv))])))))
@@ -334,12 +335,18 @@
 (define p-matcht
   (lambda (p mval penv penv-out)
     (lambda (match?)
-      (conde
-       [(self-eval-literalo p)
-        (== penv penv-out)
-        ((==t p mval) match?)]
-       [((var-p-matcht p mval penv penv-out) match?)]
-       [(fresh (var pred val type)
+      (condo
+       [(self-eval-literalt p)
+        ((==t p mval) match?)
+        (== penv penv-out)]
+
+       [(typet p 'symbol)
+        ((var-p-matcht p mval penv penv-out)
+         match?)]
+
+       [(fresh (ignore)
+          (==t `(? . ,ignore)))
+        (fresh (var pred val type)
           (== `(? ,pred ,var) p)
           (symbolo var)
           (conde
@@ -349,32 +356,34 @@
             (typet mval type)
             (var-p-matcht var mval penv penv-out))
            match?))]
-       [(fresh (quasi-p)
+
+       [else
+        (fresh (quasi-p)
           (== (list 'quasiquote quasi-p) p)
           ((quasi-p-matcht quasi-p mval penv penv-out) match?))]))))
 
 (define quasi-p-matcht
   (lambda (quasi-p mval penv penv-out)
     (lambda (match?)
-      (conde
-       [((==t quasi-p mval) match?)
-        (== penv penv-out)
-        (literalo quasi-p)]
-       [(fresh (p)
-          (== (list 'unquote p) quasi-p)
-          (ifo (==t match? #t) succeed
-               (=/= 'closure mval))
-          ((p-matcht p mval penv penv-out) match?))]
-       [(fresh (a d)
+      (condo
+       [(typet quasi-p 'pair)
+        (fresh (a d)
           (== `(,a . ,d) quasi-p)
-          (=/= 'unquote a)
-          (conde
-           [(== match? #f)
-            (== penv penv-out)
-            (literalo mval)]
-           [(fresh (v1 v2 penv^)
-              (== `(,v1 . ,v2) mval)
-              ((conjt
-                (quasi-p-matcht a v1 penv  penv^)
-                (quasi-p-matcht d v2 penv^ penv-out))
-               match?))]))]))))
+          (condo
+           [(==t 'unquote a)
+            ((p-matcht d mval penv penv-out) match?)]
+           [else
+            (condo
+             [(typet mval 'pair)
+              (fresh (v1 v2 penv^)
+                (== `(,v1 . ,v2) mval)
+                ((conjt
+                  (quasi-p-matcht a v1 penv  penv^)
+                  (quasi-p-matcht d v2 penv^ penv-out))
+                 match?))]
+             [else
+              (== match? #f)
+              (== penv penv-out)])]))]
+       [else
+        ((==t quasi-p mval) match?)
+        (== penv penv-out)]))))
