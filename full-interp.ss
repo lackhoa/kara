@@ -23,24 +23,7 @@
      [(handle-matcho expr env val)]
      [(handle-letreco expr env val)]
      [(prim-expo expr env val)]
-     [(fresh (rator rands function a*)
-        (== `(,rator . ,rands) expr)
-        (eval-expo rator env function)
-        (let ([make-arg (eval-exp*o rands env a*)])
-          (fresh (para body env^ env-res)
-            (== `(closure (lambda ,para ,body) ,env^)
-               function)
-            make-arg
-            (ext-env*o para a* env^ env-res)
-            (eval-expo body env-res val))))]
-     [(fresh (rator rands function a*)
-        (== `(,rator . ,rands) expr)
-        (eval-expo rator env function)
-        (let ([make-arg (eval-exp*o rands env a*)])
-          (fresh (prim-id)
-            (== `(prim . ,prim-id) function)
-            make-arg
-            (apply-primo prim-id a* val))))])))
+     [(applyo expr env val)])))
 
 (define applyo
   (lambda (expr env val)
