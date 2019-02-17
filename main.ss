@@ -4,7 +4,6 @@
 ;; (load "faster-miniKanren/numbers.scm")
 ;; (load "miniKanren/mk.scm")
 
-(load "reif.ss")
 
 (define pp (lambda (ls) (for-each pretty-print ls)))
 
@@ -13,18 +12,20 @@
     (unless (= i 0) (f) (repeat (- i 1) f))))
 
 (define reflect
+  ;; For debugging
   (lambda (x)
     (project (x)
       (begin (display x) (newline)
              succeed))))
 
 ;; Tests for the full interpreter
-(;; This is my version
+(load "reif.ss")
+(;; my version of the interp
  load "full-interp.ss")
 
-;; (;; This is the one in faster-mk
+;; (;; This is the interp in faster-mk
 ;;  load "faster-miniKanren/full-interp.scm")
 
 (display
- (run* (x y)
-   (evalo y #f)))
+ (run 9900 (q)
+   (evalo q '(I love you))))
