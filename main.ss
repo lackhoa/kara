@@ -26,6 +26,6 @@
 ;; (;; This is the interp in faster-mk
 ;;  load "faster-miniKanren/full-interp.scm")
 
-(display
- (run 9900 (q)
+(time
+ (run 999 (q)
    (evalo q '(I love you))))
