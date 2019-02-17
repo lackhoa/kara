@@ -93,11 +93,9 @@
                 (== `(closure ,lam-expr ,env) t))])]
            [else
             ((lookupt x rest t) bound?)]))]))))
-
 (define lookupo
   (lambda (x env val)
     ((lookupt x env val) #t)))
-
 (define not-in-envo
   (lambda (x env)
     ((lookupt x env 'unbound) #f)))
@@ -150,11 +148,11 @@
      [(== prim-id 'car)
       (fresh (d)
         (== `((,val . ,d)) a*)
-        ((typet `(,val . ,d) 'pair) #t))]
+        (typeo `(,val . ,d) 'pair))]
      [(== prim-id 'cdr)
       (fresh (a)
         (== `((,a . ,val)) a*)
-        ((typet `(,a . ,val) 'pair) #t))]
+        (typeo `(,a . ,val) 'pair))]
      [(== prim-id 'not)
       (fresh (b)
         (== `(,b) a*)
@@ -259,6 +257,12 @@
              [(disjt (==t a 'prim) (==t a 'closure))
               (== 'funval T)]
              [else (== 'pair T)]))])))))
+(define typeo
+  (lambda (term type)
+    ((typet term type) #t)))
+(define not-typeo
+  (lambda (term type)
+    ((typet term type) #f)))
 
 (define self-eval-literalo
   (lambda (term)
