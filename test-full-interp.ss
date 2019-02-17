@@ -1,3 +1,5 @@
+(display "Even lists")
+(newline)
 (time
  (equal?
   (length
@@ -11,8 +13,10 @@
                (even-list? ',x*))
             #t)))
   5))
-(newline)
 
+(newline)
+(display "Quasi-quine")
+(newline)
 (time
  (equal?
   (run* (q)
@@ -47,7 +51,6 @@
           (eval-expr ',q 'initial-env)))
      q))
   (list '((lambda (x) `(,x ',x)) '(lambda (x) `(,x ',x))))))
-(newline)
 
 (define proof?-evalo
   (lambda (proof result)
@@ -84,11 +87,22 @@
           (((A => B) (A (A => B) (B => C)) assumption ())
            (A (A (A => B) (B => C)) assumption ()))))))
 
+(newline)
+(display "Proof check")
+(newline)
 (time
  (run 1 (q)
    (proof?-evalo example-proof q)))
 
-(display "Takes a few seconds...")
+(newline)
+(display "999 I love you")
+(newline)
+(time
+ (run 999 (q)
+   (evalo q '(I love you))))
+
+(newline)
+(display "Quine: Takes a few seconds...")
 (newline)
 (time
  (run 4 (q)
