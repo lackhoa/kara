@@ -72,28 +72,56 @@
 
 (define empty-env '())
 
+;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; (define lookupt
+;;   (lambda (x env t)
+;;     (lambda (bound?)
+;;       (conde
+;;        [(== bound? #f) (== empty-env env)]
+;;        [(fresh (y b rest)
+;;           (== `((,y . ,b) . ,rest) env)
+;;           (conde
+;;            [(== #t bound?) (== x y)
+;;             (conde
+;;              [(== `(val . ,t) b)]
+;;              [(fresh (lam-expr)
+;;                 (== `(rec . ,lam-expr) b)
+;;                 (== `(closure ,lam-expr ,env) t))])]
+;;            [(=/= x y)
+;;             ((lookupt x rest t) bound?)]))]))))
+
 (define lookupo
   (lambda (x env t)
     (fresh (y b rest)
       (== `((,y . ,b) . ,rest) env)
       (conde
-       ((== x y)
+       [(== x y)
         (conde
-         ((== `(val . ,t) b))
-         ((fresh (lam-expr)
+         [;; (== `(val . ,t) b)
+          (conde [(== `(val . ,t) b)])]
+         [(fresh (lam-expr)
             (== `(rec . ,lam-expr) b)
-            (== `(closure ,lam-expr ,env) t)))))
-       ((=/= x y)
-        (lookupo x rest t))))))
+            (== `(closure ,lam-expr ,env) t))])]
+       [(=/= x y)
+        (lookupo x rest t)]))))
 
 (define not-in-envo
   (lambda (x env)
     (conde
-     ((== empty-env env))
-     ((fresh (y b rest)
+     [(== empty-env env)]
+     [(fresh (y b rest)
         (== `((,y . ,b) . ,rest) env)
         (=/= y x)
-        (not-in-envo x rest))))))
+        (not-in-envo x rest))])))
+
+;; (define lookupo
+;;   (lambda (x env val)
+;;     ((lookupt x env val) #t)))
+
+;; (define not-in-envo
+;;   (lambda (x env)
+;;     ((lookupt x env 'unbound) #f)))
+;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define eval-listo
   (lambda (expr env val)

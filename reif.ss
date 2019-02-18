@@ -1,24 +1,14 @@
 (define ==t
   (lambda (x y)
     (lambda (t)
-      (conde
-       [(== t #t) (== x y)]
-       [(== t #f) (=/= x y)]))))
-
-(define ifo
-  (lambda (test then else)
-    (fresh (t)
-      (test t)
-      (conde
-       [(== #t t) then]
-       [(== #f t) else]))))
-
-(define negt
-  (lambda (test)
-    (lambda (t)
-      (conde
-       [(== t #t) (test #f)]
-       [(== t #f) (test #t)]))))
+      (cond
+       [(eq? #t t) (== x y)]
+       [(eq? #f t) (=/= x y)]
+       [(eq? x y)  (== #t t)]
+       [else
+        (conde
+         [(== #t t) (== x y)]
+         [(== #f t) (=/= x y)])]))))
 
 (define-syntax conjt
   ;; A conjunction test
@@ -26,8 +16,9 @@
     [(_ g) g]
     [(_ g1 g2 gs ...)
      (lambda (t)
-       (ifo g1 ((conjt g2 gs ...) t)
-            (== t #f)))]))
+       (conde
+        [(g1 #t)  ((conjt g2 gs ...) t)]
+        [(== #f t) (g1 #f)]))]))
 
 (define-syntax disjt
   ;; A disjunction test
@@ -35,26 +26,21 @@
     [(_ g) g]
     [(_ g1 g2 gs ...)
      (lambda (t)
-       (ifo g1 (== t #t)
-            ((disjt g2 gs ...) t)))]))
+       (conde
+        [(== #t t) (g1 #t)]
+        [(g1 #f)  ((disjt g2 gs ...) t)]))]))
 
 (define-syntax condo
   ;; Literally the relational version of 'cond'
   ;; Fails if no clauses match
   (syntax-rules (else)
     [(_ [else g]) g]
-
     [(_ [else g1 g2 g* ...])
      (fresh () g1 g2 g* ...)]
-
-    [(_ [test g] c* ...)
-     (ifo test g
-          (condo c* ...))]
-
-    [(_ [test g1 g2 g* ...] c* ...)
-     (ifo test (fresh () g1 g2 g* ...)
-          (condo c* ...))]
-
+    [(_ [test g g* ...] c* ...)
+     (conde
+      [(test #t) g g* ...]
+      [(test #f) (condo c* ...)])]
     [(_) fail]))
 
 

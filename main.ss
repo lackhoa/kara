@@ -22,9 +22,9 @@
 (load "reif.ss")
 ;; (;; my version of the interp
 ;;  load "full-interp.ss")
-;; (;; The experiment
-;;  load "exp-interp.ss")
-(;; This is the interp in faster-mk
- load "faster-miniKanren/full-interp.scm")
+(;; The experiment
+ load "exp-interp.ss")
+;; (;; This is the interp in faster-mk
+;;  load "faster-miniKanren/full-interp.scm")
 
 (load "test-full-interp.ss")

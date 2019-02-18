@@ -1,56 +1,60 @@
-(display "Even lists")
+(display "Even lists: 1.059")
 (newline)
 (time
- (equal?
-  (length
-   (run 5 (x*)
-     (evalo `(letrec ([even-list?
-                       (lambda (ls)
-                         (match ls
-                           [`() #t]
-                           [`(,a ,b . ,d) (even-list? d)]
-                           [else #f]))])
-               (even-list? ',x*))
-            #t)))
-  5))
+ (repeat 100
+         (lambda ()
+           (equal?
+            (length
+             (run 5 (x*)
+               (evalo `(letrec ([even-list?
+                                 (lambda (ls)
+                                   (match ls
+                                     [`() #t]
+                                     [`(,a ,b . ,d) (even-list? d)]
+                                     [else #f]))])
+                         (even-list? ',x*))
+                      #t)))
+            5))))
 
 (newline)
-(display "Quasi-quine")
+(display "Quasi-quine: 3.179")
 (newline)
 (time
- (equal?
-  (run* (q)
-    (== q '((lambda (x) `(,x ',x)) '(lambda (x) `(,x ',x))))
-    (evalo
-     `(letrec ((eval-quasi
-                (lambda (q eval)
-                  (match q
-                    [(? symbol? x) x]
-                    [`() '()]
-                    [`(,`unquote ,exp) (eval exp)]
-                    [`(quasiquote ,datum) ('error)]
-                    [`(,a . ,d)
-                     (cons (eval-quasi a eval)
-                           (eval-quasi d eval))]))))
-        (letrec ((eval-expr
-                  (lambda (expr env)
-                    (match expr
-                      [`(quote ,datum) datum]
-                      [`(lambda (,(? symbol? x)) ,body)
-                       (lambda (a)
-                         (eval-expr body (lambda (y)
-                                           (if (equal? x y)
-                                               a
-                                               (env y)))))]
-                      [(? symbol? x) (env x)]
-                      [`(quasiquote ,datum)
-                       (eval-quasi datum (lambda (exp) (eval-expr
-                                                   exp env)))]
-                      [`(,rator ,rand)
-                       ((eval-expr rator env) (eval-expr rand env))]))))
-          (eval-expr ',q 'initial-env)))
-     q))
-  (list '((lambda (x) `(,x ',x)) '(lambda (x) `(,x ',x))))))
+ (repeat 100
+         (lambda ()
+           (equal?
+            (run* (q)
+              (== q '((lambda (x) `(,x ',x)) '(lambda (x) `(,x ',x))))
+              (evalo
+               `(letrec ((eval-quasi
+                          (lambda (q eval)
+                            (match q
+                              [(? symbol? x) x]
+                              [`() '()]
+                              [`(,`unquote ,exp) (eval exp)]
+                              [`(quasiquote ,datum) ('error)]
+                              [`(,a . ,d)
+                               (cons (eval-quasi a eval)
+                                     (eval-quasi d eval))]))))
+                  (letrec ((eval-expr
+                            (lambda (expr env)
+                              (match expr
+                                [`(quote ,datum) datum]
+                                [`(lambda (,(? symbol? x)) ,body)
+                                 (lambda (a)
+                                   (eval-expr body (lambda (y)
+                                                     (if (equal? x y)
+                                                         a
+                                                         (env y)))))]
+                                [(? symbol? x) (env x)]
+                                [`(quasiquote ,datum)
+                                 (eval-quasi datum (lambda (exp) (eval-expr
+                                                             exp env)))]
+                                [`(,rator ,rand)
+                                 ((eval-expr rator env) (eval-expr rand env))]))))
+                    (eval-expr ',q 'initial-env)))
+               q))
+            (list '((lambda (x) `(,x ',x)) '(lambda (x) `(,x ',x))))))))
 
 (define proof?-evalo
   (lambda (proof result)
@@ -88,21 +92,24 @@
            (A (A (A => B) (B => C)) assumption ()))))))
 
 (newline)
-(display "Proof check")
+(display "Proof check: 6.956")
 (newline)
 (time
- (run 1 (q)
-   (proof?-evalo example-proof q)))
+ (repeat 100
+         (lambda () (run 1 (q)
+                 (proof?-evalo example-proof q)))))
 
 (newline)
-(display "999 I love you")
+(display "999 I love you: 5.051")
 (newline)
 (time
- (run 999 (q)
-   (evalo q '(I love you))))
+ (repeat 10
+         (lambda ()
+           (run 999 (q)
+             (evalo q '(I love you))))))
 
 (newline)
-(display "Quine: Takes a few seconds...")
+(display "Quine: 3.762")
 (newline)
 (time
  (run 4 (q)

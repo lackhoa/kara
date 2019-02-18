@@ -77,14 +77,14 @@
     (fresh (y b rest)
       (== `((,y . ,b) . ,rest) env)
       (conde
-       ((== x y)
+       [(== x y)
         (conde
-         ((== `(val . ,t) b))
-         ((fresh (lam-expr)
+         [(== `(val . ,t) b)]
+         [(fresh (lam-expr)
             (== `(rec . ,lam-expr) b)
-            (== `(closure ,lam-expr ,env) t)))))
-       ((=/= x y)
-        (lookupo x rest t))))))
+            (== `(closure ,lam-expr ,env) t))])]
+       [(=/= x y)
+        (lookupo x rest t)]))))
 
 (define not-in-envo
   (lambda (x env)
