@@ -73,22 +73,23 @@
 (define empty-env '())
 
 ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; (define lookupt
-;;   (lambda (x env t)
-;;     (lambda (bound?)
-;;       (conde
-;;        [(== bound? #f) (== empty-env env)]
-;;        [(fresh (y b rest)
-;;           (== `((,y . ,b) . ,rest) env)
-;;           (conde
-;;            [(== #t bound?) (== x y)
-;;             (conde
-;;              [(== `(val . ,t) b)]
-;;              [(fresh (lam-expr)
-;;                 (== `(rec . ,lam-expr) b)
-;;                 (== `(closure ,lam-expr ,env) t))])]
-;;            [(=/= x y)
-;;             ((lookupt x rest t) bound?)]))]))))
+
+(define lookupt
+  (lambda (x env t)
+    (lambda (bound?)
+      (conde
+       [(== bound? #f) (== empty-env env)]
+       [(fresh (y b rest)
+          (== `((,y . ,b) . ,rest) env)
+          (condo
+           [(==t x y) (== #t bound?)
+            (conde
+             [(== `(val . ,t) b)]
+             [(fresh (lam-expr)
+                (== `(rec . ,lam-expr) b)
+                (== `(closure ,lam-expr ,env) t))])]
+           [else
+            ((lookupt x rest t) bound?)]))]))))
 
 (define lookupo
   (lambda (x env t)

@@ -27,4 +27,4 @@
 ;; (;; This is the interp in faster-mk
 ;;  load "faster-miniKanren/full-interp.scm")
 
-(load "test-full-interp.ss")
+;; (load "test-full-interp.ss")
