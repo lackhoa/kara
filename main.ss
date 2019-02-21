@@ -1,10 +1,15 @@
-(load "faster-miniKanren/mk-vicare.scm")
-(load "faster-miniKanren/mk.scm")
+;;; miniKanren
+;; (load "faster-miniKanren/mk-vicare.scm")
+;; (load "faster-miniKanren/mk.scm")
 ;; (load "faster-miniKanren/matche.scm")
 ;; (load "faster-miniKanren/numbers.scm")
 ;; (load "miniKanren/mk.scm")
+(load "micro.ss")
 
+;;; My stuff
+;; (load "compiler.ss")
 
+;;; Help functions
 (define pp (lambda (ls) (for-each pretty-print ls)))
 
 (define repeat
@@ -18,13 +23,15 @@
       (begin (display x) (newline)
              succeed))))
 
-;; Tests for the full interpreter
-(load "reif.ss")
-;; (;; my version of the interp
-;;  load "full-interp.ss")
-(;; The experiment
- load "exp-interp.ss")
-;; (;; This is the interp in faster-mk
-;;  load "faster-miniKanren/full-interp.scm")
+;;; The main program
+(defrel (appendo l1 l2 l)
+  (conde
+   [(== '() l1) (== l2 l)]
+   [(fresh (a d l-d)
+      (== `(,a . ,d) l1)
+      (== `(,a . ,l-d) l)
+      (appendo d l2 l-d))]))
 
-;; (load "test-full-interp.ss")
+(pp
+ (run* (q p)
+   (appendo q p '(1 2 3 4 5))))
