@@ -28,11 +28,30 @@
       (begin (display x) (newline)
              succeed))))
 
-;;; The main program
+;; The main program
+(display
+ (let ([x (var 'x)])
+   ((== #t x) empty-c)))
+(newline)
+
+(display
+ (let ([x (var 'x)]
+       [y (var 'y)])
+   ((conj2 (== #t x) (== y x))
+    empty-c)))
+(newline)
+
 (display
  (let ([x (var 'x)]
        [y (var 'y)]
        [z (var 'z)])
-   ((=/= x z)
-    (car ((== y x)
-          (car ((== #t x) empty-c)))))))
+   ((conj2 (conj2 (=/= z x) (== #t x)) (== x y))
+    empty-c)))
+(newline)
+
+(display
+ (let ([x (var 'x)]
+       [y (var 'y)]
+       [z (var 'z)])
+   ((conj2 (conj2 (conj2 (=/= z x) (== #t x)) (== y x)) (== z #t))
+    empty-c)))
