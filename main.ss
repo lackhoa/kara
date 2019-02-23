@@ -22,36 +22,11 @@
      (repeat-func i (lambda () e))]))
 
 (define reflect
-  ;; For debugging
+  ;; Goal for debugging
   (lambda (x)
     (project (x)
       (begin (display x) (newline)
              succeed))))
 
 ;; The main program
-(display
- (let ([x (var 'x)])
-   ((== #t x) empty-c)))
-(newline)
-
-(display
- (let ([x (var 'x)]
-       [y (var 'y)])
-   ((conj2 (== #t x) (== y x))
-    empty-c)))
-(newline)
-
-(display
- (let ([x (var 'x)]
-       [y (var 'y)]
-       [z (var 'z)])
-   ((conj2 (conj2 (=/= z x) (== #t x)) (== x y))
-    empty-c)))
-(newline)
-
-(display
- (let ([x (var 'x)]
-       [y (var 'y)]
-       [z (var 'z)])
-   ((conj2 (conj2 (conj2 (=/= z x) (== #t x)) (== y x)) (== z #t))
-    empty-c)))
+(load "test-compiler.ss")
