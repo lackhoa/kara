@@ -1,14 +1,9 @@
 (define ==t
   (lambda (x y)
     (lambda (t)
-      (cond
-       [(eq? #t t) (== x y)]
-       [(eq? #f t) (=/= x y)]
-       [(eq? x y)  (== #t t)]
-       [else
-        (conde
-         [(== #t t) (== x y)]
-         [(== #f t) (=/= x y)])]))))
+      (conde
+       [(== #t t) (== x y)]
+       [(== #f t) (=/= x y)]))))
 
 (define-syntax conjt
   ;; A conjunction test

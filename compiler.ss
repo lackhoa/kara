@@ -1,11 +1,14 @@
 (define make-c (lambda (S D O) (list S D O)))
 (define empty-c (make-c '(#|S|#) '(#|D|#) '(#|O|#)))
-(define c->S car)
-(define c->D cadr)
-(define c->O caddr)
+(define c->
+  (lambda (c store)
+    (cond
+     [(eq? store 'S) (car c)]
+     [(eq? store 'D) (cadr c)]
+     [(eq? store 'O) (caddr c)])))
 (define update-c
   (lambda (c store value)
-    (let ([S (c->S c)] [D (c->D c)] [O (c->O c)])
+    (let ([S (c-> c 'S)] [D (c-> c 'D)] [O (c-> c 'O)])
       (cond
        [(eq? store 'S) (make-c value D O)]
        [(eq? store 'D) (make-c S value O)]
@@ -14,18 +17,14 @@
 (define-syntax lambdag@
   (syntax-rules (:)
     [(_ (c) e) (lambda (c) e)]
-    [(_ (c : S D) e)
+    [(_ (c : s* ...) e)
      (lambda (c)
-       (let ([S (c->S c)] [D (c->D c)])
-         e))]
-    [(_ (c : S D O) e)
-     (lambda (c)
-       (let ([S (c->S c)] [D (c->D c)] [O (c->O c)])
+       (let ([s* (c-> c 's*)] ...)
          e))]))
 
 (define ans list)  ;; [c], empty = failure
 (define lhs car)
-(define rhs cdr)
+(define rhs cadr)
 
 (define var
   (lambda (name)
@@ -43,18 +42,18 @@
 (define prefix-S
   (lambda (S+ S)
     (cond
-     ((eq? S+ S) '())
-     (else (cons (car S+)
-                 (prefix-S (cdr S+) S))))))
+     [(eq? S+ S) '()]
+     [else `(,(car S+)
+             . ,(prefix-S (cdr S+) S))])))
 
 (define unify
   (lambda (u v S)
-    (let ((u (walk u S))
-          (v (walk v S)))
+    (let ([u (walk u S)]
+          [v (walk v S)])
       (cond
        [(eq? u v) S]
-       [(var? u) (and (not (occurs? u v S)) `((,u . ,v) . ,S))]
-       [(var? v) (and (not (occurs? v u S)) `((,v . ,u) . ,S))]
+       [(var? u) (and (not (occurs? u v S)) `((,u ,v) . ,S))]
+       [(var? v) (and (not (occurs? v u S)) `((,v ,u) . ,S))]
        [(and (pair? u) (pair? v))
         (let ([S+ (unify (car u) (car v) S)])
           (and S+ (unify (cdr u) (cdr v) S+)))]
@@ -82,48 +81,19 @@
       (cond
        [(var? v) v]
        [(pair? v)
-        `(,(walk* (car v) S) . ,(walk* (cdr v) S))]
+        `(,(walk* (car v) S) ,(walk* (cdr v) S))]
        [else v]))))
 
-(define-syntax ==
-  (syntax-rules ()
-    [(_ u v)
-     (lambdag@ (c : S D)
-       (cond
-        [(unify u v S) =>
-         (lambda (S+)
-           (cond
-            [(==fail? S+ D) (ans)]
-            [else (ans (update-c c 'S S+))]))]
-        [else (ans)]))]))
-
-(define =/=
+(define ==
   (lambda (u v)
     (lambdag@ (c : S D)
       (cond
        [(unify u v S) =>
         (lambda (S+)
-          (let ([pS (prefix-S S+ S)])
-            (cond
-             [(null? pS) (ans)]
-             [else (ans (update-c c 'D `(,pS . ,D)))])))]
-       [else (ans c)]))))
-
-(define ==fail?
-  (lambda (S D)
-    (=/=-fail? S D)))
-
-(define =/=-fail?
-  (lambda (S D)
-    (exists (d-fail? S) D)))
-
-(define d-fail?
-  (lambda (S)
-    (lambda (d)
-      (cond
-       [(unify* d S) =>
-	(lambda (S+) (null? (prefix-S S+ S)))]
-       [else #f]))))
+          (cond
+           [(==fail? S+ D) (ans)]
+           [else (ans (update-c c 'S S+))]))]
+       [else (ans)]))))
 
 (define subsumed?
   ;; Is d subsumed by d*?
@@ -147,9 +117,39 @@
        [else
         (rem-subsumed (cdr D) `(,(car D) . ,d^*))]))))
 
+(define =/=
+  (lambda (u v)
+    (lambdag@ (c : S D)
+      (cond
+       [(unify u v S) =>
+        (lambda (S+)
+          (let ([pS (prefix-S S+ S)])
+            (cond
+             [(null? pS) (ans)]
+             [else
+              (let* ([D+ `(,pS . ,D)])
+                (ans (update-c c 'D (rem-subsumed D+))))])))]
+       [else (ans c)]))))
+
+(define ==fail?
+  (lambda (S D)
+    (=/=-fail? S D)))
+
+(define =/=-fail?
+  (lambda (S D)
+    (exists (d-fail? S) D)))
+
+(define d-fail?
+  (lambda (S)
+    (lambda (d)
+      (cond
+       [(unify* d S) =>
+	(lambda (S+) (null? (prefix-S S+ S)))]
+       [else #f]))))
+
 ;;; Less core stuff
-(define succeed (== #t #t))
-(define fail (== #t #f))
+(define succeed (lambdag@ (c) (ans c)))
+(define fail    (lambdag@ (c) (ans)))
 
 (define conj2
   (lambda (g1 g2)
@@ -189,7 +189,31 @@
 (define-syntax run
   (syntax-rules ()
     [(_ g* ...)
-     (let ([c* ((conj g* ...) empty-c)])
-       (map (lambda (c)
-              (update-c c 'D (rem-subsumed (c->D c))))
-            c*))]))
+     ((conj g* ...) empty-c)]))
+
+(define fake-goal
+  (lambda (expr)
+    (lambdag@ (c : S D O)
+      (ans (update-c c 'O expr)))))
+
+
+;;; Code generation
+(define common
+  (lambda (select-method . e**)
+    (let common ([e*1u '()]
+                 [e*1  (car e**)]
+                 [e**u (map (lambda __ '()) (cdr e**))]
+                 [e**  (cdr e**)]
+                 [res  '()])
+      (cond
+       [(or (null? e*1) (exists null? e**))
+        (values `(,e*1u . ,(append e**u e**)) res)]
+       [else
+        (let ([e*1a (car e*1)] [e*1d (cdr e*1)])
+          (cond
+           [(select-method e*1a e**)
+            =>
+            (lambda (e**+)
+              (common e*1u e*1d e**u e**+ `(e*1a . ,res)))]
+           [else
+            (common `(,e1 . ,e*1u) e*1d e**u e** res)]))]))))
