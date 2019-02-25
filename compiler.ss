@@ -1,5 +1,8 @@
+(define empty-S '())
+(define empty-D '())
+(define empty-O '())
 (define make-c (lambda (S D O) (list S D O)))
-(define empty-c (make-c '(#|S|#) '(#|D|#) '(#|O|#)))
+(define empty-c (make-c empty-S empty-D empty-O))
 (define c->
   (lambda (c store)
     (cond
@@ -75,15 +78,6 @@
   (lambda (S+ S)
     (unify (map lhs S+) (map rhs S+) S)))
 
-(define walk*
-  (lambda (v S)
-    (let ((v (walk v S)))
-      (cond
-       [(var? v) v]
-       [(pair? v)
-        `(,(walk* (car v) S) ,(walk* (cdr v) S))]
-       [else v]))))
-
 (define ==
   (lambda (u v)
     (lambdag@ (c : S D)
@@ -126,9 +120,7 @@
           (let ([pS (prefix-S S+ S)])
             (cond
              [(null? pS) (ans)]
-             [else
-              (let* ([D+ `(,pS . ,D)])
-                (ans (update-c c 'D (rem-subsumed D+))))])))]
+             [else (ans (update-c c 'D `(,pS . ,D)))])))]
        [else (ans c)]))))
 
 (define ==fail?
@@ -188,8 +180,55 @@
 
 (define-syntax run
   (syntax-rules ()
-    [(_ g* ...)
-     ((conj g* ...) empty-c)]))
+    [(_ (q) g* ...)
+     (map (lambda (c) (reify q c)) ((conj g* ...) empty-c))]))
+
+(define walk*
+  (lambda (v S)
+    (let ([v (walk v S)])
+      (cond
+       [(var? v) v]
+       [(pair? v)
+        `(,(walk* (car v) S) ,(walk* (cdr v) S))]
+       [else v]))))
+
+(define reify-S
+  (lambda (v S)
+    (let ([v (walk v S)])
+      (cond
+       [(var? v) `((,v ,(reify-name (length s) S)) . S)]
+       [(pair? v) (reify-S (cdr v) (reify-s (car v) S))]
+       [else S]))))
+
+(define reify-name
+  (lambda (n)
+    (string->symbol (string-append "_." (number->string n)))))
+
+(define purify
+  (lambda (D/O r)
+    (filter (lambda (d/o) (anyvar? d/o r)) D/O)))
+
+(define anyvar?
+  (lambda (v r)
+    (cond
+     [(var? v) (var? (walk v r))]
+     [(pair? v) (or (anyvar? (car v) r)
+                   (anyvar? (cdr v) r))]
+     [else #f])))
+
+(define reify
+  (lambda (v c)
+    (let ([S (c-> c 'S)]
+          [D (c-> c 'D)]
+          [O (c-> c 'O)])
+      (let ([v (walk* v S)]
+            [D (walk* D S)]
+            [O (walk* O S)])
+        (let ([r (reify-S v empty-S)])
+          (let ([v (walk* v r)]
+                [D (walk* (rem-subsumed (purify D r) empty-D) r)]
+                [O (walk* (purify O r) r)])
+            `(,v ,D ,O)))))))
 
 (define fake-goal
   (lambda (expr)
@@ -198,22 +237,3 @@
 
 
 ;;; Code generation
-(define common
-  (lambda (select-method . e**)
-    (let common ([e*1u '()]
-                 [e*1  (car e**)]
-                 [e**u (map (lambda __ '()) (cdr e**))]
-                 [e**  (cdr e**)]
-                 [res  '()])
-      (cond
-       [(or (null? e*1) (exists null? e**))
-        (values `(,e*1u . ,(append e**u e**)) res)]
-       [else
-        (let ([e*1a (car e*1)] [e*1d (cdr e*1)])
-          (cond
-           [(select-method e*1a e**)
-            =>
-            (lambda (e**+)
-              (common e*1u e*1d e**u e**+ `(e*1a . ,res)))]
-           [else
-            (common `(,e1 . ,e*1u) e*1d e**u e** res)]))]))))
