@@ -1,4 +1,5 @@
 (define empty-S '())
+(define make-s  (lambda (u v) `(,u ,v)))
 (define empty-D '())
 (define empty-O '())
 (define make-c (lambda (S D O) (list S D O)))
@@ -55,8 +56,8 @@
           [v (walk v S)])
       (cond
        [(eq? u v) S]
-       [(var? u) (and (not (occurs? u v S)) `((,u ,v) . ,S))]
-       [(var? v) (and (not (occurs? v u S)) `((,v ,u) . ,S))]
+       [(var? u) (and (not (occurs? u v S)) `(,(make-s u v) . ,S))]
+       [(var? v) (and (not (occurs? v u S)) `(,(make-s v u) . ,S))]
        [(and (pair? u) (pair? v))
         (let ([S+ (unify (car u) (car v) S)])
           (and S+ (unify (cdr u) (cdr v) S+)))]
@@ -263,3 +264,41 @@
        [else
         (let ([new-var (var (length S))])
           (values new-var `((,t* . ,new-var) . ,S)))]))))
+
+(define extract-vars
+  (lambda (t)
+    (cond
+     [(var? t) `(,t)]
+     [(pair? t) (append (extract-vars (car t)) (extract-vars (cdr t)))]
+     [else #f])))
+
+(define minimize-uni
+  (lambda answers
+    (let ([q* (map car answers)]
+          [D* (map cadr answers)]
+          [O* (map caddr answers)])
+      (let-values ([(au _S) (apply anti-unify q*)])
+        (map (lambda (q)
+               (let ([;; Unify right back in
+                      S (unify q au '())])
+                 (unify-commands (map s->lhs S) (map s->rhs S) '())))
+             q*)))))
+
+(define unify-commands
+  (lambda (S)
+    (let unify-commands ([S S] [renames '()] [f '()])
+      ;; Ret: commands, renames (cumulator), fresh variables (cumulator)
+      (cond
+       [(null? S) (values '() renames f)]
+       [(pair? S)
+        (let ([u (lhs (car S))]
+              [v (rhs (car S))])
+          (cond
+           [(var? v)
+            =>
+            (cond
+             [(assq v renames) => (lambda _ (values '() renames f))]
+             [else (lambda _ (values '() `(,(make-s v u) . ,renames) f))])]
+           [(pair? v)
+            (values (f))]
+           [else `(== ,u ,v)]))]))))

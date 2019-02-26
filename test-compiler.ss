@@ -169,3 +169,7 @@
   (let-values ([(au S) (anti-unify t1 t2 t3)])
     (display au) (newline) (display S)))
 (newline)
+
+(printf "minimize\n")
+(display (apply minimize-uni (run* (x env t) ((lookupt x env t) #t))))
+(newline)
