@@ -2,9 +2,6 @@
 ;; using the "half-closure" approach from Reynold's definitional
 ;; interpreters.
 
-(define data
-  `(data ))
-
 (define evalo
   (lambda (expr val)
     (eval-expo expr initial-env val)))
@@ -59,8 +56,8 @@
      [(fresh (p-name x body letrec-body)
         ;; single-function variadic letrec version
         (== `(letrec ((,p-name (lambda ,x ,body)))
-               ,letrec-body)
-            expr)
+              ,letrec-body)
+           expr)
         (conde
          ;; Variadic
          [(symbolo x)]

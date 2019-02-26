@@ -8,6 +8,7 @@
 
 ;;; Loading my stuff
 (load "compiler.ss")
+;; (load "faster-miniKanren/full-interp.scm")
 ;; (load "exp-interp.ss")
 
 ;;; Help functions
@@ -15,7 +16,7 @@
 
 (define repeat-func
   (lambda (i f)
-    (unless (= i 0) (f) (repeat (- i 1) f))))
+    (unless (= i 0) (f) (repeat-func (- i 1) f))))
 (define-syntax repeat
   (syntax-rules ()
     [(_ i e)
@@ -30,3 +31,4 @@
 
 ;; The main program
 (load "test-compiler.ss")
+;; (load "test-full-interp.ss")

@@ -199,27 +199,30 @@
        [else v]))))
 
 (define reify-S
+  ;; Generate numbered vars for anonymous variables instead of strings
+  ;; Also handles non-vars, and duplications
   (lambda (v S)
     (let ([v (walk v S)])
       (cond
-       [(var? v) `((,v ,(reify-name (length S))) . ,S)]
+       [(var? v)
+        (cond
+         [(member v (map rhs S)) => (lambda _ S)]
+         [else `((,v ,(var (length S))) . ,S)])]
        [(pair? v) (reify-S (cdr v) (reify-S (car v) S))]
        [else S]))))
 
-(define reify-name
-  (lambda (n)
-    (string->symbol (string-append "_." (number->string n)))))
-
 (define purify
   (lambda (D r)
-    (filter (lambda (d) (not (anyvar? d r))) D)))
+    (filter (lambda (d) (not (any-useless-var? d r))) D)))
 
-(define anyvar?
+(define any-useless-var?
   (lambda (v r)
     (cond
-     [(var? v) (var? (walk v r))]
-     [(pair? v) (or (anyvar? (car v) r)
-                   (anyvar? (cdr v) r))]
+     [(var? v) (let ([v (walk v r)])
+                 (and (var? v)
+                    (not (number? (vector-ref v 0)))))]
+     [(pair? v) (or (any-useless-var? (car v) r)
+                   (any-useless-var? (cdr v) r))]
      [else #f])))
 
 (define reify
@@ -243,3 +246,20 @@
 
 
 ;;; Code generation
+
+(define anti-unify
+  ;; Returns the anti-unification and an inverse substitution
+  ;; Cannot deal with variable shadowing
+  (lambda t*
+    (let anti-unify ([t* t*] [S '()])
+      (cond
+       [(for-all (lambda (t) (eq? (car t*) t)) (cdr t*))
+        (values (car t*) S)]
+       [(for-all pair? t*)
+        (let*-values ([(aua S+) (anti-unify (map car t*) S)]
+                      [(aud S++) (anti-unify (map cdr t*) S+)])
+          (values `(,aua . ,aud) S++))]
+       [(assoc t* S) => (lambda (pr) (values (cdr pr) S))]
+       [else
+        (let ([new-var (var (length S))])
+          (values new-var `((,t* . ,new-var) . ,S)))]))))

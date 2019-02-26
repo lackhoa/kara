@@ -56,12 +56,13 @@
   empty-c))
 (newline)
 
-(printf "Run & subsumption\n")
+(printf "Run & Subsumption & Unification: x is not 5\n")
 (display
- (run* (q)
-   (fresh (x y)
-     (=/= x 5)
-     (=/= `(,x ,y) '(5 6)))))
+ (run* (x y)
+   (=/= x 5)
+   (=/= `(,x ,y) '(5 6))
+   (fresh (x)
+     (=/= x 6))))
 (newline)
 
 (printf "==t\n")
@@ -149,12 +150,22 @@
             (fake-goal `((lookupt ,x ,rest ,t) ,bound?))]))]))))
 (display
  (run* (x env t) ((lookupt x env t) #t)))
-;; (newline)
-;; (((x ((x val . y) . z) y) () ())
-;;  ((x ((x rec . y) . z) (closure y ((x rec . y) . z))) () ())
-;;  ((x ((y . z) . u) v) (((x y))) ((lookupt x u v) #t)))
+(newline)
 
 (printf "lookupt -> not-in-envo\n")
 (display
  (run* (x env t) ((lookupt x env t) #f)))
+(newline)
+
+(printf "Anti-unification: 2 * 2 = 2 + 2 vs 2 * 3 = 3 + 3\n")
+(let-values ([(au S) (anti-unify '(2 * 2 = 2 + 2) '(2 * 3 = 3 + 3))])
+  (display au) (newline) (display S))
+(newline)
+
+(printf "Anti-unification: Very big terms\n")
+(let ([t1 '(#(0) ((#(0) val . #(1)) . #(2)) #(1))]
+      [t2 '(#(0) ((#(0) rec . #(1)) . #(2)) (closure #(1) ((#(0) rec . #(1)) . #(2))))]
+      [t3 '(#(0) ((#(1) . #(2)) . #(3)) #(4))])
+  (let-values ([(au S) (anti-unify t1 t2 t3)])
+    (display au) (newline) (display S)))
 (newline)
