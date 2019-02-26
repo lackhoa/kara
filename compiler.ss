@@ -178,10 +178,16 @@
     [(_ [g g* ...] ...)
      (disj (conj g g* ...) ...)]))
 
-(define-syntax run
+(define-syntax run*
   (syntax-rules ()
-    [(_ (q) g* ...)
-     (map (lambda (c) (reify q c)) ((conj g* ...) empty-c))]))
+    [(_ (q) g g* ...)
+     (fresh (q)
+       (map (lambda (c) (reify q c))
+            ((conj g g* ...) empty-c)))]
+    [(_ (q0 q1 q* ...) g g* ...)
+     (run* (q)
+       (fresh (q0 q1 q* ...)
+         g g* ... (== `(,q0 ,q1 ,q* ...) q)))]))
 
 (define walk*
   (lambda (v S)
@@ -189,15 +195,15 @@
       (cond
        [(var? v) v]
        [(pair? v)
-        `(,(walk* (car v) S) ,(walk* (cdr v) S))]
+        `(,(walk* (car v) S) . ,(walk* (cdr v) S))]
        [else v]))))
 
 (define reify-S
   (lambda (v S)
     (let ([v (walk v S)])
       (cond
-       [(var? v) `((,v ,(reify-name (length s) S)) . S)]
-       [(pair? v) (reify-S (cdr v) (reify-s (car v) S))]
+       [(var? v) `((,v ,(reify-name (length S))) . ,S)]
+       [(pair? v) (reify-S (cdr v) (reify-S (car v) S))]
        [else S]))))
 
 (define reify-name
@@ -205,8 +211,8 @@
     (string->symbol (string-append "_." (number->string n)))))
 
 (define purify
-  (lambda (D/O r)
-    (filter (lambda (d/o) (anyvar? d/o r)) D/O)))
+  (lambda (D r)
+    (filter (lambda (d) (not (anyvar? d r))) D)))
 
 (define anyvar?
   (lambda (v r)
@@ -224,10 +230,10 @@
       (let ([v (walk* v S)]
             [D (walk* D S)]
             [O (walk* O S)])
-        (let ([r (reify-S v empty-S)])
+        (let ([r (reify-S (list v O) empty-S)])
           (let ([v (walk* v r)]
-                [D (walk* (rem-subsumed (purify D r) empty-D) r)]
-                [O (walk* (purify O r) r)])
+                [D (walk* (rem-subsumed (purify D r)) r)]
+                [O (walk* O r)])
             `(,v ,D ,O)))))))
 
 (define fake-goal

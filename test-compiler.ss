@@ -58,9 +58,10 @@
 
 (printf "Run & subsumption\n")
 (display
- (run (fresh (x y)
-        (=/= x 5)
-        (=/= `(,x ,y) '(5 6)))))
+ (run* (q)
+   (fresh (x y)
+     (=/= x 5)
+     (=/= `(,x ,y) '(5 6)))))
 (newline)
 
 (printf "==t\n")
@@ -71,13 +72,12 @@
        [(== #t t) (== x y)]
        [(== #f t) (=/= x y)]))))
 (display
- (run (fresh (x y)
-        ((==t x y) #f))))
+ (run* (x y) ((==t x y) #f)))
 (newline)
 
 (printf "conjt\n")
 (define-syntax conjt
-  ;; A conjunction test
+  ;; Conjunction of test
   (syntax-rules ()
     [(_ g) g]
     [(_ g1 g2 gs ...)
@@ -86,8 +86,8 @@
         [(g1 #t)  ((conjt g2 gs ...) t)]
         [(== #f t) (g1 #f)]))]))
 (display
- (run (fresh (x y z t)
-        ((conjt (==t x y) (==t y z)) t))))
+ (run* (x y z t)
+   ((conjt (==t x y) (==t y z)) t)))
 (newline)
 
 (printf "disjt\n")
@@ -101,11 +101,10 @@
         [(== #t t) (g1 #t)]
         [(g1 #f)  ((disjt g2 gs ...) t)]))]))
 (display
- (run (fresh (x y z t)
-        ((disjt (==t x y) (==t y z)) t))))
+ (run* (x y z t) ((disjt (==t x y) (==t y z)) t)))
 (newline)
 
-(printf "condo\n")
+(printf "condo & memberd\n")
 (define-syntax condo
   ;; Literally the relational version of 'cond'
   ;; Fails if no clauses match
@@ -126,10 +125,10 @@
        [(==t x e) succeed]
        [else (fake-goal `(memberd ,x ,es))]))))
 (display
- (run (fresh (x x*) (memberd x x*))))
+ (run* (x x*) (memberd x x*)))
 (newline)
 
-(printf "lookupt\n")
+(printf "lookupt -> lookupo\n")
 (define lookupt
   (lambda (x env t)
     (lambda (bound?)
@@ -149,6 +148,13 @@
            [else
             (fake-goal `((lookupt ,x ,rest ,t) ,bound?))]))]))))
 (display
- (run (fresh (x env t)
-        ((lookupt x env t) #f))))
+ (run* (x env t) ((lookupt x env t) #t)))
+;; (newline)
+;; (((x ((x val . y) . z) y) () ())
+;;  ((x ((x rec . y) . z) (closure y ((x rec . y) . z))) () ())
+;;  ((x ((y . z) . u) v) (((x y))) ((lookupt x u v) #t)))
+
+(printf "lookupt -> not-in-envo\n")
+(display
+ (run* (x env t) ((lookupt x env t) #f)))
 (newline)
