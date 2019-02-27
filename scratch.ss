@@ -40,3 +40,25 @@
 (((x0 ((x0 . (val . t0)) . z0) t0) () ())
  ((x1 ((x1 . (rec . y1)) . z1) (closure y1 ((x1 . (rec . y1)) . z1))) () ())
  ((x2 ((y2 . z2) . u2) v2) (((x2 y2))) ((lookupt x2 u2 v2) #t)))
+
+
+(define-syntax let
+  (lambda (x)
+    (define ids?
+      (lambda (ls)
+        (or (null? ls)
+           (and (identifier? (car ls))
+              (ids? (cdr ls))))))
+    (define unique-ids?
+      (lambda (ls)
+        (or (null? ls)
+           (and (let notmem? ((x (car ls)) (ls (cdr ls)))
+                (or (null? ls)
+                   (and (not (bound-identifier=? x (car ls)))
+                      (notmem? x (cdr ls)))))
+              (unique-ids? (cdr ls))))))
+    (syntax-case x ()
+      ((_ ((i v) ...) e1 e2 ...)
+       (and (ids? (syntax (i ...)))
+          (unique-ids? (syntax (i ...))))
+       (syntax ((lambda (i ...) e1 e2 ...) v ...))))))

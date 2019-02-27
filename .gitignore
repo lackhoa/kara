@@ -6,7 +6,8 @@
 kara-lang/
 log/
 db/
-mini-kanren/
+miniKanren/
+mikeKanren/
 faster-miniKanren/
 cKanren/
 text1
