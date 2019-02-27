@@ -170,6 +170,41 @@
     (display au) (newline) (display S)))
 (newline)
 
-(printf "minimize\n")
-(display (apply minimize-uni (run* (x env t) ((lookupt x env t) #t))))
+;; (printf "minimize\n")
+;; (display (apply minimize-uni (run* (x env t) ((lookupt x env t) #t))))
+;; (newline)
+
+(printf "typet\n")
+(define typet
+  ;; Complete classification of recognized terms
+  ;; also able to determine if a term is of some type
+  (lambda (term type)
+    (lambda (same?)
+      (fresh (T)
+        ((==t type T) same?)
+        (conde
+         [(== 'symbol  T) (fake-goal `(symbolo ,term))]
+         [(== 'boolean T) (conde [(== term #t)]
+                                [(== term #f)])]
+         [(== 'number  T) (fake-goal `(numbero ,term))]
+         [(== 'null    T) (== '() term)]
+         [(fresh (a _d)
+            (== `(,a . ,_d) term)
+            (condo
+             [(disjt (==t a 'prim) (==t a 'closure))
+              (== 'funval T)]
+             [else (== 'pair T)]))])))))
+(display
+ (run* (term)
+   ((typet term 'pair) #f)))
 (newline)
+
+#!eof
+
+((#(0) () (symbolo #(0)))
+ (#t () ())
+ (#f () ())
+ (#(0) () (numbero #(0)))
+ (() () ())
+ ((prim . #(0)) () ())
+ ((closure . #(0)) () ()))

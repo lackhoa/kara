@@ -31,10 +31,16 @@
 (define rhs cadr)
 
 (define var
-  (lambda (name)
-    (vector name)))
-
+  (lambda (name) (vector name)))
+(define mvp-var
+  (lambda (name pri) (vector name pri)))
 (define var? vector?)
+(define mvp-var?
+  (lambda (var) (and (vector? var) (= (vector-length var) 2))))
+(define var->name
+  (lambda (var) (vector-ref var 0)))
+(define var->pri
+  (lambda (var) (if (= (vector-length var) 2) (vector-ref var 1) 10)))
 
 (define walk
   (lambda (u S)
@@ -56,6 +62,10 @@
           [v (walk v S)])
       (cond
        [(eq? u v) S]
+       [(and (var? u) (var? v))
+        (if (> (var->pri u) (var->pri v))
+            `(,(make-s u v) . ,S)
+            `(,(make-s v u) . ,S))]
        [(var? u) (and (not (occurs? u v S)) `(,(make-s u v) . ,S))]
        [(var? v) (and (not (occurs? v u S)) `(,(make-s v u) . ,S))]
        [(and (pair? u) (pair? v))
@@ -90,7 +100,7 @@
            [else (ans (update-c c 'S S+))]))]
        [else (ans)]))))
 
-(define subsumed?
+(trace-define subsumed?
   ;; Is d subsumed by d*?
   (lambda (d d*)
     (cond
@@ -182,12 +192,14 @@
 (define-syntax run*
   (syntax-rules ()
     [(_ (q) g g* ...)
-     (fresh (q)
+     (let ([q (mvp-var 'q 0)])
        (map (lambda (c) (reify q c))
             ((conj g g* ...) empty-c)))]
     [(_ (q0 q1 q* ...) g g* ...)
      (run* (q)
-       (fresh (q0 q1 q* ...)
+       (let ([q0 (mvp-var 'q0 0)]
+             [q1 (mvp-var 'q1 0)]
+             [q* (mvp-var 'q* 0)] ...)
          g g* ... (== `(,q0 ,q1 ,q* ...) q)))]))
 
 (define walk*
@@ -205,6 +217,7 @@
   (lambda (v S)
     (let ([v (walk v S)])
       (cond
+       [(mvp-var? v) `((,v ,(var->name v)) . ,S)]
        [(var? v)
         (cond
          [(member v (map rhs S)) => (lambda _ S)]
@@ -214,7 +227,17 @@
 
 (define purify
   (lambda (D r)
-    (filter (lambda (d) (not (any-useless-var? d r))) D)))
+    (filter (lambda (d) (not (or (constant? d)
+                         (any-useless-var? d r))))
+            D)))
+
+(define constant?
+  (lambda (d)
+    (cond
+     [(var? d) #f]
+     [(pair? d) (or (constant? (car d))
+                   (constant? (cdr d)))]
+     [else #t])))
 
 (define any-useless-var?
   (lambda (v r)
@@ -264,13 +287,6 @@
        [else
         (let ([new-var (var (length S))])
           (values new-var `((,t* . ,new-var) . ,S)))]))))
-
-(define extract-vars
-  (lambda (t)
-    (cond
-     [(var? t) `(,t)]
-     [(pair? t) (append (extract-vars (car t)) (extract-vars (cdr t)))]
-     [else #f])))
 
 (define minimize-uni
   (lambda answers

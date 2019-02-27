@@ -30,5 +30,5 @@
              succeed))))
 
 ;; The main program
-(load "test-compiler.ss")
 ;; (load "test-full-interp.ss")
+(load "test-compiler.ss")
