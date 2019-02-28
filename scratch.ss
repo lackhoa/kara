@@ -1,3 +1,59 @@
+(load "miniKanren/mk.scm")
+
+(define num
+  (lambda (n) (if (zero? n) 0 `(s ,(num (- n 1))))))
+
+(define pluso
+  (lambda (n m sum)
+    (conde
+     [(== 0 n) (== m sum)]
+     [(fresh (x y)
+        (== `(s ,x) n) (== `(s ,y) sum) (pluso x m y))])))
+(define minuso
+  (lambda (n m k)
+    (pluso m k n)))
+(define eveno
+  (lambda (n)
+    (conde
+     [(== 0 n)]
+     [(fresh (m) (== `(s (s ,m)) n) (eveno m))])))
+(define positiveo
+  (lambda (n)
+    (fresh (m)
+      (== `(s ,m) n))))
+(define plus*o
+  (lambda (in* out)
+    (conde
+     [(== '() in*) (== 0 out)]
+     [(fresh (a d res)
+        (== `(,a . ,d) in*)
+        (pluso a res out)
+        (plus*o d res))])))
+(define foldro
+  (lambda (relo)
+    (lambda (base)
+      (letrec ([foldro
+                (lambda (in* out)
+                  (conde [(== '() in*) (== base out)]
+                         [(fresh (a d res)
+                            (== `(,a . ,d) in*)
+                            (relo a res out)
+                            (foldro d res))]))])
+        foldro))))
+(define plusr*o ((foldro pluso) (num 0)))
+(define pos-plusr*o
+  ((foldro (lambda (a res out)
+             (fresh ()
+               (positiveo a)
+               (pluso a res out))))
+   (num 0)))
+
+(display
+ (run* (q)
+   (pos-plusr*o q (num 5))))
+
+#!eof
+
 ;; I need to store the list of llg variables, they will all be freshed.
 ;; llg variables shall be more important than others
 ;; Should I make a framework of renaming? If a var is already freshed, then rename instead of unify.
