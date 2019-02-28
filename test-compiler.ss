@@ -18,6 +18,7 @@
     empty-c)))
 (newline)
 
+(printf "This will return nothing\n")
 (display
  (let ([x (var 'x)]
        [y (var 'y)]

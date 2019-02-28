@@ -26,21 +26,12 @@
        (let ([s* (c-> c 's*)] ...)
          e))]))
 
-(define ans list)  ;; [c], empty = failure
 (define lhs car)
 (define rhs cadr)
 
 (define var
   (lambda (name) (vector name)))
-(define mvp-var
-  (lambda (name pri) (vector name pri)))
 (define var? vector?)
-(define mvp-var?
-  (lambda (var) (and (vector? var) (= (vector-length var) 2))))
-(define var->name
-  (lambda (var) (vector-ref var 0)))
-(define var->pri
-  (lambda (var) (if (= (vector-length var) 2) (vector-ref var 1) 10)))
 
 (define walk
   (lambda (u S)
@@ -62,10 +53,6 @@
           [v (walk v S)])
       (cond
        [(eq? u v) S]
-       [(and (var? u) (var? v))
-        (if (> (var->pri u) (var->pri v))
-            `(,(make-s u v) . ,S)
-            `(,(make-s v u) . ,S))]
        [(var? u) (and (not (occurs? u v S)) `(,(make-s u v) . ,S))]
        [(var? v) (and (not (occurs? v u S)) `(,(make-s v u) . ,S))]
        [(and (pair? u) (pair? v))
@@ -96,11 +83,11 @@
        [(unify u v S) =>
         (lambda (S+)
           (cond
-           [(==fail? S+ D) (ans)]
-           [else (ans (update-c c 'S S+))]))]
-       [else (ans)]))))
+           [(==fail? S+ D) (list)]
+           [else (list (update-c c 'S S+))]))]
+       [else (list)]))))
 
-(trace-define subsumed?
+(define subsumed?
   ;; Is d subsumed by d*?
   (lambda (d d*)
     (cond
@@ -115,9 +102,9 @@
       (cond
        [(null? D) d^*]
        [(or (;; Is is subsumed by the unprocessed list?
-            subsumed? (car D) (cdr D))
-           (;; Is it subsumed the processed list?
-            subsumed? (car D) d^*))
+             subsumed? (car D) (cdr D))
+            (;; Is it subsumed the processed list?
+             subsumed? (car D) d^*))
         (rem-subsumed (cdr D) d^*)]
        [else
         (rem-subsumed (cdr D) `(,(car D) . ,d^*))]))))
@@ -130,9 +117,9 @@
         (lambda (S+)
           (let ([pS (prefix-S S+ S)])
             (cond
-             [(null? pS) (ans)]
-             [else (ans (update-c c 'D `(,pS . ,D)))])))]
-       [else (ans c)]))))
+             [(null? pS) (list)]
+             [else (list (update-c c 'D `(,pS . ,D)))])))]
+       [else (list c)]))))
 
 (define ==fail?
   (lambda (S D)
@@ -151,8 +138,8 @@
        [else #f]))))
 
 ;;; Less core stuff
-(define succeed (lambdag@ (c) (ans c)))
-(define fail    (lambdag@ (c) (ans)))
+(define succeed (lambdag@ (c) (list c)))
+(define fail    (lambdag@ (c) (list)))
 
 (define conj2
   (lambda (g1 g2)
@@ -189,18 +176,22 @@
     [(_ [g g* ...] ...)
      (disj (conj g g* ...) ...)]))
 
+(define rename
+  (lambda (q* ans)
+    (let ([v* (car ans)])
+      (let rename ([q* q*] [v* v*] [ans ans])
+        (cond
+         [(null? q*) ans]
+         [(var? (car v*)) (rename (cdr q*) (cdr v*)
+                                  (substq (car q*) (car v*) ans))]
+         [else (rename (cdr q*) (cdr v*) ans)])))))
+
 (define-syntax run*
   (syntax-rules ()
-    [(_ (q) g g* ...)
-     (let ([q (mvp-var 'q 0)])
-       (map (lambda (c) (reify q c))
-            ((conj g g* ...) empty-c)))]
-    [(_ (q0 q1 q* ...) g g* ...)
-     (run* (q)
-       (let ([q0 (mvp-var 'q0 0)]
-             [q1 (mvp-var 'q1 0)]
-             [q* (mvp-var 'q* 0)] ...)
-         g g* ... (== `(,q0 ,q1 ,q* ...) q)))]))
+    [(_ (q q* ...) g g* ...)
+     (fresh (q q* ...)
+       (map (lambda (c) (reify `(,q ,q* ...) c))
+            ((conj g g* ...) empty-c)))]))
 
 (define walk*
   (lambda (v S)
@@ -217,7 +208,6 @@
   (lambda (v S)
     (let ([v (walk v S)])
       (cond
-       [(mvp-var? v) `((,v ,(var->name v)) . ,S)]
        [(var? v)
         (cond
          [(member v (map rhs S)) => (lambda _ S)]
@@ -235,38 +225,38 @@
   (lambda (d)
     (cond
      [(var? d) #f]
-     [(pair? d) (or (constant? (car d))
-                   (constant? (cdr d)))]
+     [(pair? d) (and (constant? (car d)) (constant? (cdr d)))]
      [else #t])))
 
 (define any-useless-var?
   (lambda (v r)
     (cond
-     [(var? v) (let ([v (walk v r)])
-                 (and (var? v)
-                    (not (number? (vector-ref v 0)))))]
+     [(var? v)
+      (let ([v (walk v r)])
+        (and (var? v)
+           (not (number? (vector-ref v 0)))))]
      [(pair? v) (or (any-useless-var? (car v) r)
                    (any-useless-var? (cdr v) r))]
      [else #f])))
 
 (define reify
-  (lambda (v c)
+  (lambda (q* c)
     (let ([S (c-> c 'S)]
           [D (c-> c 'D)]
           [O (c-> c 'O)])
-      (let ([v (walk* v S)]
+      (let ([v (walk* q* S)]
             [D (walk* D S)]
             [O (walk* O S)])
         (let ([r (reify-S (list v O) empty-S)])
           (let ([v (walk* v r)]
                 [D (walk* (rem-subsumed (purify D r)) r)]
                 [O (walk* O r)])
-            `(,v ,D ,O)))))))
+            (rename q* `(,v ,D ,O))))))))
 
 (define fake-goal
   (lambda (expr)
     (lambdag@ (c : S D O)
-      (ans (update-c c 'O expr)))))
+      (list (update-c c 'O expr)))))
 
 
 ;;; Code generation
