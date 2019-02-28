@@ -163,17 +163,13 @@
   (display au) (newline) (display S))
 (newline)
 
-(printf "Anti-unification: Very big terms\n")
-(let ([t1 '(#(0) ((#(0) val . #(1)) . #(2)) #(1))]
-      [t2 '(#(0) ((#(0) rec . #(1)) . #(2)) (closure #(1) ((#(0) rec . #(1)) . #(2))))]
-      [t3 '(#(0) ((#(1) . #(2)) . #(3)) #(4))])
+(printf "Anti-unification: Big terms\n")
+(let ([t1 '(#(x) ((#(x) val . #(t)) . #(2)) #(t))]
+      [t2 '(#(x) ((#(x) rec . #(1)) . #(2)) (closure #(1) ((#(x) rec . #(1)) . #(2))))]
+      [t3 '(#(x) ((#(1) . #(2)) . #(3)) #(t))])
   (let-values ([(au S) (anti-unify t1 t2 t3)])
     (display au) (newline) (display S)))
 (newline)
-
-;; (printf "minimize\n")
-;; (display (apply minimize-uni (run* (x env t) ((lookupt x env t) #t))))
-;; (newline)
 
 (printf "typet\n")
 (define typet
@@ -200,12 +196,27 @@
    ((typet term 'pair) #f)))
 (newline)
 
+(printf "lookupo #t, translated\n")
+(display
+ (minimize-uni (run* (x env t) ((lookupt x env t) #t))))
+(newline)
+
 #!eof
 
-((#(0) () (symbolo #(0)))
- (#t () ())
- (#f () ())
- (#(0) () (numbero #(0)))
- (() () ())
- ((prim . #(0)) () ())
- ((closure . #(0)) () ()))
+(((#(t) (closure #(1) ((#(x) rec . #(1)) . #(2))) #(t)) . #(3))
+ ((#(2) #(2) #(3)) . #(2))
+ (((val . #(t)) (rec . #(1)) #(2)) . #(1))
+ ((#(x) #(x) #(1)) . #(0)))
+
+For the first branch: 0 -> x, 1 -> (val . t), 2 -> 2, 3 -> t
+(fresh (t)
+  (== 0 x)
+  (== 1 `(,val . ,t))
+  (== 2 2)
+  (== 3 t))
+
+(((#(t) (closure #(1) ((#(x) rec . #(1)) . #(2))) #(t)) #(4))
+ ((#(2) #(2) #(3)) #(3))
+ (((val . #(t)) (rec . #(1)) #(2)) #(2))
+ ((#(x) #(x) #(1)) #(1))
+ ((#(x) #(x) #(x)) #(0)))

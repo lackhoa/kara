@@ -263,48 +263,56 @@
 
 (define anti-unify
   ;; Returns the anti-unification and an inverse substitution
-  ;; Cannot deal with variable shadowing
+  ;; Cannot deal with variable shadowing (for the use of 'assoc')
   (lambda t*
     (let anti-unify ([t* t*] [S '()])
       (cond
-       [(for-all (lambda (t) (eq? (car t*) t)) (cdr t*))
+       [;; rule 7, for symbols only (alternative mentioned in the paper)
+        (for-all (lambda (t) (eq? (car t*) t)) (cdr t*))
         (values (car t*) S)]
-       [(for-all pair? t*)
+       [;; rule 8
+        (for-all pair? t*)
         (let*-values ([(aua S+) (anti-unify (map car t*) S)]
                       [(aud S++) (anti-unify (map cdr t*) S+)])
           (values `(,aua . ,aud) S++))]
-       [(assoc t* S) => (lambda (pr) (values (cdr pr) S))]
-       [else
+       [;; rule 9 (cannot deal with variable shadowing)
+        (assoc t* S) => (lambda (s) (values (rhs s) S))]
+       [;; rule 10
+        else
         (let ([new-var (var (length S))])
-          (values new-var `((,t* . ,new-var) . ,S)))]))))
+          (values new-var `(,(make-s t* new-var) . ,S)))]))))
 
 (define minimize-uni
-  (lambda answers
+  (lambda (answers)
     (let ([q* (map car answers)]
           [D* (map cadr answers)]
           [O* (map caddr answers)])
-      (let-values ([(au _S) (apply anti-unify q*)])
-        (map (lambda (q)
-               (let ([;; Unify right back in
-                      S (unify q au '())])
-                 (unify-commands (map s->lhs S) (map s->rhs S) '())))
-             q*)))))
+      (let-values ([(au S) (apply anti-unify q*)])
+        (let ([S (map (lambda (s) `(,(car (car s)) . ,(cdr s))) S)])
+          (S-process S))))))
 
-(define unify-commands
+(define extract-vars
+  (lambda (t)
+    (cond
+     [(var? t) `(,t)]
+     [(pair? t) (append (extract-vars (car t))
+                        (extract-vars (cdr t)))]
+     [else '()])))
+
+(define S-process
+  ;; The anti-unification variables are on the right
   (lambda (S)
-    (let unify-commands ([S S] [renames '()] [f '()])
-      ;; Ret: commands, renames (cumulator), fresh variables (cumulator)
-      (cond
-       [(null? S) (values '() renames f)]
-       [(pair? S)
-        (let ([u (lhs (car S))]
-              [v (rhs (car S))])
-          (cond
-           [(var? v)
-            =>
-            (cond
-             [(assq v renames) => (lambda _ (values '() renames f))]
-             [else (lambda _ (values '() `(,(make-s v u) . ,renames) f))])]
-           [(pair? v)
-            (values (f))]
-           [else `(== ,u ,v)]))]))))
+    (cond
+     [(null? S) '()]
+     [else
+      (append (let ([s (car S)])
+                (let ([lhs (lhs s)]
+                      [rhs (rhs s)])
+                  (cond
+                   [(pair? lhs)
+                    (append
+                     (map (lambda (v*) `(fresh-vars v*))
+                          (extract-vars lhs))
+                     `((== ,lhs ,rhs)))]
+                   [else `((== ,lhs ,rhs))])))
+              (S-process (cdr S)))])))
