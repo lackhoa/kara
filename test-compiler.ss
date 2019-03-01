@@ -182,7 +182,7 @@
         (conde
          [(== 'symbol  T) (fake-goal `(symbolo ,term))]
          [(== 'boolean T) (conde [(== term #t)]
-                                [(== term #f)])]
+                                 [(== term #f)])]
          [(== 'number  T) (fake-goal `(numbero ,term))]
          [(== 'null    T) (== '() term)]
          [(fresh (a _d)
@@ -196,27 +196,22 @@
    ((typet term 'pair) #f)))
 (newline)
 
-(printf "lookupo #t, translated\n")
+(printf "run*min test\n")
 (display
- (minimize-uni (run* (x env t) ((lookupt x env t) #t))))
+ (run*min (x y z)
+          (fresh (u)
+            (== `(,z ,u var) x)
+            (conde
+             [(== u y)]
+             [(=/= u y)]))))
 (newline)
 
+(printf "run*min on lookupo\n")
+(display
+ (run*min (x env t)
+          ((lookupt x env t) #t)))
+(newline)
+
+
+
 #!eof
-
-(((#(t) (closure #(1) ((#(x) rec . #(1)) . #(2))) #(t)) . #(3))
- ((#(2) #(2) #(3)) . #(2))
- (((val . #(t)) (rec . #(1)) #(2)) . #(1))
- ((#(x) #(x) #(1)) . #(0)))
-
-For the first branch: 0 -> x, 1 -> (val . t), 2 -> 2, 3 -> t
-(fresh (t)
-  (== 0 x)
-  (== 1 `(,val . ,t))
-  (== 2 2)
-  (== 3 t))
-
-(((#(t) (closure #(1) ((#(x) rec . #(1)) . #(2))) #(t)) #(4))
- ((#(2) #(2) #(3)) #(3))
- (((val . #(t)) (rec . #(1)) #(2)) #(2))
- ((#(x) #(x) #(1)) #(1))
- ((#(x) #(x) #(x)) #(0)))

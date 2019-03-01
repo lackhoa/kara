@@ -1,3 +1,7 @@
+(define pmap
+  (lambda (f pair)
+    `(,(f (car pair)) . ,(f (cdr pair)))))
+
 (define empty-S '())
 (define make-s  (lambda (u v) `(,u ,v)))
 (define empty-D '())
@@ -26,11 +30,17 @@
        (let ([s* (c-> c 's*)] ...)
          e))]))
 
+;; (define-syntax lambdat@
+;;   (syntax-rules (:)
+;;     [(_ )]))
+
 (define lhs car)
 (define rhs cadr)
 
 (define var
   (lambda (name) (vector name)))
+(define var->name
+  (lambda (var) (vector-ref var 0)))
 (define var? vector?)
 
 (define walk
@@ -176,15 +186,12 @@
     [(_ [g g* ...] ...)
      (disj (conj g g* ...) ...)]))
 
-(define rename
-  (lambda (q* ans)
-    (let ([v* (car ans)])
-      (let rename ([q* q*] [v* v*] [ans ans])
-        (cond
-         [(null? q*) ans]
-         [(var? (car v*)) (rename (cdr q*) (cdr v*)
-                                  (substq (car q*) (car v*) ans))]
-         [else (rename (cdr q*) (cdr v*) ans)])))))
+(define revars
+  (lambda (v S)
+    (cond
+     [(and (var? v) (assq v S)) => rhs]
+     [(pair? v) `(,(revars (car v) S) . ,(revars (cdr v) S))]
+     [else v])))
 
 (define-syntax run*
   (syntax-rules ()
@@ -231,10 +238,7 @@
 (define any-useless-var?
   (lambda (v r)
     (cond
-     [(var? v)
-      (let ([v (walk v r)])
-        (and (var? v)
-           (not (number? (vector-ref v 0)))))]
+     [(var? v) (not (numbered-var? (walk v r)))]
      [(pair? v) (or (any-useless-var? (car v) r)
                    (any-useless-var? (cdr v) r))]
      [else #f])))
@@ -244,14 +248,16 @@
     (let ([S (c-> c 'S)]
           [D (c-> c 'D)]
           [O (c-> c 'O)])
-      (let ([v (walk* q* S)]
+      (let ([v* (walk* q* S)]
             [D (walk* D S)]
             [O (walk* O S)])
-        (let ([r (reify-S (list v O) empty-S)])
-          (let ([v (walk* v r)]
+        (let ([r (reify-S (list v* O) empty-S)])
+          (let ([v* (walk* v* r)]
                 [D (walk* (rem-subsumed (purify D r)) r)]
                 [O (walk* O r)])
-            (rename q* `(,v ,D ,O))))))))
+            (revars `(,v* ,D ,O)
+                    (filter (lambda (vq) (var? (lhs vq)))
+                            (transpose v* q*)))))))))
 
 (define fake-goal
   (lambda (expr)
@@ -259,15 +265,77 @@
       (list (update-c c 'O expr)))))
 
 
-;;; Code generation
+;;; Code generation techniques
+(define-syntax run*min
+  (syntax-rules ()
+    [(_ (q q* ...) g g* ...)
+     (fresh (q q* ...)
+       (minimize (map (lambda (c) (reify `(,q ,q* ...) c))
+                      ((conj g g* ...) empty-c))
+                 `(,q ,q* ...)))]))
+
+(trace-define extract-vars
+  (lambda (t)
+    (cond
+     [(var? t) `(,t)]
+     [(pair? t) (append (extract-vars (car t))
+                        (extract-vars (cdr t)))]
+     [else '()])))
+(define minimize
+  (lambda (answers q*)
+    (let ([ta (apply transpose answers)])
+      (let ([v* (car ta)]
+            [D* (cadr ta)]
+            [O* (caddr ta)])
+        (let-values ([(au iS) (apply anti-unify v*)])
+          (let ([S* (extract-iS iS)]
+                [uS (;; Unification with au is mandatory
+                     transpose q* au)])
+            (let ([r (renames uS q* '())])
+              (let ([uS (dedup (revars uS r))])
+                `(,uS
+                  .
+                  ,(;; Other unifications
+                    map (lambda (SDO)
+                          (let ([S (car SDO)]
+                                [DO (cdr SDO)])
+                            (let ([auv* ;; (map rhs iS) WRONG
+                                   (extract-vars (map rhs uS))])
+                              (let ([r (renames S (append auv* q*) auv*)])
+                                (let ([S (dedup (revars S r))]
+                                      [DO (revars DO r)])
+                                  `(,S . ,DO))))))
+                        (transpose S* D* O*)))))))))))
+
+(define sdup?
+  (lambda (s) (eq? (lhs s) (rhs s))))
+(define dedup
+  (lambda (S) (dedup-seen S '())))
+(define teq?
+  (lambda (t1 t2)
+    (or (eq? t1 t2)
+       (and (pair? t1) (pair? t2)
+          (teq? (car t1) (car t2))
+          (teq? (cdr t1) (cdr t2))))))
+(define dedup-seen
+  (lambda (S seen)
+    (cond
+     [(null? S) '()]
+     [else
+      (let ([s (car S)])
+        (cond
+         [(or (sdup? s) (find (lambda (s^) (teq? s s^)) seen))
+          (dedup-seen (cdr S) seen)]
+         [else
+          `(,s . ,(dedup-seen (cdr S) `(,s . ,seen)))]))])))
 
 (define anti-unify
   ;; Returns the anti-unification and an inverse substitution
-  ;; Cannot deal with variable shadowing (for the use of 'assoc')
   (lambda t*
     (let anti-unify ([t* t*] [S '()])
       (cond
        [;; rule 7, for symbols only (alternative mentioned in the paper)
+        ;; works for variables as well, since vars of different branches can still be eq?
         (for-all (lambda (t) (eq? (car t*) t)) (cdr t*))
         (values (car t*) S)]
        [;; rule 8
@@ -276,43 +344,62 @@
                       [(aud S++) (anti-unify (map cdr t*) S+)])
           (values `(,aua . ,aud) S++))]
        [;; rule 9 (cannot deal with variable shadowing)
-        (assoc t* S) => (lambda (s) (values (rhs s) S))]
+        (find (lambda (s) (teq? (lhs s) t*)) S)
+        =>
+        (lambda (s) (values (rhs s) S))]
        [;; rule 10
         else
-        (let ([new-var (var (length S))])
+        (let ([new-var (var (au-name (length S)))])
           (values new-var `(,(make-s t* new-var) . ,S)))]))))
 
-(define minimize-uni
-  (lambda (answers)
-    (let ([q* (map car answers)]
-          [D* (map cadr answers)]
-          [O* (map caddr answers)])
-      (let-values ([(au S) (apply anti-unify q*)])
-        (let ([S (map (lambda (s) `(,(car (car s)) . ,(cdr s))) S)])
-          (S-process S))))))
+(define au-name
+  (lambda (n)
+    (string->symbol (string-append "au" (number->string n)))))
 
-(define extract-vars
-  (lambda (t)
-    (cond
-     [(var? t) `(,t)]
-     [(pair? t) (append (extract-vars (car t))
-                        (extract-vars (cdr t)))]
-     [else '()])))
+(define transpose
+  (lambda l*
+    (apply map list l*)))
 
-(define S-process
-  ;; The anti-unification variables are on the right
-  (lambda (S)
-    (cond
-     [(null? S) '()]
-     [else
-      (append (let ([s (car S)])
-                (let ([lhs (lhs s)]
-                      [rhs (rhs s)])
-                  (cond
-                   [(pair? lhs)
-                    (append
-                     (map (lambda (v*) `(fresh-vars v*))
-                          (extract-vars lhs))
-                     `((== ,lhs ,rhs)))]
-                   [else `((== ,lhs ,rhs))])))
-              (S-process (cdr S)))])))
+(define extract-iS
+  (lambda (iS)
+    (let ([lhs* (map lhs iS)]
+          [rhs* (map rhs iS)])
+      (map (lambda (lhs) (transpose lhs rhs*))
+           (apply transpose lhs*)))))
+
+(define numbered-var?
+  (lambda (v) (and (var? v) (number? (var->name v)))))
+
+(define renames
+  ;; Input: an S
+  ;; Returns: a rename list
+  (lambda (S freshes locked)
+    (let ([S (filter (lambda (s) (andmap var? s)) S)])
+      (filter
+       (lambda (s) s)
+       (map (lambda (s)
+              (let ([lhs (lhs s)] [rhs (rhs s)])
+                (cond
+                 [(and (not (memq lhs freshes))
+                     (not (memq lhs locked)))
+                  s]
+                 [(and (not (memq rhs freshes))
+                     (not (memq rhs locked)))
+                  (make-s rhs lhs)]
+                 [(and (left-of lhs rhs freshes)
+                     (not (memq lhs locked)))
+                  (make-s lhs rhs)]
+                 [(and (left-of rhs lhs freshes)
+                     (not (memq rhs locked)))
+                  (make-s rhs lhs)]
+                 [else #f])))
+            S)))))
+
+(define left-of
+  (lambda (v1 v2 f)
+    (let left-of ([f f])
+      (cond
+       [(null? f) #f]
+       [(eq? v1 (car f)) #t]
+       [(eq? v2 (car f)) #f]
+       [else (left-of (cdr f))]))))

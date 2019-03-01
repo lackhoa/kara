@@ -1,66 +1,64 @@
+(display "You ran the wrong file!")
 #!eof
 
-;; I need to store the list of llg variables, they will all be freshed.
-;; llg variables shall be more important than others
-;; Should I make a framework of renaming? If a var is already freshed, then rename instead of unify.
-;; CPS matche technique would be very useful!
-;; The plan is to go from the list of states -> fetch the query variable -> anti-unify -> unify back in each clauses to get mini-substitutions -> utilize unify-command to get back the original semantics for each clause
-
-(fresh (_.1 _.2 _.3)
-  (== `((,_.1 . ,_.2) . ,_.3) env)
+(fresh (z u)
+  (== `(,z ,u var) x)
   (conde
-   [;; Unify back in
-    (== _.0 _.1)
-    (== `(val . ,t0) _.2)]
-   [(fresh (y1 z1)
-      (== x1 _.1)
-      (== `(rec . ,y1) _.2)
-      (== `(closure ,y1 ((,x1 . (rec . ,y1) . ,z1))) t))]
-   [(fresh (y2 z2 u2)
-      (=/= x2 y2)
-      ((lookupt x2 u2 v2) #t))]))
+   [(== u y)]
+   [(=/= u y)]))
 
-(x env t)
-(((x0 ((x0 . (val . t0)) . z0) t0) () ())
- ((x1 ((x1 . (rec . y1)) . z1) (closure y1 ((x1 . (rec . y1)) . z1))) () ())
- ((x2 ((y2 . z2) . u2) v2) (((x2 y2))) ((lookupt x2 u2 v2) #t)))
+(((#(au0) #(au1) var) #(y)) (#(x) #(y)))
+(((;; (;; This is from the qv (doesn't matter)
+   ;;  #(x) (#(0) #(y) var))
+   ;; (#(y) #(y))
+   (#(y) #(au1))
+   ;; (#(0) #(au0)) 0 -> au0
+   )
+  ()
+  ())
+ ((;; (;; This is from the qv (doesn't matter)
+   ;;  #(x) (#(0) #(1) var))
+   ;; (#(y) #(y))
+   ;; (#(1) #(au1)) 1 -> au1
+   ;; (#(0) #(au0)) 0 -> au0
+   )
+  ((;; (#(1) #(y))
+    (#(au1) #(y))
+    ))
+  ()))
+(fresh (au0 au1)
+  (== `(,au0 ,au1 var) x)
+  (conde [(== y au1)]
+         [(=/= y au1)]))
 
-((_.1 x1)
- (_.2 `(rec . ,y1))
- (_.3 z1)
- (_.4 `(closure ,y1 (()))))
-;; Observation: the lhs is always an generalizer variable
-;; The rhs is an arbitrary term of the original clause-based version
+;; Start working on THIS!
 
-(_.0 ((_.1 . _.2) . _.3) _.4)
-(((y0 (closure y1 ((x1 rec . y1) . z1)) v2) . _.4)
- ((z0 z1 u2)                                . _.3)
- (((val . y0) (rec . y1) z2)                . _.2)
- ((x0 x1 y2)                                . _.1)
- ((x0 x1 x2)                                . _.0))
-(x env t)
-(((x0 ((x0 . (val . t0)) . z0) t0) () ())
- ((x1 ((x1 . (rec . y1)) . z1) (closure y1 ((x1 . (rec . y1)) . z1))) () ())
- ((x2 ((y2 . z2) . u2) v2) (((x2 y2))) ((lookupt x2 u2 v2) #t)))
+(((#(x) (#(z) #(au0) var)))
+ (((#(y) #(au0)))
+  ()
+  ())
+ (;; ((#(1) #(au0))) DEL
+  (;; ((#(1) #(y))) ->  (#(au0) #(y))
+   )
+  ()))
+
+(((#(env) ((#(au0) . #(au1)) . #(au2))))
+ ((((val . #(t)) #(au1))
+   (#(x) #(au0)))
+  ()
+  ())
+ ((((closure #(1) ((#(x) rec . #(1)) . #(au2))) #(au3))
+   ((rec . #(1)) #(au1))
+   (#(x) #(au0)))
+  ()
+  ())
+ (()
+  (((#(x) #(au0))))
+  ((lookupt #(x) #(au2) #(t)) #t)))
 
 
-(define-syntax let
-  (lambda (x)
-    (define ids?
-      (lambda (ls)
-        (or (null? ls)
-           (and (identifier? (car ls))
-              (ids? (cdr ls))))))
-    (define unique-ids?
-      (lambda (ls)
-        (or (null? ls)
-           (and (let notmem? ((x (car ls)) (ls (cdr ls)))
-                (or (null? ls)
-                   (and (not (bound-identifier=? x (car ls)))
-                      (notmem? x (cdr ls)))))
-              (unique-ids? (cdr ls))))))
-    (syntax-case x ()
-      ((_ ((i v) ...) e1 e2 ...)
-       (and (ids? (syntax (i ...)))
-          (unique-ids? (syntax (i ...))))
-       (syntax ((lambda (i ...) e1 e2 ...) v ...))))))
+Note:
+- qv: one side is a query variable
+- au: one side is an anti-unify variable
+- Obvious move: Delete when two sides are eq?
+- If one side is neither a query variable or an au variable (and it must be the reverse situation for the other side), it shall be renamed to the other one
