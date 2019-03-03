@@ -1,9 +1,36 @@
-(define pmap
-  (lambda (f pair)
-    `(,(f (car pair)) . ,(f (cdr pair)))))
+(define transpose
+  (lambda (l*) (apply map list l*)))
+(define eqp?
+  (lambda (u) (lambda (v) (eq? u v))))
+(define TAGS '(f c r a q))
 
-(define empty-S '())
+(define var (lambda (name tag) (vector name tag)))
+(define var->name (lambda (var) (vector-ref var 0)))
+(define var->tag (lambda (var) (vector-ref var 1)))
+(define var? vector?)
+(define tagged? (lambda (var tag) (eq? (var->tag var) tag)))
+(define var<
+  (lambda (v1 v2)
+    (let ([t1 (var->tag v1)]
+          [t2 (var->tag v2)])
+      (memq t2 (memq t1 TAGS)))))
+
+(define-syntax case-term
+  (syntax-rules ()
+    [(_ e [v e1] [(a d) e2] [atom e3])
+     (let ([term e])
+       (cond
+        [(var? term) (let ([v term]) e1)]
+        [(pair? term) (let ([a (car term)] [d (cdr term)]) e2)]
+        [else (let ([atom term]) e3)]))]))
+
+;;; A single substitution cell
 (define make-s  (lambda (u v) `(,u ,v)))
+(define lhs car)
+(define rhs cadr)
+
+;;; Constraint stuff
+(define empty-S '())
 (define empty-D '())
 (define empty-O '())
 (define make-c (lambda (S D O) (list S D O)))
@@ -14,13 +41,24 @@
      [(eq? store 'S) (car c)]
      [(eq? store 'D) (cadr c)]
      [(eq? store 'O) (caddr c)])))
+(define c->S (lambda (c) (c-> c 'S)))
+(define c->D (lambda (c) (c-> c 'D)))
+(define c->O (lambda (c) (c-> c 'O)))
 (define update-c
   (lambda (c store value)
-    (let ([S (c-> c 'S)] [D (c-> c 'D)] [O (c-> c 'O)])
+    (let ([S (c->S c)] [D (c->D c)] [O (c->O c)])
       (cond
        [(eq? store 'S) (make-c value D O)]
        [(eq? store 'D) (make-c S value O)]
        [(eq? store 'O) (make-c S D value)]))))
+(define update-S (lambda (c value) (update-c c 'S value)))
+(define update-D (lambda (c value) (update-c c 'D value)))
+(define update-O (lambda (c value) (update-c c 'O value)))
+
+;;; Stream stuff
+(define mzero (lambda () '()))
+(define unit (lambda (x) `(,x)))
+(define choice (lambda (x y) `(,x . ,y)))
 
 (define-syntax lambdag@
   (syntax-rules (:)
@@ -29,19 +67,6 @@
      (lambda (c)
        (let ([s* (c-> c 's*)] ...)
          e))]))
-
-;; (define-syntax lambdat@
-;;   (syntax-rules (:)
-;;     [(_ )]))
-
-(define lhs car)
-(define rhs cadr)
-
-(define var
-  (lambda (name) (vector name)))
-(define var->name
-  (lambda (var) (vector-ref var 0)))
-(define var? vector?)
 
 (define walk
   (lambda (u S)
@@ -54,8 +79,7 @@
   (lambda (S+ S)
     (cond
      [(eq? S+ S) '()]
-     [else `(,(car S+)
-             . ,(prefix-S (cdr S+) S))])))
+     [else `(,(car S+) . ,(prefix-S (cdr S+) S))])))
 
 (define unify
   (lambda (u v S)
@@ -63,8 +87,17 @@
           [v (walk v S)])
       (cond
        [(eq? u v) S]
-       [(var? u) (and (not (occurs? u v S)) `(,(make-s u v) . ,S))]
-       [(var? v) (and (not (occurs? v u S)) `(,(make-s v u) . ,S))]
+       [;; The more important variable will be on the right
+        (and (var? u) (var? v))
+        (cond
+         [(var< u v) `(,(make-s u v) . ,S)]
+         [else `(,(make-s v u) . ,S)])]
+       [(var? u) (let ([v (walk v S)])
+                   (and (not (occurs? (eqp? u) v))
+                      `(,(make-s u v) . ,S)))]
+       [(var? v) (let ([u (walk u S)])
+                   (and (not (occurs? (eqp? v) u))
+                      `(,(make-s v u) . ,S)))]
        [(and (pair? u) (pair? v))
         (let ([S+ (unify (car u) (car v) S)])
           (and S+ (unify (cdr u) (cdr v) S+)))]
@@ -72,15 +105,12 @@
        [else #f]))))
 
 (define occurs?
-  (lambda (x v S)
-    (let ([v (walk v S)])
-      (cond
-       [(var? v) (eq? v x)]
-       [(pair? v)
-        (or
-         (occurs? x (car v) S)
-         (occurs? x (cdr v) S))]
-       [else #f]))))
+  (lambda (p t)
+    (let occurs? ([t t])
+      (case-term t
+        [v (p v)]
+        [(a d) (or (occurs? a) (occurs? d))]
+        [atom #f]))))
 
 (define unify*
   (lambda (S+ S)
@@ -93,9 +123,9 @@
        [(unify u v S) =>
         (lambda (S+)
           (cond
-           [(==fail? S+ D) (list)]
-           [else (list (update-c c 'S S+))]))]
-       [else (list)]))))
+           [(==fail? S+ D) (mzero)]
+           [else (unit (update-S c S+))]))]
+       [else (mzero)]))))
 
 (define subsumed?
   ;; Is d subsumed by d*?
@@ -106,15 +136,14 @@
              (or (and d^ (eq? d^ d))
                 (subsumed? d (cdr d*))))])))
 (define rem-subsumed
-  ;; A conjunction of =='s is equivalent to one == on lists
   (lambda (D)
     (let rem-subsumed ([D D] [d^* '()])
       (cond
        [(null? D) d^*]
        [(or (;; Is is subsumed by the unprocessed list?
-             subsumed? (car D) (cdr D))
-            (;; Is it subsumed the processed list?
-             subsumed? (car D) d^*))
+            subsumed? (car D) (cdr D))
+           (;; Is it subsumed the processed list?
+            subsumed? (car D) d^*))
         (rem-subsumed (cdr D) d^*)]
        [else
         (rem-subsumed (cdr D) `(,(car D) . ,d^*))]))))
@@ -127,9 +156,9 @@
         (lambda (S+)
           (let ([pS (prefix-S S+ S)])
             (cond
-             [(null? pS) (list)]
-             [else (list (update-c c 'D `(,pS . ,D)))])))]
-       [else (list c)]))))
+             [(null? pS) (mzero)]
+             [else (unit (update-D c `(,pS . ,D)))])))]
+       [else (unit c)]))))
 
 (define ==fail?
   (lambda (S D)
@@ -148,15 +177,16 @@
        [else #f]))))
 
 ;;; Less core stuff
-(define succeed (lambdag@ (c) (list c)))
-(define fail    (lambdag@ (c) (list)))
+(define succeed (lambdag@ (c) (unit c)))
+(define fail    (lambdag@ (c) (mzero)))
 
 (define conj2
   (lambda (g1 g2)
     (lambdag@ (c)
-      (let ([c* (g1 c)])
-        (apply append
-          (map (lambda (c-new) (g2 c-new)) c*))))))
+      (bind (g1 c) g2))))
+(define bind
+  (lambda (c* g)
+    (apply append (map g c*))))
 
 (define-syntax conj
   (syntax-rules ()
@@ -178,7 +208,7 @@
 (define-syntax fresh
   (syntax-rules ()
     [(_ (x* ...) g g* ...)
-     (let ([x* (var 'x*)] ...)
+     (let ([x* (var 'x* 'f)] ...)
        (conj g g* ...))]))
 
 (define-syntax conde
@@ -186,126 +216,105 @@
     [(_ [g g* ...] ...)
      (disj (conj g g* ...) ...)]))
 
-(define revars
-  (lambda (v S)
-    (cond
-     [(and (var? v) (assq v S)) => rhs]
-     [(pair? v) `(,(revars (car v) S) . ,(revars (cdr v) S))]
-     [else v])))
-
 (define-syntax run*
   (syntax-rules ()
-    [(_ (q q* ...) g g* ...)
-     (fresh (q q* ...)
-       (map (lambda (c) (reify `(,q ,q* ...) c))
+    [(_ (q0 q* ...) g g* ...)
+     (let ([q0 (var 'q0 'q)] [q* (var 'q* 'q)] ...)
+       (map (lambda (c) (reify `(,q0 ,q* ...) c))
             ((conj g g* ...) empty-c)))]))
 
 (define walk*
-  (lambda (v S)
-    (let ([v (walk v S)])
-      (cond
-       [(var? v) v]
-       [(pair? v)
-        `(,(walk* (car v) S) . ,(walk* (cdr v) S))]
-       [else v]))))
-
-(define reify-S
-  ;; Generate numbered vars for anonymous variables instead of strings
-  ;; Also handles non-vars, and duplications
-  (lambda (v S)
-    (let ([v (walk v S)])
-      (cond
-       [(var? v)
-        (cond
-         [(member v (map rhs S)) => (lambda _ S)]
-         [else `((,v ,(var (length S))) . ,S)])]
-       [(pair? v) (reify-S (cdr v) (reify-S (car v) S))]
-       [else S]))))
+  (lambda (t S)
+    (let ([t (walk t S)])
+      (case-term t
+        [v v]
+        [(a d) `(,(walk* a S) . ,(walk* d S))]
+        [a a]))))
 
 (define purify
-  (lambda (D r)
-    (filter (lambda (d) (not (or (constant? d)
-                         (any-useless-var? d r))))
+  (lambda (D)
+    (filter (lambda (d)
+              (not (or (constant? d)
+                    (;; fresh variables don't matter
+                     occurs? (lambda (v) (tagged? v 'f)) d))))
             D)))
 
 (define constant?
-  (lambda (d)
-    (cond
-     [(var? d) #f]
-     [(pair? d) (and (constant? (car d)) (constant? (cdr d)))]
-     [else #t])))
-
-(define any-useless-var?
-  (lambda (v r)
-    (cond
-     [(var? v) (not (numbered-var? (walk v r)))]
-     [(pair? v) (or (any-useless-var? (car v) r)
-                   (any-useless-var? (cdr v) r))]
-     [else #f])))
+  (lambda (t)
+    (case-term t
+      [v #f]
+      [(a d) (and (constant? a) (constant? d))]
+      [atom #t])))
 
 (define reify
+  ;; This will return a c
   (lambda (q* c)
-    (let ([S (c-> c 'S)]
-          [D (c-> c 'D)]
-          [O (c-> c 'O)])
-      (let ([v* (walk* q* S)]
-            [D (walk* D S)]
-            [O (walk* O S)])
-        (let ([r (reify-S (list v* O) empty-S)])
-          (let ([v* (walk* v* r)]
-                [D (walk* (rem-subsumed (purify D r)) r)]
-                [O (walk* O r)])
-            (revars `(,v* ,D ,O)
-                    (filter (lambda (vq) (var? (lhs vq)))
-                            (transpose v* q*)))))))))
+    (let ([S (c->S c)] [D (c->D c)] [O (c->O c)])
+      (let ([v (walk* q* S)] [D (walk* D S)] [O (walk* O S)])
+        (let ([R (reify-S `(;; Gotta respect O
+                            ,v ,O))])
+          (let ([S (transpose `(,q* ,(walk* v R)))]
+                [D (walk* D R)]
+                [O (walk* O R)])
+            (let ([S (dedup S)]
+                  [D (rem-subsumed (;; This will remove 'f vars
+                                    purify D))])
+              `(,S ,D ,O))))))))
+
+(define reify-S
+  ;; The sole purpose is to rename 'f variables to 'r
+  (lambda (t)
+    (let reify-S ([t t] [S empty-S])
+      (case-term (walk t S)
+        [v (cond
+            [;; Variable still fresh -> gotta reify
+             (tagged? v 'f)
+             (let ([new-var (var (length S) 'r)])
+               `(,(make-s v new-var) . ,S))]
+            [else S])]
+        [(a d) (reify-S d (reify-S a S))]
+        [a S]))))
 
 (define fake-goal
   (lambda (expr)
     (lambdag@ (c : S D O)
-      (list (update-c c 'O expr)))))
+      (unit (update-O c expr)))))
 
 
 ;;; Code generation techniques
+
 (define-syntax run*min
   (syntax-rules ()
-    [(_ (q q* ...) g g* ...)
-     (fresh (q q* ...)
-       (minimize (map (lambda (c) (reify `(,q ,q* ...) c))
+    [(_ (q0 q* ...) g g* ...)
+     (let ([q0 (var 'q0 'q)] [q* (var 'q* 'q)] ...)
+       (minimize (map (lambda (c) (reify `(,q0 ,q* ...) c))
                       ((conj g g* ...) empty-c))
-                 `(,q ,q* ...)))]))
+                 `(,q0 ,q* ...)))]))
 
-(trace-define extract-vars
-  (lambda (t)
-    (cond
-     [(var? t) `(,t)]
-     [(pair? t) (append (extract-vars (car t))
-                        (extract-vars (cdr t)))]
-     [else '()])))
 (define minimize
-  (lambda (answers q*)
-    (let ([ta (apply transpose answers)])
-      (let ([v* (car ta)]
-            [D* (cadr ta)]
-            [O* (caddr ta)])
+  (lambda (c* q*)
+    (let ([S* (map car c*)]
+          [D* (map cadr c*)]
+          [O* (map caddr c*)])
+      (let (;; Convert to clausal form
+            [v* (map (lambda (S) (walk* q* S)) S*)])
         (let-values ([(au iS) (apply anti-unify v*)])
-          (let ([S* (extract-iS iS)]
-                [uS (;; Unification with au is mandatory
-                     transpose q* au)])
-            (let ([r (renames uS q* '())])
-              (let ([uS (dedup (revars uS r))])
-                `(,uS
-                  .
-                  ,(;; Other unifications
-                    map (lambda (SDO)
-                          (let ([S (car SDO)]
-                                [DO (cdr SDO)])
-                            (let ([auv* ;; (map rhs iS) WRONG
-                                   (extract-vars (map rhs uS))])
-                              (let ([r (renames S (append auv* q*) auv*)])
-                                (let ([S (dedup (revars S r))]
-                                      [DO (revars DO r)])
-                                  `(,S . ,DO))))))
-                        (transpose S* D* O*)))))))))))
+          (let ([auv* (map rhs iS)]
+                [uS (;; Unification with au (common)
+                     unify q* au empty-S)]
+                [;; Then each clause unify right back in (separately)
+                 S* (map (lambda (v) (unify au v empty-S)) v*)])
+            (let ([al0 (get-aliases uS '())]
+                  [al* (map (lambda (S) (get-aliases S auv*)) S*)])
+              (let ([uS (dedup (revars uS al0))])
+                (let ([revars* (lambda (X*)
+                                 (map (lambda (X al)
+                                        (revars X (append al0 al)))
+                                      X* al*))])
+                  (let ([S* (map dedup (revars* S*))]
+                        [D* (revars* D*)]
+                        [O* (revars* O*)])
+                    `(,uS ,(transpose `(,S* ,D* ,O*)))))))))))))
 
 (define sdup?
   (lambda (s) (eq? (lhs s) (rhs s))))
@@ -349,57 +358,24 @@
         (lambda (s) (values (rhs s) S))]
        [;; rule 10
         else
-        (let ([new-var (var (au-name (length S)))])
+        (let ([new-var (var (length S) 'a)])
           (values new-var `(,(make-s t* new-var) . ,S)))]))))
 
-(define au-name
-  (lambda (n)
-    (string->symbol (string-append "au" (number->string n)))))
+(define get-aliases
+  (lambda (S locked)
+    (filter
+     (lambda (s)
+       (let ([l (lhs s)] [r (rhs s)])
+         (and (var? l) (var? r)
+            (var< l r)
+            (not (memq l locked)))))
+     S)))
 
-(define transpose
-  (lambda l*
-    (apply map list l*)))
-
-(define extract-iS
-  (lambda (iS)
-    (let ([lhs* (map lhs iS)]
-          [rhs* (map rhs iS)])
-      (map (lambda (lhs) (transpose lhs rhs*))
-           (apply transpose lhs*)))))
-
-(define numbered-var?
-  (lambda (v) (and (var? v) (number? (var->name v)))))
-
-(define renames
-  ;; Input: an S
-  ;; Returns: a rename list
-  (lambda (S freshes locked)
-    (let ([S (filter (lambda (s) (andmap var? s)) S)])
-      (filter
-       (lambda (s) s)
-       (map (lambda (s)
-              (let ([lhs (lhs s)] [rhs (rhs s)])
-                (cond
-                 [(and (not (memq lhs freshes))
-                     (not (memq lhs locked)))
-                  s]
-                 [(and (not (memq rhs freshes))
-                     (not (memq rhs locked)))
-                  (make-s rhs lhs)]
-                 [(and (left-of lhs rhs freshes)
-                     (not (memq lhs locked)))
-                  (make-s lhs rhs)]
-                 [(and (left-of rhs lhs freshes)
-                     (not (memq rhs locked)))
-                  (make-s rhs lhs)]
-                 [else #f])))
-            S)))))
-
-(define left-of
-  (lambda (v1 v2 f)
-    (let left-of ([f f])
-      (cond
-       [(null? f) #f]
-       [(eq? v1 (car f)) #t]
-       [(eq? v2 (car f)) #f]
-       [else (left-of (cdr f))]))))
+(define revars
+  (lambda (t S)
+    (let revars ([t t])
+      (case-term t
+        [v (let ([p (assq v S)])
+             (if p (rhs p) v))]
+        [(a d) `(,(revars a) . ,(revars d))]
+        [atom atom]))))

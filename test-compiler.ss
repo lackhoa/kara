@@ -1,45 +1,12 @@
-(display
- (let ([x (var 'x)])
-   ((== #t x) empty-c)))
-(newline)
-
-(display
- (let ([x (var 'x)]
-       [y (var 'y)])
-   ((conj2 (== #t x) (== y x))
-    empty-c)))
-(newline)
-
-(display
- (let ([x (var 'x)]
-       [y (var 'y)]
-       [z (var 'z)])
-   ((conj (=/= z x) (== #t x) (== x y))
-    empty-c)))
-(newline)
-
 (printf "This will return nothing\n")
-(display
- (let ([x (var 'x)]
-       [y (var 'y)]
-       [z (var 'z)])
+(pp
+ (fresh (x y z)
    ((conj (=/= z x) (== #t x)(== y x) (== z #t))
     empty-c)))
 (newline)
 
-(display
- (let ([x (var 'x)])
-   ((disj2 (== x 5) (== x 6)) empty-c)))
-(newline)
-
-(display
- (let ([x (var 'x)]
-       [y (var 'y)])
-   ((disj (== x 5) (== x 6) (=/= x y)) empty-c)))
-(newline)
-
 (printf "conde and fresh: x = 6 and y =/= 6\n")
-(display
+(pp
  ((fresh (x y)
     (conde
      [(== x 5) (== x y)]
@@ -48,8 +15,8 @@
   empty-c))
 (newline)
 
-(printf "Shadowing\n")
-(display
+(printf "Shadowing: x is both 5 and 6\n")
+(pp
  ((fresh (x)
     (== x 5)
     (fresh (x)
@@ -57,8 +24,8 @@
   empty-c))
 (newline)
 
-(printf "Run & Subsumption & Unification: x is not 5\n")
-(display
+(printf "Run & Subsumption & Reification: x is not 5\n")
+(pp
  (run* (x y)
    (=/= x 5)
    (=/= `(,x ,y) '(5 6))
@@ -66,14 +33,14 @@
      (=/= x 6))))
 (newline)
 
-(printf "==t\n")
+(printf "==t: x is different from y\n")
 (define ==t
   (lambda (x y)
     (lambda (t)
       (conde
        [(== #t t) (== x y)]
        [(== #f t) (=/= x y)]))))
-(display
+(pp
  (run* (x y) ((==t x y) #f)))
 (newline)
 
@@ -87,7 +54,7 @@
        (conde
         [(g1 #t)  ((conjt g2 gs ...) t)]
         [(== #f t) (g1 #f)]))]))
-(display
+(pp
  (run* (x y z t)
    ((conjt (==t x y) (==t y z)) t)))
 (newline)
@@ -102,7 +69,7 @@
        (conde
         [(== #t t) (g1 #t)]
         [(g1 #f)  ((disjt g2 gs ...) t)]))]))
-(display
+(pp
  (run* (x y z t) ((disjt (==t x y) (==t y z)) t)))
 (newline)
 
@@ -126,7 +93,7 @@
       (condo
        [(==t x e) succeed]
        [else (fake-goal `(memberd ,x ,es))]))))
-(display
+(pp
  (run* (x x*) (memberd x x*)))
 (newline)
 
@@ -149,27 +116,27 @@
                 (== `(closure ,lam-expr ,env) t))])]
            [else
             (fake-goal `((lookupt ,x ,rest ,t) ,bound?))]))]))))
-(display
+(pp
  (run* (x env t) ((lookupt x env t) #t)))
 (newline)
 
 (printf "lookupt -> not-in-envo\n")
-(display
+(pp
  (run* (x env t) ((lookupt x env t) #f)))
 (newline)
 
-(printf "Anti-unification: 2 * 2 = 2 + 2 vs 2 * 3 = 3 + 3\n")
-(let-values ([(au S) (anti-unify '(2 * 2 = 2 + 2) '(2 * 3 = 3 + 3))])
-  (display au) (newline) (display S))
-(newline)
+;; (printf "Anti-unification: 2 * 2 = 2 + 2 vs 2 * 3 = 3 + 3\n")
+;; (let-values ([(au S) (anti-unify '(2 * 2 = 2 + 2) '(2 * 3 = 3 + 3))])
+;;   (pp au) (newline) (pp S))
+;; (newline)
 
-(printf "Anti-unification: Big terms\n")
-(let ([t1 '(#(x) ((#(x) val . #(t)) . #(2)) #(t))]
-      [t2 '(#(x) ((#(x) rec . #(1)) . #(2)) (closure #(1) ((#(x) rec . #(1)) . #(2))))]
-      [t3 '(#(x) ((#(1) . #(2)) . #(3)) #(t))])
-  (let-values ([(au S) (anti-unify t1 t2 t3)])
-    (display au) (newline) (display S)))
-(newline)
+;; (printf "Anti-unification: Big terms\n")
+;; (let ([t1 '(#(x) ((#(x) val . #(t)) . #(2)) #(t))]
+;;       [t2 '(#(x) ((#(x) rec . #(1)) . #(2)) (closure #(1) ((#(x) rec . #(1)) . #(2))))]
+;;       [t3 '(#(x) ((#(1) . #(2)) . #(3)) #(t))])
+;;   (let-values ([(au S) (anti-unify t1 t2 t3)])
+;;     (pp au) (newline) (pp S)))
+;; (newline)
 
 (printf "typet\n")
 (define typet
@@ -191,23 +158,23 @@
              [(disjt (==t a 'prim) (==t a 'closure))
               (== 'funval T)]
              [else (== 'pair T)]))])))))
-(display
+(pp
  (run* (term)
    ((typet term 'pair) #f)))
 (newline)
 
-(printf "run*min test\n")
-(display
+(printf "run*min test: x is (z u): u could be y or not\n")
+(pp
  (run*min (x y z)
           (fresh (u)
-            (== `(,z ,u var) x)
+            (== `(,z ,u) x)
             (conde
              [(== u y)]
              [(=/= u y)]))))
 (newline)
 
 (printf "run*min on lookupo\n")
-(display
+(pp
  (run*min (x env t)
           ((lookupt x env t) #t)))
 (newline)
