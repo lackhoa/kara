@@ -1,3 +1,9 @@
+(define ->string
+  (lambda (x)
+    (cond
+     [(number? x) (number->string x)]
+     [(symbol? x) (symbol->string x)]
+     [else (error '->string "Unsupported type" x)])))
 (define transpose
   (lambda (l*) (apply map list l*)))
 (define eqp?
@@ -20,10 +26,14 @@
 (define var->name (lambda (var) (vector-ref var 0)))
 (define var->tag (lambda (var) (vector-ref var 1)))
 (define var? vector?)
-(define var<
-  ;; v1 is less prioritized than v2
+(define var<?
+  ;; v1 is less prioritized than v2, or its name is
   (lambda (v1 v2)
-    (memq (var->tag v2) (memq (var->tag v1) TAGS))))
+    (let ([n1 (->string (var->name v1))] [t1 (var->tag v1)]
+          [n2 (->string (var->name v2))] [t2 (var->tag v2)])
+      (cond
+       [(eq? t1 t2) (string<? n1 n2)]
+       [else (memq t2 (memq t1 TAGS))]))))
 
 (define-syntax case-term
   ;; A type dispatch for mk terms
@@ -93,7 +103,7 @@
        [;; The more important variable will be on the right
         (and (var? t1) (var? t2))
         (cond
-         [(var< t1 t2) `(,(make-s t1 t2) . ,S)]
+         [(var<? t1 t2) `(,(make-s t1 t2) . ,S)]
          [else `(,(make-s t2 t1) . ,S)])]
        [(var? t1) (ext-S-check t1 t2 S)]
        [(var? t2) (ext-S-check t2 t1 S)]
@@ -303,7 +313,8 @@
                    unify q* au empty-S)]
               [;; Then each clause unify right back in (one for each clause)
                S* (map (lambda (v) (unify au v empty-S)) t*)])
-          (let ([al0 (get-aliases uS '())]
+          (let ([al0 (;; Can't rename queries
+                      get-aliases uS q*)]
                 [al* (map (lambda (S) (get-aliases S auv*)) S*)])
             (let ([uS (dedup (revars uS al0))])
               (let ([revars* (lambda (X*)
@@ -350,7 +361,7 @@
      (lambda (s)
        (let ([l (lhs s)] [r (rhs s)])
          (and (var? l) (var? r)
-            (var< l r)
+            (var<? l r)
             (not (memq l locked)))))
      S)))
 
