@@ -1,16 +1,3 @@
-;;; miniKanren
-(load "faster-miniKanren/mk-vicare.scm")
-(load "faster-miniKanren/mk.scm")
-;; (load "faster-miniKanren/matche.scm")
-;; (load "faster-miniKanren/numbers.scm")
-;; (load "miniKanren/mk.scm")
-;; (load "micro.ss")
-
-;;; Loading my stuff
-;; (load "compiler.ss")
-(load "faster-miniKanren/full-interp.scm")
-;; (load "exp-interp.ss")
-
 ;;; Help functions
 (define pp pretty-print)
 (define ppl (lambda (ls) (for-each pp ls)))
@@ -30,19 +17,22 @@
       (begin (display x) (newline)
              succeed))))
 
+;;; miniKanren
+;; (load "faster-miniKanren/mk-vicare.scm")
+;; (load "faster-miniKanren/mk.scm")
+;; (load "faster-miniKanren/matche.scm")
+;; (load "faster-miniKanren/numbers.scm")
+;; (load "miniKanren/mk.scm")
+;; (load "micro.ss")
+
+;;; Other "libraries"
+;; (load "faster-miniKanren/full-interp.scm")
+;; (load "reif.ss")
+
 ;; The main program
+;; (load "full-interp.ss")
+;; (load "test-reif.ss")
 ;; (load "test-full-interp.ss")
-;; (load "test-compiler.ss")
-(pp
- (run* (q)
-   (evalo
-    '(letrec ([e? (lambda (ls)
-                    (match ls
-                      [`() #t]
-                      [`(,a . ,d) (o? d)]))])
-       (letrec ([o? (lambda (ls)
-                      (match ls
-                        [`() #f]
-                        [`(,a . ,d) (e? d)]))])
-         (e? '(1 2))))
-    q)))
+(load "compiler.ss")
+(load "reif.ss")
+(load "test-compiler.ss")

@@ -224,8 +224,8 @@
       (== `(if ,e1 ,e2 ,e3) expr)
       (not-in-envo 'if env)
       (eval-expo e1 env t)
-      (ifo (==t #f t) (eval-expo e3 env val)
-           (eval-expo e2 env val)))))
+      (condo [(==t #f t) (eval-expo e3 env val)]
+             [else (eval-expo e2 env val)]))))
 
 (define initial-env
   `((list    . (val . (closure (lambda x x) ,empty-env)))
@@ -309,8 +309,8 @@
          [;; `var` is bound in `penv`
           (lookupt var penv val)
           ((==t mval val) match?)
-          (ifo (==t match? #t) (=/= 'closure mval)
-               succeed)
+          (condo [(==t match? #t) (=/= 'closure mval)]
+                 [else succeed])
           (== penv penv-out)]
          [;; `var` is not bound -> auto match
           (==t match? #t)

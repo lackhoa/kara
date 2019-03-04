@@ -1,11 +1,11 @@
-(printf "This will return nothing\n")
+(pp "=> nothing\n")
 (pp
  (fresh (x y z)
    ((conj (=/= z x) (== #t x)(== y x) (== z #t))
     empty-c)))
 (newline)
 
-(printf "conde and fresh: x = 6 and y =/= 6\n")
+(pp "conde and fresh => x = 6 and y =/= 6\n")
 (pp
  ((fresh (x y)
     (conde
@@ -15,7 +15,7 @@
   empty-c))
 (newline)
 
-(printf "Shadowing: x is both 5 and 6\n")
+(pp "Shadowing => x is both 5 and 6\n")
 (pp
  ((fresh (x)
     (== x 5)
@@ -24,7 +24,8 @@
   empty-c))
 (newline)
 
-(printf "Run & Subsumption & Reification: x is not 5\n")
+(pp "Run & Subsumption & Reification involved")
+(pp "=> x is not 5\n")
 (pp
  (run* (x y)
    (=/= x 5)
@@ -33,71 +34,40 @@
      (=/= x 6))))
 (newline)
 
-(printf "==t: x is different from y\n")
-(define ==t
-  (lambda (x y)
-    (lambda (t)
-      (conde
-       [(== #t t) (== x y)]
-       [(== #f t) (=/= x y)]))))
+(pp "=> a bit more than nothing\n")
+(pp (run* (x)
+      (fresh (x) (=/= x 5))))
+(newline)
+
+(pp "==t => x is different from y\n")
 (pp
  (run* (x y) ((==t x y) #f)))
 (newline)
 
-(printf "conjt\n")
-(define-syntax conjt
-  ;; Conjunction of test
-  (syntax-rules ()
-    [(_ g) g]
-    [(_ g1 g2 gs ...)
-     (lambda (t)
-       (conde
-        [(g1 #t)  ((conjt g2 gs ...) t)]
-        [(== #f t) (g1 #f)]))]))
+(pp "conjt => x is y and y is z\n")
 (pp
  (run* (x y z t)
    ((conjt (==t x y) (==t y z)) t)))
 (newline)
 
-(printf "disjt\n")
-(define-syntax disjt
-  ;; A disjunction test
-  (syntax-rules ()
-    [(_ g) g]
-    [(_ g1 g2 gs ...)
-     (lambda (t)
-       (conde
-        [(== #t t) (g1 #t)]
-        [(g1 #f)  ((disjt g2 gs ...) t)]))]))
+(pp "disjt => x is y or y is z\n")
 (pp
  (run* (x y z t) ((disjt (==t x y) (==t y z)) t)))
 (newline)
 
-(printf "condo & memberd\n")
-(define-syntax condo
-  ;; Literally the relational version of 'cond'
-  ;; Fails if no clauses match
-  (syntax-rules (else)
-    [(_ [else g]) g]
-    [(_ [else g1 g2 g* ...])
-     (fresh () g1 g2 g* ...)]
-    [(_ [test g g* ...] c* ...)
-     (conde
-      [(test #t) g g* ...]
-      [(test #f) (condo c* ...)])]
-    [(_) fail]))
+(pp "condo & memberd => (memberd x x*)\n")
 (define memberd
   (lambda (x ees)
     (fresh (e es)
       (== ees `(,e . ,es))
       (condo
        [(==t x e) succeed]
-       [else (fake-goal `(memberd ,x ,es))]))))
+       [else (fake `(memberd ,x ,es))]))))
 (pp
  (run* (x x*) (memberd x x*)))
 (newline)
 
-(printf "lookupt -> lookupo\n")
+(pp "lookupt => lookupo\n")
 (define lookupt
   (lambda (x env t)
     (lambda (bound?)
@@ -115,22 +85,22 @@
                 (== `(rec . ,lam-expr) b)
                 (== `(closure ,lam-expr ,env) t))])]
            [else
-            (fake-goal `((lookupt ,x ,rest ,t) ,bound?))]))]))))
+            (fake `((lookupt ,x ,rest ,t) ,bound?))]))]))))
 (pp
  (run* (x env t) ((lookupt x env t) #t)))
 (newline)
 
-(printf "lookupt -> not-in-envo\n")
+(pp "lookupt => not-in-envo\n")
 (pp
  (run* (x env t) ((lookupt x env t) #f)))
 (newline)
 
-;; (printf "Anti-unification: 2 * 2 = 2 + 2 vs 2 * 3 = 3 + 3\n")
+;; (pp "Anti-unification: 2 * 2 = 2 + 2 vs 2 * 3 = 3 + 3\n")
 ;; (let-values ([(au S) (anti-unify '(2 * 2 = 2 + 2) '(2 * 3 = 3 + 3))])
 ;;   (pp au) (newline) (pp S))
 ;; (newline)
 
-;; (printf "Anti-unification: Big terms\n")
+;; (pp "Anti-unification: Big terms\n")
 ;; (let ([t1 '(#(x) ((#(x) val . #(t)) . #(2)) #(t))]
 ;;       [t2 '(#(x) ((#(x) rec . #(1)) . #(2)) (closure #(1) ((#(x) rec . #(1)) . #(2))))]
 ;;       [t3 '(#(x) ((#(1) . #(2)) . #(3)) #(t))])
@@ -138,7 +108,7 @@
 ;;     (pp au) (newline) (pp S)))
 ;; (newline)
 
-(printf "typet\n")
+(pp "typet => not pair\n")
 (define typet
   ;; Complete classification of recognized terms
   ;; also able to determine if a term is of some type
@@ -147,10 +117,10 @@
       (fresh (T)
         ((==t type T) same?)
         (conde
-         [(== 'symbol  T) (fake-goal `(symbolo ,term))]
+         [(== 'symbol  T) (fake `(symbolo ,term))]
          [(== 'boolean T) (conde [(== term #t)]
-                                 [(== term #f)])]
-         [(== 'number  T) (fake-goal `(numbero ,term))]
+                                [(== term #f)])]
+         [(== 'number  T) (fake `(numbero ,term))]
          [(== 'null    T) (== '() term)]
          [(fresh (a _d)
             (== `(,a . ,_d) term)
@@ -163,22 +133,46 @@
    ((typet term 'pair) #f)))
 (newline)
 
-(printf "run*min test: x is (z u): u could be y or not\n")
+(pp "run*au test: x is (z u): u could be y or not\n")
 (pp
- (run*min (x y z)
-          (fresh (u)
-            (== `(,z ,u) x)
-            (conde
-             [(== u y)]
-             [(=/= u y)]))))
+ (run*au (x y z)
+         (fresh (u)
+           (== `(,z ,u) x)
+           (conde
+            [(== u y)]
+            [(=/= u y)]))))
 (newline)
 
-(printf "run*min on lookupo\n")
+(pp "run*au on lookupo\n")
 (pp
- (run*min (x env t)
-          ((lookupt x env t) #t)))
+ (run*au (x env t)
+         ((lookupt x env t) #t)))
 (newline)
 
-
+(pp "Time for it to work on itself!")
+(define vart
+  (lambda (t) (lambda (?) (fake `(vector?o ,t ,?)))))
+(define pairt
+  (lambda (t) (lambda (?) (fake `(pair?o ,t ,?)))))
+(define fake-unify
+  (lambda (t1 t2 S S+)
+    (fresh (t1+ t2+)
+      (fake `(walko ,t1 ,S ,t1+))
+      (fake `(walko ,t2 ,S ,t2+))
+      (condo
+       [(==t t1+ t2+) (== S S+)]
+       [(vart t1+) (fake `(ext-S-checko ,t1+ ,t2+ ,S ,S+))]
+       [(vart t2+) (fake `(ext-S-checko ,t2+ ,t1+ ,S ,S+))]
+       [(conjt (pairt t1+) (pairt t2+))
+        (fresh (a1 a2 d1 d2 S^)
+          (== `(,a1 . ,d1) t1+)
+          (== `(,a2 . ,d2) t2+)
+          (fake `(unifyo ,a1 ,a2 ,S ,S^))
+          (condo [(=/=t S^ #f)
+                  (fake `(unifyo ,d1 ,d2 ,S^ ,S+))]))]
+       [(==t t1+ t2+) (== S+ S)]
+       [else (== S+ #f)]
+       ))))
+(pp (run* (t1 t2 S S+) (fake-unify t1 t2 S S+)))
 
 #!eof
