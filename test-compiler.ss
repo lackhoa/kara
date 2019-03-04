@@ -149,11 +149,7 @@
 (newline)
 
 (pp "How does run*au deal with permutation? => x == y")
-(trace var<?)
 (pp (run*au (x y) (conde [(== y x)] [(== x y)])))
-
-#!eof
-
 
 (pp "Time for it to work on itself!")
 (define vart
@@ -178,4 +174,7 @@
                   (fake `(unifyo ,d1 ,d2 ,S^ ,S+))]))]
        [(==t t1+ t2+) (== S+ S)]
        [else (== S+ #f)]))))
-(pp (run* (t1 t2 S S+) (fake-unify t1 t2 S S+)))
+(pp (run*au (t1 t2 S S+) (fake-unify t1 t2 S S+)))
+
+
+#!eof
