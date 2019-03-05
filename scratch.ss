@@ -86,3 +86,7 @@
     (vector?o #(0 r) #f)
     (walko #(t2 q) #(S q) #(1 r))
     (walko #(t1 q) #(S q) #(0 r)))]))
+
+(unifier
+ #<procedure unify at ak.ss:1415>
+ (((foo (nom-tag "a") (nom-tag "a")) foo (nom-tag "b") (nom-tag "b"))))
