@@ -18,8 +18,8 @@
              succeed))))
 
 ;;; miniKanren
-;; (load "faster-miniKanren/mk-vicare.scm")
-;; (load "faster-miniKanren/mk.scm")
+(load "faster-miniKanren/mk-vicare.scm")
+(load "faster-miniKanren/mk.scm")
 ;; (load "faster-miniKanren/matche.scm")
 ;; (load "faster-miniKanren/numbers.scm")
 ;; (load "miniKanren/mk.scm")
@@ -27,12 +27,11 @@
 
 ;;; Other "libraries"
 ;; (load "faster-miniKanren/full-interp.scm")
-;; (load "reif.ss")
+(load "reif.ss")
 
 ;; The main program
 ;; (load "full-interp.ss")
 ;; (load "test-reif.ss")
 ;; (load "test-full-interp.ss")
-(load "compiler.ss")
-(load "reif.ss")
-(load "test-compiler.ss")
+;; (load "compiler.ss") ;; (load "test-compiler.ss")
+(load "net.ss") (load "test-net.ss")

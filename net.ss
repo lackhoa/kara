@@ -1,73 +1,119 @@
-;; Packet = (protocol, source-ip, destination-ip, flags)
+(define hier
+  ;; This is a tree
+  '(* (tcp (telnet) (www))
+      (udp (dns))
+      (icmp (echo) (echo-reply))
+      (ten-net (vlan1 (pc-a))
+               (vlan2 (pc-c)))))
 
-(define lookup
-  (lambda (x ls res)
-    (conde [(== ls '()) (== res #f)]
-           [(fresh (a d y ys)
-              (== ls `(,a . ,d))
-              (== a `(,y . ,ys))
-              (conde [(== x y) (== res ys)]
-                     [(=/= x y) (lookup x d res)]))])))
+(define treeo
+  (lambda (value children tree)
+    (== `(,value . ,children) tree)))
 
-(define packet?
+(define tree-findt
+  ;; Returns the tree whose root is the value
+  (lambda (v tree tree-res)
+    (lambda (found?)
+      (;; Mutual recursion ahead!
+       letrec ([tree-findt1
+                (lambda (tree)
+                  (lambda (found?)
+                    (fresh (u children)
+                      (treeo u chidlren tree)
+                      (condo
+                       [(==t u v) (== #t found?)]
+                       [else ((tree-findt2 children) found?)]))))]
+               [tree-findt2
+                (lambda (forest tree)
+                  ;; "tree" is the tree in the forest we're looking for
+                  (lambda (found?)
+                    (conde
+                     [(== '() forest) (== #f found?)]
+                     [(fresh (a d)
+                        (== `(,a . ,d) forest)
+                        (condo
+                         [(tree-findt1 a) (== tree a)]
+                         [else ((tree-findt2 d tree) found?)]))])))])
+        ((tree-findt1 tree) found?)))))
+
+(define superst
+  (lambda (v1 v2)
+    (lambda (?)
+      (let superst1 ([tree hier])
+        (conde
+         [(symbolo tree)
+          (== )]))
+      (condo
+       [(==t v1 v2) (== #t res)]
+       [else
+        (fresh (lu)
+          (lookupo range lu)
+          (conde
+           [(== #f lu) (== #f res)]
+           [(=/= #f lu) (any-coverso lu value res)]))]))))
+
+
+;; Packet = (protocol, source-ip, destination-ip, est?)
+
+(define packeto
   ;; A four-tuple
   (lambda (p)
-    (fresh (protocol src-adr dst-adr flags)
-      (== p `(,protocol ,src-adr ,dst-adr ,flags)))))
+    (fresh (protocol src-adr dst-adr est?)
+      (== `(,protocol ,src-adr ,dst-adr ,est?) p))))
 
-(define entry?
+(define entryo
   ;; An entry is just a packet with an action attached
   (lambda (e)
-    (fresh (action proto src-adr dst-adr flags)
-      (== e `(,action ,proto ,src-adr ,dst-adr ,flags)))))
+    (fresh (action proto src-adr dst-adr est?)
+      (== `(,action ,proto ,src-adr ,dst-adr ,est?) e))))
 
-(define acl?
+(define aclo
   (lambda (acl)
-    (conde [(== acl '())]
-           [(fresh (a d)
-              (== acl `(,a . ,d))
-              (entry? a) (acl? d))])))
-
-(define any-covers?
-  (lambda (ranges value res)
-    (conde [(== ranges '()) (== res #f)]
-           [(fresh (a d test)
-              (== ranges `(,a . ,d))
-              (covers? a value test)
-              (conde [(== test #t) (== res #t)]
-                     [(== test #f) (any-covers? d value res)]))])))
-
-(define covers?
-  (lambda (range value res)
     (conde
-     [(== range '*) (== res #t)]
-     [(=/= range '*)
-      (conde [(== range value) (== res #t)]
-             [(=/= range value)
-              (fresh (lu)
-                (lookup range hier lu)
-                (conde [(== lu #f) (== res #f)]
-                       [(=/= lu #f) (any-covers? lu value res)]))])])))
+     [(== '() acl)]
+     [(fresh (a d)
+        (== `(,a . ,d) acl)
+        (entryo a)
+        (aclo d))])))
+
+
 
 (define entry-match?
   (lambda (entry pkt res)
     (fresh (eaction epkt fms)
       (== entry `(,eaction . ,epkt))
-      (mapo2 covers? epkt pkt fms)
-      (conde [(== fms '(#t #t #t #t)) (== res #t)]
-             [(membero #f fms)       (== res #f)]))))
+      (mapo2 coverso epkt pkt fms)
+      (conde
+       [(== fms '(#t #t #t #t)) (== res #t)]
+       [(membero #f fms)       (== res #f)]))))
+(define membero
+  (lambda (mem ls)
+    (fresh (a d)
+      (== ls `(,a . ,d))
+      (conde [(== a mem)]
+             [(=/= a mem) (membero mem d)]))))
+(define mapo2
+  (lambda (f l1 l2 out)
+    (conde [(== l1 '()) (== out '())]
+           [(fresh (a1 d1 a2 d2 fa d-out)
+              (== l1 `(,a1 . ,d1))
+              (== l2 `(,a2 . ,d2))
+              (f a1 a2 fa)
+              (== out `(,fa . ,d-out))
+              (mapo2 f d1 d2 d-out))])))
 
 (define acl-map
   (lambda (acl pkt matched-entry)
     (conde [(== acl '())
-            (== matched-entry '(deny * * * *))]
+            (== '(deny * * * *) matched-entry)]
            [(fresh (entry acl-rest eres)
-              (== acl `(,entry . ,acl-rest))
+              (== `(,entry . ,acl-rest) acl)
               (entry-match? entry pkt eres)
-              (conde [(== eres #t)
-                      (== matched-entry entry)]
-                     [(== eres #f)
-                      (acl-map acl-rest pkt matched-entry)]))])))
+              (conde
+               [(== #t eres)
+                (== matched-entry entry)]
+               [(== #f eres)
+                (acl-map acl-rest pkt matched-entry)]))])))
 
 (define acl-permit
   (lambda (acl pkt permit-entry)
@@ -90,30 +136,3 @@
   (lambda (acl pkt)
     (fresh (e)
       (acl-deny acl pkt e))))
-
-
-
-;;; Example data
-
-(define acl101
-  '([permit www ok-adr   * established]
-    [deny   tcp *        * *]
-    [permit *   good-adr * *]
-    ))
-
-(define hier
-  '([tcp telnet www]
-    [udp dns]
-    [icmp echo echo-reply]
-    [ten-net pc-a pc-c]))
-
-(define acl100
-  '([permit www        ten-net *          *]
-    [permit tcp        pc-a    r3-s       *]
-    [permit *          ten-net twenty-net *]
-    [permit echo       ten-net twenty-net *]
-    [permit echo-reply ten-net twenty-net *]))
-
-(define web-policy
-  '([permit www thirty-net r1-s    *]
-    [permit www thirty-net isp-net *]))
