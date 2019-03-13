@@ -34,5 +34,5 @@
 ;; (load "test-reif.ss")
 ;; (load "test-full-interp.ss")
 ;; (load "compiler.ss") ;; (load "test-compiler.ss")
-;; (load "net.ss") (load "test-net.ss")
-(load "coq.ss") (load "test-coq.ss")
+(load "net.ss") (load "test-net.ss")
+;; (load "coq.ss") (load "test-coq.ss")
