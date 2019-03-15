@@ -1,3 +1,60 @@
+;;; Test functions!
+(define tfilter
+  (lambda (ct2 ees fs)
+    (conde
+     [(== ees '()) (== fs '())]
+     [(fresh (e es fs+)
+        (== ees `(,e . ,es))
+        (condo [(ct2 e) (== fs `(,e . ,fs+))]
+               [else (== fs fs+)])
+        (tfilter ct2 es fs+))])))
+
+(define duplicate
+  (lambda (x xs)
+    (fresh (_0 _1 _2)
+      (tfilter (lambda (item) (==t x item))
+               xs
+               `(,_0 ,_1 . ,_2)))))
+
+(define memberd
+  (lambda (x ees)
+    (fresh (e es)
+      (== ees `(,e . ,es))
+      (condo
+       [(==t x e) succeed]
+       [else (memberd x es)]))))
+
+(define memberdt
+  (lambda (x es)
+    (lambda (?)
+      (conde
+       [(== ? #t) (memberd x es)]
+       [(== ? #f) (fresh (_0)
+                   (mapo (lambda (in _out) (fresh () (== in _out) (=/= in x)))
+                         es
+                         _0))]))))
+
+(define first-duplicate
+  (lambda (x ees)
+    (fresh (e es)
+      (== ees `(,e . ,es))
+      (condo
+       [(memberdt e es) (== x e)]
+       [else (first-duplicate x es)]))))
+
+(define tree-memberdt
+  (lambda (e tree)
+    (lambda (?)
+      (conde
+       [(== tree '()) (== ? #f)]
+       [(fresh (f l r)
+          (== tree `(,f ,l ,r))
+          ((condt [(==t e f)]
+                  [(tree-memberdt e l)]
+                  [(tree-memberdt e r)])
+           ?))]))))
+
+
 (pp "==t => x is different from y\n")
 (pp
  (run* (x y) ((==t x y) #f)))

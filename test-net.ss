@@ -17,12 +17,8 @@
 
 
 
-;;; T*es
-;;; Tree t*es
-(pp "Fuck you")
-(pp (run* (p found?) (fresh (f u) ((forest-findt hier u p) found?))))
-#!eof
-
+;;; Tests
+;;; Tree tests
 (pp "tree-findt vlan1: found")
 (pp (run* (p found?) (fresh (f) ((forest-findt hier `(vlan1 . ,f) p) found?))))
 
@@ -35,10 +31,7 @@
 (pp "tree-findt fun 2 (not found)")
 (pp (run* (t p) ((forest-findt hier t p) #f)))
 
-(pp "tree-refo")
-(pp (run* (p q) (tree-refo hier p q)))
-
-
+#!eof
 (pp "supert")
 (pp (run* (v1 v2) ((supert v1 v2) #t)))
 
