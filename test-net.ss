@@ -1,6 +1,6 @@
 ;;; Example data
 (define acl100
-  '([permit www        ten-net *a        *e]
+  '([permit www        ten-net *a         *e]
     [permit tcp        pc-a    r3-s       *e]
     [permit *p         ten-net twenty-net *e]
     [permit echo       ten-net twenty-net *e]
@@ -19,17 +19,25 @@
 
 ;;; T*es
 ;;; Tree t*es
+(pp "Fuck you")
+(pp (run* (p found?) (fresh (f u) ((forest-findt hier u p) found?))))
+#!eof
+
 (pp "tree-findt vlan1: found")
-(pp (run* (q p found?) ((forest-findt hier 'vlan1 q p) found?)))
+(pp (run* (p found?) (fresh (f) ((forest-findt hier `(vlan1 . ,f) p) found?))))
 
 (pp "tree-findt vlan3: not found")
-(pp (run* (q found? p) ((forest-findt hier 'vlan3 q p) found?)))
+(pp (run* (p found?) (fresh (f) ((forest-findt hier `(vlan3 . ,f) p) found?))))
 
 (pp "tree-findt fun (found)")
-(pp (run* (q p) (fresh (v) ((forest-findt hier v q p) #t))))
+(pp (run* (t p) ((forest-findt hier t p) #t)))
 
 (pp "tree-findt fun 2 (not found)")
-(pp (run* (v p) (fresh (t) ((forest-findt hier v t p) #f))))
+(pp (run* (t p) ((forest-findt hier t p) #f)))
+
+(pp "tree-refo")
+(pp (run* (p q) (tree-refo hier p q)))
+
 
 (pp "supert")
 (pp (run* (v1 v2) ((supert v1 v2) #t)))

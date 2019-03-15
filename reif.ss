@@ -1,3 +1,8 @@
+(define truet
+  (lambda (?) (== #t ?)))
+(define falset
+  (lambda (?) (== #f ?)))
+
 (define ==t
   (lambda (x y)
     (lambda (?)
@@ -18,6 +23,7 @@
 (define-syntax conjt
   ;; A conjunction test
   (syntax-rules ()
+    [(_) truet]
     [(_ g) g]
     [(_ g1 g2 gs ...)
      (lambda (?)
@@ -28,6 +34,7 @@
 (define-syntax disjt
   ;; A disjunction test
   (syntax-rules ()
+    [(_) falset]
     [(_ g) g]
     [(_ g1 g2 gs ...)
      (lambda (?)
@@ -35,19 +42,31 @@
         [(== #t ?) (g1 #t)]
         [(g1 #f)  ((disjt g2 gs ...) ?)]))]))
 
+(define-syntax fresht
+  (syntax-rules ()
+    [(_ (idens ...) gs ...)
+     (lambda (?) (fresh (idens ...) ((conjt gs ...) ?)))]))
+
+(define-syntax wrapt
+  (syntax-rules ()
+    [(_ gs ...)
+     (lambda (_?) (fresh () (== #t _?) gs ...))]))
+
+;; Next: condt?
+
 (define-syntax condo
   ;; Literally the relational version of 'cond'
   ;; Fails if no clauses match
   (syntax-rules (else)
+    [(_ [else]) succeed]
     [(_ [else g]) g]
     [(_ [else g1 g2 g* ...])
      (fresh () g1 g2 g* ...)]
-    [(_ [test g g* ...] c* ...)
+    [(_ [test g* ...] c* ...)
      (conde
-      [(test #t) g g* ...]
+      [(test #t) g* ...]
       [(test #f) (condo c* ...)])]
     [(_) fail]))
-
 
 ;;; Test functions!
 (define tfilter
@@ -104,58 +123,3 @@
                   [(tree-memberdt e l)]
                   [(tree-memberdt e r)])
            ?))]))))
-
-#!eof
-;; Test cases!
-;; (tfilter (lambda (item) (condt [(==t x item)] [(==t y item)]))
-;;          '(1 2 3 2 3 3)
-;;          fs)
-;; (memberd x `(1 ,y 2 3 1))
-;; (first-duplicate x `(,a ,b ,c))
-;; ((tree-memberdt x t) #t)
-;; pure vs impure: epic showdown
-(define a-z
-  '(a b c d e f g h i j k l m n o p q r s t u v w z y z))
-(define-syntax ifa
-  (syntax-rules ()
-    ((_) (mzero))
-    ((_ (e g ...) b ...)
-     (let loop ((c-inf e))
-       (case-inf c-inf
-                 (() (ifa b ...))
-                 ((f) (inc (loop (f))))
-                 ((a) (bind* c-inf g ...))
-                 ((a f) (bind* c-inf g ...)))))))
-(define-syntax conda
-  (syntax-rules ()
-    ((_ (g0 g ...) (g1 g^ ...) ...)
-     (lambdag@ (c)
-       (inc
-        (ifa ((g0 c) g ...)
-             ((g1 c) g^ ...) ...))))))
-(define-syntax ifu
-  (syntax-rules ()
-    ((_) (mzero))
-    ((_ (e g ...) b ...)
-     (let loop ((c-inf e))
-       (case-inf c-inf
-                 (() (ifu b ...))
-                 ((f) (inc (loop (f))))
-                 ((c) (bind* c-inf g ...))
-                 ((c f) (bind* (unit c) g ...)))))))
-(define-syntax condu
-  (syntax-rules ()
-    ((_ (g0 g ...) (g1 g^ ...) ...)
-     (lambdag@ (c)
-       (inc
-        (ifu ((g0 c) g ...)
-             ((g1 c) g^ ...) ...))))))
-(define memberd-impure
-  (lambda (x ees)
-    (fresh (e es)
-      (== ees `(,e . ,es))
-      (conda
-       [(== x e) succeed]
-       [succeed (memberd-impure x es)]))))
-;; (time (repeat 100000 (lambda () (run* (q) (memberd-impure 'z a-z)))))
-;; (time (repeat 100000 (lambda () (run* (q) (memberd 'z a-z)))))
