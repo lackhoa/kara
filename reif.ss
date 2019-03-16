@@ -47,11 +47,6 @@
     [(_ (idens ...) gs ...)
      (lambda (?) (fresh (idens ...) ((conjt gs ...) ?)))]))
 
-(define-syntax wrapt
-  (syntax-rules ()
-    [(_ gs ...)
-     (lambda (_?) (fresh () (== #t _?) gs ...))]))
-
 ;; Next: condt?
 
 (define-syntax condo

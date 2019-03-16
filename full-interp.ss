@@ -224,12 +224,13 @@
       (== `(if ,e1 ,e2 ,e3) expr)
       (not-in-envo 'if env)
       (eval-expo e1 env t)
-      (condo [(==t #f t) (eval-expo e3 env val)]
-             [else (eval-expo e2 env val)]))))
+      (condo
+       [(==t #f t) (eval-expo e3 env val)]
+       [else (eval-expo e2 env val)]))))
 
 (define initial-env
   `((list    . (val . (closure (lambda x x) ,empty-env)))
-    (not       . (val . (prim . not)))
+    (not     . (val . (prim . not)))
     (equal?  . (val . (prim . equal?)))
     (symbol? . (val . (prim . symbol?)))
     (cons    . (val . (prim . cons)))

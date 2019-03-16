@@ -49,9 +49,10 @@
        [(== tree '()) (== ? #f)]
        [(fresh (f l r)
           (== tree `(,f ,l ,r))
-          ((condt [(==t e f)]
-                  [(tree-memberdt e l)]
-                  [(tree-memberdt e r)])
+          ((condt
+            [(==t e f)]
+            [(tree-memberdt e l)]
+            [(tree-memberdt e r)])
            ?))]))))
 
 
