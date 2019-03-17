@@ -49,6 +49,11 @@
 (define make-s  (lambda (u v) `(,u ,v)))
 (define lhs car)
 (define rhs cadr)
+(define extend (lambda (env l r) `(,(make-s l r) . ,env)))
+(define extend-check
+  (lambda (v t S)
+    (and (not (occurs? v t S))
+         (extend S v t))))
 
 ;;; Constraints
 (define all-constraints '(S C D O))
@@ -92,20 +97,16 @@
       (cond
        [(eq? t1 t2) S]
        [(and (var? t1) (var? t2))
-        (cond
-         [(var<? t2 t1) `(,(make-s t1 t2) . ,S)]
-         [else `(,(make-s t2 t1) . ,S)])]
-       [(var? t1) (ext-S t1 t2 S)]
-       [(var? t2) (ext-S t2 t1 S)]
+        (or (and (var<? t2 t1)
+                 (extend S t1 t2))
+            (extend S t2 t1))]
+       [(var? t1) (extend-check t1 t2 S)]
+       [(var? t2) (extend-check t2 t1 S)]
        [(and (pair? t1) (pair? t2))
         (let ([S+ (unify (car t1) (car t2) S)])
           (and S+ (unify (cdr t1) (cdr t2) S+)))]
        [(equal? t1 t2) S]
        [else #f]))))
-
-(define ext-S
-  (lambda (v t S)
-    (and (not (occurs? v t S)) `(,(make-s v t) . ,S))))
 
 (define occurs?
   (lambda (v t S)
@@ -209,12 +210,18 @@
     [(_ g) g]
     [(_ g g* ...) (disj2 g (disj g* ...))]))
 
+(define-syntax letv
+  (syntax-rules ()
+    [(_ (x* ...) g)
+     (lambdag@ (c : C)
+       (let ([x* (var 'x* C)] ...)
+         (g (update-C c (+ C 1)))))]))
+
 (define-syntax fresh
   (syntax-rules ()
     [(_ (x* ...) g g* ...)
-     (lambdag@ (c : C)
-       (let ([x* (var 'x* C)] ...)
-         ((conj g g* ...) (update-C c (+ C 1)))))]))
+     (letv (x* ...)
+       (conj g g* ...))]))
 
 (define-syntax conde
   (syntax-rules ()
@@ -255,6 +262,7 @@
       [v `(,v)]
       [(a d) (append (get-vars a) (get-vars d))]
       [a '()])))
+
 (define purify-D
   (lambda (D R)
     (filter (lambda (d)
@@ -296,10 +304,10 @@
           [O* (map caddr c*)])
       (let-values ([(au _iS) (apply anti-unify t*)])
         (let ([uS (unify qs au init-S)])
-          (let ([au (walk* au uS)]
-                [uS (purify-S uS init-C)])
+          (let ([au (walk* au uS)])
             (let* ([S* (map (lambda (t) (prefix-unify au t uS)) t*)])
-              `(,uS ,(map au-helper S* D* O*)))))))))
+              `(,(purify-S uS init-C)
+                ,(map au-helper S* D* O*)))))))))
 
 (define prefix-unify
   (lambda (t1 t2 S) (prefix-S (unify t1 t2 S) S)))
@@ -319,27 +327,27 @@
 (define anti-unify
   ;; Returns the anti-unification and an inverse substitution
   (lambda t*
-    (let anti-unify ([t* t*] [S '()])
+    (let anti-unify ([t* t*] [iS '()])
       (cond
        [;; rule 7: eq? deal with variables as well
         ;; hence, it wouldn't introduce useless new vars
         (for-all (eqp? (car t*)) (cdr t*))
-        (values (car t*) S)]
+        (values (car t*) iS)]
        [;; rule 8
         (for-all pair? t*)
-        (let-values ([(aua S+) (anti-unify (map car t*) S)])
-          (let-values ([(aud S++) (anti-unify (map cdr t*) S+)])
-            (values `(,aua . ,aud) S++)))]
+        (let-values ([(aua iS+) (anti-unify (map car t*) iS)])
+          (let-values ([(aud iS++) (anti-unify (map cdr t*) iS+)])
+            (values `(,aua . ,aud) iS++)))]
        [;; rule 9
-        (find (lambda (s) (teq? (lhs s) t*)) S)
+        (find (lambda (s) (teq? (lhs s) t*)) iS)
         =>
-        (lambda (s) (values (rhs s) S))]
+        (lambda (s) (values (rhs s) iS))]
        [;; rule 10
         else
-        (let ([new-var (var (au-name (length S)) AU-SCOPE)])
-          (values new-var `(,(make-s t* new-var) . ,S)))]))))
+        (let ([new-var (var (au-name (length iS)) AU-SCOPE)])
+          (values new-var (extend iS t* new-var)))]))))
 
-(define AU-SCOPE 0.5)
+(define AU-SCOPE (+ init-C 0.5))
 (define au-name
   (lambda (n) (string->symbol (string-append "au" (number->string n)))))
 

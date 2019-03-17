@@ -155,14 +155,14 @@
       (pp au) (pp S))))
 (newline)
 
-(pp "run*au test: x is (z u): u could be y or not\n")
+(pp "run*au test: x is (z u z): u could be y or not\n")
 (pp
  (run*au (x y z)
-         (fresh (u)
-           (== `(,z ,u) x)
+         (fresh (u v)
+           (== `(,z ,u ,v) x)
            (conde
-            [(== u y)]
-            [(=/= u y)]))))
+            [(== u y) (== z v)]
+            [(=/= u y) (== z v)]))))
 (newline)
 
 (pp "run*au on lookupo\n")
@@ -174,10 +174,6 @@
 
 (pp "run*au on memberd")
 (pp (run*au (x ees) (memberd x ees)))
-(newline)
-
-(pp "run*au on non-pairo")
-(pp (run*au (term) ((typet term 'pair) #f)))
 (newline)
 
 #!eof
