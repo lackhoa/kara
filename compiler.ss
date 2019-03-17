@@ -1,20 +1,30 @@
+;;; Macros
 (define-syntax letg@
-  ;; Special let with state inspection
+  ;; let with state inspection
   (syntax-rules (:)
     [(_ (c : s* ...) e)
      (let ([s* (c-> c 's*)] ...) e)]))
 (define-syntax lambdag@
-  ;; Special lambda from letg@
+  ;; lambda with state inspection
   (syntax-rules (:)
     [(_ (c) e) (lambda (c) e)]
     [(_ (c : s* ...) e)
      (lambda (c) (letg@ (c : s* ...) e))]))
+(define-syntax case-term
+  ;; A type dispatcher for mk terms
+  (syntax-rules ()
+    [(_ e [v e1] [(a d) e2] [atom e3])
+     (let ([term e])
+       (cond
+        [(var? term) (let ([v term]) e1)]
+        [(pair? term) (let ([a (car term)] [d (cdr term)]) e2)]
+        [else (let ([atom term]) e3)]))]))
 
+;;; Misc
 (define transpose
   (lambda (l*) (apply map list l*)))
 (define eqp?
   (lambda (u) (lambda (v) (eq? u v))))
-
 (define teq?
   ;; Compares two mk terms
   (lambda (t1 t2)
@@ -22,6 +32,8 @@
         (and (pair? t1) (pair? t2)
              (teq? (car t1) (car t2))
              (teq? (cdr t1) (cdr t2))))))
+
+;;; Variables
 (;; name is a symbol, scope is a number
  define var (lambda (name scope) (vector name scope)))
 (define var->name (lambda (var) (vector-ref var 0)))
@@ -35,17 +47,7 @@
       (or (< s1 s2)
           (and (= s1 s2) (string<? n1 n2))))))
 
-(define-syntax case-term
-  ;; A type dispatch for mk terms
-  (syntax-rules ()
-    [(_ e [v e1] [(a d) e2] [atom e3])
-     (let ([term e])
-       (cond
-        [(var? term) (let ([v term]) e1)]
-        [(pair? term) (let ([a (car term)] [d (cdr term)]) e2)]
-        [else (let ([atom term]) e3)]))]))
-
-;;; Associations (in substitutions)
+;;; Associations and Environments
 (define make-s  (lambda (u v) `(,u ,v)))
 (define lhs car)
 (define rhs cadr)
@@ -220,8 +222,7 @@
 (define-syntax fresh
   (syntax-rules ()
     [(_ (x* ...) g g* ...)
-     (letv (x* ...)
-       (conj g g* ...))]))
+     (letv (x* ...) (conj g g* ...))]))
 
 (define-syntax conde
   (syntax-rules ()
