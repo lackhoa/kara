@@ -176,6 +176,11 @@
 (pp (run*au (x ees) (memberd x ees)))
 (newline)
 
+(pp "run* on memberd")
+(pp (run* (x ees) (memberd x ees)))
+(newline)
+
+
 #!eof
 
 (pp "Time for it to work on itself!")

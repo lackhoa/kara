@@ -58,20 +58,20 @@
          (extend S v t))))
 
 ;;; Constraints
-(define all-constraints '(S C D O))
+(define all-constraints '(S C D F))
 (define init-S '())
 (define init-C 0)
 (define init-D '())
-(define init-O '())
-(define make-c (lambda (S C D O) (list S C D O)))
-(define init-c (make-c init-S init-C init-D init-O))
+(define init-F '())
+(define make-c (lambda (S C D F) (list S C D F)))
+(define init-c (make-c init-S init-C init-D init-F))
 (define c->
   (lambda (c store)
     (rhs (assq store (transpose `(,all-constraints ,c))))))
-(define update-S (lambda (c S) (letg@ (c : C D O) (make-c S C D O))))
-(define update-C (lambda (c C) (letg@ (c : S D O) (make-c S C D O))))
-(define update-D (lambda (c D) (letg@ (c : S C O) (make-c S C D O))))
-(define update-O (lambda (c O) (letg@ (c : S C D) (make-c S C D O))))
+(define update-S (lambda (c S) (letg@ (c : C D F) (make-c S C D F))))
+(define update-C (lambda (c C) (letg@ (c : S D F) (make-c S C D F))))
+(define update-D (lambda (c D) (letg@ (c : S C F) (make-c S C D F))))
+(define update-F (lambda (c F) (letg@ (c : S C D) (make-c S C D F))))
 
 ;;; Answer stream monad (actually just lists)
 (define mzero (lambda () '()))
@@ -186,8 +186,8 @@
 ;;; Goal constructors
 (define fake
   (lambda (expr)
-    (lambdag@ (c : O)
-      (unit (update-O c `(,expr . ,O))))))
+    (lambdag@ (c : F)
+      (unit (update-F c `(,expr . ,F))))))
 
 (define succeed (lambdag@ (c) (unit c)))
 (define fail (lambdag@ (c) (mzero)))
@@ -249,13 +249,13 @@
 (define reify
   ;; This will return a c with clausal S
   (lambda (c q*)
-    (letg@ (c : S D O)
+    (letg@ (c : S D F)
       (let ([t (walk* q* S)]
             [D (walk* D S)]
-            [O (walk* O S)])
-        (let ([R (get-vars `(,t ,O))])
+            [F (walk* F S)])
+        (let ([R (get-vars `(,t ,F))])
           (let ([D (rem-subsumed (purify-D D R))])
-            `(,t ,D ,O)))))))
+            `(,t ,D ,F)))))))
 
 (define get-vars
   (lambda (t)
@@ -302,23 +302,23 @@
   (lambda (c* qs)
     (let ([t* (map car c*)]
           [D* (map cadr c*)]
-          [O* (map caddr c*)])
+          [F* (map caddr c*)])
       (let-values ([(au _iS) (apply anti-unify t*)])
         (let ([uS (unify qs au init-S)])
           (let ([au (walk* au uS)])
             (let* ([S* (map (lambda (t) (prefix-unify au t uS)) t*)])
               `(,(purify-S uS init-C)
-                ,(map au-helper S* D* O*)))))))))
+                ,(map au-helper S* D* F*)))))))))
 
 (define prefix-unify
   (lambda (t1 t2 S) (prefix-S (unify t1 t2 S) S)))
 
 (define au-helper
-  (lambda (S D O)
+  (lambda (S D F)
     (let ([S (purify-S S AU-SCOPE)]
           [D (walk* D S)]
-          [O (walk* O S)])
-      `(,S ,D ,O))))
+          [F (walk* F S)])
+      `(,S ,D ,F))))
 
 (define purify-S
   (lambda (S locked)
