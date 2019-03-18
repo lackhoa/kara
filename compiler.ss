@@ -20,11 +20,6 @@
         [(pair? term) (let ([a (car term)] [d (cdr term)]) e2)]
         [else (let ([atom term]) e3)]))]))
 
-;;; Misc
-(define transpose
-  (lambda (l*) (apply map list l*)))
-(define eqp?
-  (lambda (u) (lambda (v) (eq? u v))))
 (define teq?
   ;; Compares two mk terms
   (lambda (t1 t2)
@@ -34,21 +29,21 @@
              (teq? (cdr t1) (cdr t2))))))
 
 ;;; Variables
-(;; name is a symbol, scope is a number
- define var (lambda (name scope) (vector name scope)))
+(;; name is a symbol, bd is a number
+ define var (lambda (name bd) (vector name bd)))
 (define var->name (lambda (var) (vector-ref var 0)))
-(define var->scope (lambda (var) (vector-ref var 1)))
+(define var->bd (lambda (var) (vector-ref var 1)))
 (define var? vector?)
 (define var<?
   ;; v1 is prioritized over v2
   (lambda (v1 v2)
-    (let ([n1 (symbol->string (var->name v1))] [s1 (var->scope v1)]
-          [n2 (symbol->string (var->name v2))] [s2 (var->scope v2)])
-      (or (< s1 s2)
-          (and (= s1 s2) (string<? n1 n2))))))
+    (let ([n1 (symbol->string (var->name v1))] [bd1 (var->bd v1)]
+          [n2 (symbol->string (var->name v2))] [bd2 (var->bd v2)])
+      (or (< bd1 bd2)
+          (and (= bd1 bd2) (string<? n1 n2))))))
 
 ;;; Associations and Environments
-(define make-s  (lambda (u v) `(,u ,v)))
+(define make-s (lambda (u v) `(,u ,v)))
 (define lhs car)
 (define rhs cadr)
 (define extend (lambda (env l r) `(,(make-s l r) . ,env)))
@@ -67,7 +62,7 @@
 (define init-c (make-c init-S init-C init-D init-F))
 (define c->
   (lambda (c store)
-    (rhs (assq store (transpose `(,all-constraints ,c))))))
+    (rhs (assq store (map list all-constraints c)))))
 (define update-S (lambda (c S) (letg@ (c : C D F) (make-c S C D F))))
 (define update-C (lambda (c C) (letg@ (c : S D F) (make-c S C D F))))
 (define update-D (lambda (c D) (letg@ (c : S C F) (make-c S C D F))))
@@ -86,11 +81,13 @@
         (lambda (pr) (walk (rhs pr)))]
        [else u]))))
 
-(define prefix-S
-  (lambda (S+ S)
-    (cond
-     [(eq? S+ S) '()]
-     [else `(,(car S+) . ,(prefix-S (cdr S+) S))])))
+(define walk*
+  (lambda (t S)
+    (let ([t (walk t S)])
+      (case-term t
+        [v v]
+        [(a d) `(,(walk* a S) . ,(walk* d S))]
+        [a a]))))
 
 (define unify
   (lambda (t1 t2 S)
@@ -167,6 +164,12 @@
              [else (unit (update-D c `(,pS . ,D)))])))]
        [else (unit c)]))))
 
+(define prefix-S
+  (lambda (S+ S)
+    (cond
+     [(eq? S+ S) '()]
+     [else `(,(car S+) . ,(prefix-S (cdr S+) S))])))
+
 (define ==fail?
   (lambda (S D)
     (=/=-fail? S D)))
@@ -238,14 +241,6 @@
   (lambda (qs)
     (lambdag@ (final-c) (unit (reify final-c qs)))))
 
-(define walk*
-  (lambda (t S)
-    (let ([t (walk t S)])
-      (case-term t
-        [v v]
-        [(a d) `(,(walk* a S) . ,(walk* d S))]
-        [a a]))))
-
 (define reify
   ;; This will return a c with clausal S
   (lambda (c q*)
@@ -315,14 +310,14 @@
 
 (define au-helper
   (lambda (S D F)
-    (let ([S (purify-S S AU-SCOPE)]
+    (let ([S (purify-S S AU-BD)]
           [D (walk* D S)]
           [F (walk* F S)])
       `(,S ,D ,F))))
 
 (define purify-S
   (lambda (S locked)
-    (filter (lambda (s) (<= (var->scope (lhs s)) locked))
+    (filter (lambda (s) (<= (var->bd (lhs s)) locked))
             S)))
 
 (define anti-unify
@@ -345,10 +340,11 @@
         (lambda (s) (values (rhs s) iS))]
        [;; rule 10
         else
-        (let ([new-var (var (au-name (length iS)) AU-SCOPE)])
+        (let ([new-var (var (au-name (length iS)) AU-BD)])
           (values new-var (extend iS t* new-var)))]))))
+(define eqp? (lambda (u) (lambda (v) (eq? u v))))
 
-(define AU-SCOPE (+ init-C 0.5))
+(define AU-BD (+ init-C 0.5))
 (define au-name
   (lambda (n) (string->symbol (string-append "au" (number->string n)))))
 
