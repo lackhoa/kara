@@ -27,6 +27,14 @@
         (and (pair? t1) (pair? t2)
              (teq? (car t1) (car t2))
              (teq? (cdr t1) (cdr t2))))))
+(define occurs?
+  (lambda (v t S)
+    (let occurs? ([t t])
+      (let ([t (walk t S)])
+        (case-term t
+          [u (eq? u v)]
+          [(a d) (or (occurs? a) (occurs? d))]
+          [atom #f])))))
 
 ;;; Variables
 (;; name is a symbol, bd is a number
@@ -40,7 +48,7 @@
     (let ([n1 (symbol->string (var->name v1))] [bd1 (var->bd v1)]
           [n2 (symbol->string (var->name v2))] [bd2 (var->bd v2)])
       (or (< bd1 bd2)
-          (and (= bd1 bd2) (string<? n1 n2))))))
+         (and (= bd1 bd2) (string<? n1 n2))))))
 
 ;;; Associations and Environments
 (define make-s (lambda (u v) `(,u ,v)))
@@ -50,7 +58,7 @@
 (define extend-check
   (lambda (v t S)
     (and (not (occurs? v t S))
-         (extend S v t))))
+       (extend S v t))))
 
 ;;; Constraints
 (define all-constraints '(S C D F))
@@ -72,6 +80,8 @@
 (define mzero (lambda () '()))
 (define unit (lambda (x) `(,x)))
 (define choice (lambda (x y) `(,x . ,y)))
+(define mplus append)
+(define bind (lambda (c* g) (apply mplus (map g c*))))
 
 (define walk
   (lambda (u S)
@@ -107,19 +117,6 @@
        [(equal? t1 t2) S]
        [else #f]))))
 
-(define occurs?
-  (lambda (v t S)
-    (let occurs? ([t t])
-      (let ([t (walk t S)])
-        (case-term t
-          [u (eq? u v)]
-          [(a d) (or (occurs? a) (occurs? d))]
-          [atom #f])))))
-
-(define unify*
-  (lambda (S+ S)
-    (unify (map lhs S+) (map rhs S+) S)))
-
 (define ==
   (lambda (u v)
     (lambdag@ (c : S D)
@@ -130,27 +127,6 @@
            [(==fail? S+ D) (mzero)]
            [else (unit (update-S c S+))]))]
        [else (mzero)]))))
-
-(define subsumed?
-  ;; Is d subsumed by d*?
-  (lambda (d d*)
-    (cond
-     [(null? d*) #f]
-     [else (let ([d^ (unify* (car d*) d)])
-             (or (and d^ (eq? d^ d))
-                (subsumed? d (cdr d*))))])))
-(define rem-subsumed
-  (lambda (D)
-    (let rem-subsumed ([D D] [d^* '()])
-      (cond
-       [(null? D) d^*]
-       [(or (;; Is is subsumed by the unprocessed list?
-            subsumed? (car D) (cdr D))
-           (;; Is it subsumed the processed list?
-            subsumed? (car D) d^*))
-        (rem-subsumed (cdr D) d^*)]
-       [else
-        (rem-subsumed (cdr D) `(,(car D) . ,d^*))]))))
 
 (define =/=
   (lambda (u v)
@@ -163,12 +139,6 @@
              [(null? pS) (mzero)]
              [else (unit (update-D c `(,pS . ,D)))])))]
        [else (unit c)]))))
-
-(define prefix-S
-  (lambda (S+ S)
-    (cond
-     [(eq? S+ S) '()]
-     [else `(,(car S+) . ,(prefix-S (cdr S+) S))])))
 
 (define ==fail?
   (lambda (S D)
@@ -186,6 +156,37 @@
 	(lambda (S+) (null? (prefix-S S+ S)))]
        [else #f]))))
 
+(define unify*
+  (lambda (S+ S)
+    (unify (map lhs S+) (map rhs S+) S)))
+
+(define subsumed?
+  ;; Is d subsumed by d*?
+  (lambda (d d*)
+    (cond
+     [(null? d*) #f]
+     [else (let ([d^ (unify* (car d*) d)])
+             (or (and d^ (eq? d^ d))
+                 (subsumed? d (cdr d*))))])))
+(define rem-subsumed
+  (lambda (D)
+    (let rem-subsumed ([D D] [d^* '()])
+      (cond
+       [(null? D) d^*]
+       [(or (;; Is is subsumed by the unprocessed list?
+             subsumed? (car D) (cdr D))
+            (;; Is it subsumed the processed list?
+             subsumed? (car D) d^*))
+        (rem-subsumed (cdr D) d^*)]
+       [else
+        (rem-subsumed (cdr D) `(,(car D) . ,d^*))]))))
+
+(define prefix-S
+  (lambda (S+ S)
+    (cond
+     [(eq? S+ S) '()]
+     [else `(,(car S+) . ,(prefix-S (cdr S+) S))])))
+
 ;;; Goal constructors
 (define fake
   (lambda (expr)
@@ -197,8 +198,6 @@
 
 (define conj2
   (lambda (g1 g2) (lambdag@ (c) (bind (g1 c) g2))))
-(define bind
-  (lambda (c* g) (apply append (map g c*))))
 
 (define-syntax conj
   (syntax-rules ()
@@ -207,7 +206,7 @@
     [(_ g g* ...) (conj2 g (conj g* ...))]))
 
 (define disj2
-  (lambda (g1 g2) (lambdag@ (c) (append (g1 c) (g2 c)))))
+  (lambda (g1 g2) (lambdag@ (c) (mplus (g1 c) (g2 c)))))
 
 (define-syntax disj
   (syntax-rules ()
@@ -215,17 +214,16 @@
     [(_ g) g]
     [(_ g g* ...) (disj2 g (disj g* ...))]))
 
+(define-syntax fresh
+  (syntax-rules ()
+    [(_ (x* ...) g g* ...)
+     (letv (x* ...) (conj g g* ...))]))
 (define-syntax letv
   (syntax-rules ()
     [(_ (x* ...) g)
      (lambdag@ (c : C)
        (let ([x* (var 'x* C)] ...)
          (g (update-C c (+ C 1)))))]))
-
-(define-syntax fresh
-  (syntax-rules ()
-    [(_ (x* ...) g g* ...)
-     (letv (x* ...) (conj g g* ...))]))
 
 (define-syntax conde
   (syntax-rules ()
@@ -237,6 +235,7 @@
     [(_ (q q* ...) g g* ...)
      ((fresh (q q* ...) g g* ... (finalize `(,q ,q* ...)))
       init-c)]))
+
 (define finalize
   (lambda (qs)
     (lambdag@ (final-c) (unit (reify final-c qs)))))
@@ -258,7 +257,6 @@
       [v `(,v)]
       [(a d) (append (get-vars a) (get-vars d))]
       [a '()])))
-
 (define purify-D
   (lambda (D R)
     (filter (lambda (d)
