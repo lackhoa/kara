@@ -28,11 +28,34 @@
 ;;; Other "libraries"
 ;; (load "faster-miniKanren/full-interp.scm")
 ;; (load "reif.ss")
+(load "pmatch.scm")
+(load "test-fw.ss")
 
-;; The main program
+;;; The main program
 ;; (load "full-interp.ss")
 ;; (load "test-reif.ss")
 ;; (load "test-full-interp.ss")
-(load "compiler.ss") (load "reif.ss") (load "test-compiler.ss")
+;; (load "compiler.ss") (load "reif.ss") (load "test-compiler.ss")
 ;; (load "net.ss") (load "test-net.ss")
 ;; (load "coq.ss") (load "test-coq.ss")
+(load "lambda.ss")
+;; (load "lambda2.ss")
+
+;;; Tracing
+;; (trace val read-back)
+
+(pp (check-program '()
+                   '((define three
+                       (the Nat
+                            (add1 (add1 (add1 zero)))))
+                     (define +
+                       (the (-> Nat (-> Nat Nat))
+                            (lambda (n)
+                              (lambda (k)
+                                (rec Nat n
+                                     k
+                                     (lambda (pred)
+                                       (lambda (almost-sum)
+                                         (add1 almost-sum))))))))
+                     (+ three)
+                     ((+ three) three))))
