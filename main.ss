@@ -22,40 +22,26 @@
 ;; (load "faster-miniKanren/mk.scm")
 ;; (load "faster-miniKanren/matche.scm")
 ;; (load "faster-miniKanren/numbers.scm")
-;; (load "miniKanren/mk.scm")
+(load "miniKanren/mk.scm")
 ;; (load "micro.ss")
 
 ;;; Other "libraries"
-;; (load "faster-miniKanren/full-interp.scm")
-;; (load "reif.ss")
+(load "reif.ss")
 (load "pmatch.scm")
 (load "test-fw.ss")
 
 ;;; The main program
+;; (load "faster-miniKanren/full-interp.scm")
 ;; (load "full-interp.ss")
 ;; (load "test-reif.ss")
 ;; (load "test-full-interp.ss")
 ;; (load "compiler.ss") (load "reif.ss") (load "test-compiler.ss")
 ;; (load "net.ss") (load "test-net.ss")
-;; (load "coq.ss") (load "test-coq.ss")
-(load "lambda.ss")
+(load "coq.ss")
+;; (load "lambda.ss")
 ;; (load "lambda2.ss")
 
 ;;; Tracing
-;; (trace val read-back)
+(trace)
 
-(pp (check-program '()
-                   '((define three
-                       (the Nat
-                            (add1 (add1 (add1 zero)))))
-                     (define +
-                       (the (-> Nat (-> Nat Nat))
-                            (lambda (n)
-                              (lambda (k)
-                                (rec Nat n
-                                     k
-                                     (lambda (pred)
-                                       (lambda (almost-sum)
-                                         (add1 almost-sum))))))))
-                     (+ three)
-                     ((+ three) three))))
+(pp (run* (out) (socrates-mortal out)))

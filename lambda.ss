@@ -19,8 +19,7 @@
     (pmatch fun
       "do-ap"
       [(CLOS ,rho ,x ,b) (val (extend rho x arg) b)]
-      [;; Will only be met if called from read-back
-       else `(N-ap ,fun ,arg)])))
+      [else `(N-ap ,fun ,arg)])))
 
 (define run-program
   (lambda (rho exprs)
@@ -50,19 +49,6 @@
       [(N-var ,x) x]
       [(N-ap ,rator ,rand)
        `(,(read-back used rator) ,(read-back used rand))])))
-
-(define read-back
-  ;; The version without renaming
-  (lambda (_used v)
-    (pmatch v
-      "read-back"
-      [;; The only clause that matters
-       (CLOS ,rho ,x ,body)
-       (let ([P (extend rho x `(N-var ,x))])
-         `(lambda (,x) ,(read-back '() (val P body))))]
-      [(N-var ,x) x]
-      [(N-ap ,rator ,rand)
-       `(,(read-back '() rator) ,(read-back '() rand))])))
 
 (define norm (lambda (rho e) (read-back '() (val rho e))))
 
