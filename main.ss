@@ -35,13 +35,11 @@
 ;; (load "full-interp.ss")
 ;; (load "test-reif.ss")
 ;; (load "test-full-interp.ss")
-;; (load "compiler.ss") (load "reif.ss") (load "test-compiler.ss")
+(load "compiler.ss") (load "reif.ss") (load "test-compiler.ss")
 ;; (load "net.ss") (load "test-net.ss")
-(load "coq.ss")
+;; (load "coq.ss")
 ;; (load "lambda.ss")
 ;; (load "lambda2.ss")
 
 ;;; Tracing
 (trace)
-
-(pp (run* (out) (socrates-mortal out)))

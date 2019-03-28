@@ -1,11 +1,11 @@
 ;;; Functions
-(define memberd
+(define membero
   (lambda (x ees)
     (fresh (e es)
       (== ees `(,e . ,es))
       (condo
        [(==t x e) succeed]
-       [else (fake `(memberd ,x ,es))]))))
+       [else (fake `(membero ,x ,es))]))))
 (define lookupt
   (lambda (x env t)
     (lambda (bound?)
@@ -65,6 +65,19 @@
        [else (== S+ #f)]))))
 
 ;;; Tests
+(pp "run*su => q = p = r")
+(pp (run*su (q p r) (== q p) (== p r)))
+
+(pp "run*su => q = `(,p ,r); u = p")
+(pp (run*su (q p r u) (== `(,p ,r) q) (== u p)))
+
+(pp "run*su => q = p or p = r")
+(pp (run*su (q p r) (fresh (t) ((disjt (==t q p) (==t p r)) t))))
+
+(pp "run*su => q = p and p = q")
+(pp (run*su (q p) (== q p) (== p q)))
+
+
 (pp "=> nothing\n")
 (pp
  ((fresh (x y z)
@@ -122,9 +135,9 @@
  (run* (x y z t) ((disjt (==t x y) (==t y z)) t)))
 (newline)
 
-(pp "condo & memberd => (memberd x x*)\n")
+(pp "condo & membero => (membero x x*)\n")
 (pp
- (run* (x x*) (memberd x x*)))
+ (run* (x x*) (membero x x*)))
 (newline)
 
 (pp "typet => not pair\n")
@@ -142,17 +155,18 @@
 (newline)
 
 (pp "Anti-unification => 2*x=x+x")
-(let-values ([(au S) (anti-unify '(2 * 2 = 2 + 2) '(2 * 3 = 3 + 3))])
-  (pp au) (pp S))
+(pp (anti-unify '((1 * 2 = 2 + 1)
+                  (4 * 3 = 3 + 4))))
 (newline)
 
 (pp "Anti-unification: => (x (? z))\n")
-(let ([x (var 'x 0)] [z (var 'z 0)] [y (var 'y 0)])
-  (let ([t1 `(,x (,x ,z))]
-        [t2 `(,x (,y ,z))]
-        [t3 `(,x (,x ,z))])
-    (let-values ([(au S) (anti-unify t1 t2 t3)])
-      (pp au) (pp S))))
+(pp (let ([x (var 'x 0)]
+          [z (var 'z 0)]
+          [y (var 'y 0)])
+      (let ([t1 `(,x (,x ,z))]
+            [t2 `(,x (,y ,z))]
+            [t3 `(,x (,x ,z))])
+        (anti-unify `(,t1 ,t2 ,t3)))))
 (newline)
 
 (pp "run*au test: x is (z u z): u could be y or not\n")
@@ -171,13 +185,18 @@
 
 (pp "How does run*au deal with permutation? => x == y")
 (pp (run*au (x y) (conde [(== y x)] [(== x y)])))
-
-(pp "run*au on memberd")
-(pp (run*au (x ees) (memberd x ees)))
 (newline)
 
-(pp "run* on memberd")
-(pp (run* (x ees) (memberd x ees)))
+(pp "run* on membero")
+(pp (run* (x ees) (membero x ees)))
+(newline)
+
+(pp "run*su on membero")
+(pp (run*su (x ees) (membero x ees)))
+(newline)
+
+(pp "run*au on membero")
+(pp (run*au (x ees) (membero x ees)))
 (newline)
 
 

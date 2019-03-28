@@ -280,6 +280,25 @@
 
 
 ;;; Code generation techniques
+
+;;; Returning substitution
+(define-syntax run*su
+  ;; run* with substitutions
+  (syntax-rules ()
+    [(_ (q q* ...) g g* ...)
+     (let ([q (var 'q init-C)] [q* (var 'q* init-C)] ...)
+       (let ([qs `(,q ,q* ...)])
+         (let ([c* ((conj g g* ... (finalize qs))
+                    (update-C init-c (+ init-C 1)))])
+           (map (lambda (c) (su c qs)) c*))))]))
+
+(define su
+  (lambda (c qs)
+    `(,(unify (car c) qs init-S)
+      .
+      ,(cdr c))))
+
+;;; Anti-unification
 (define-syntax run*au
   ;; run* with anti-unification analysis
   (syntax-rules ()
@@ -291,17 +310,16 @@
            (au-extract c* qs))))]))
 
 (define au-extract
-  ;; Piggybacks on the result of run*
   (lambda (c* qs)
     (let ([t* (map car c*)]
           [D* (map cadr c*)]
           [F* (map caddr c*)])
-      (let-values ([(au _iS) (apply anti-unify t*)])
-        (let ([uS (unify qs au init-S)])
-          (let ([au (walk* au uS)])
-            (let* ([S* (map (lambda (t) (prefix-unify au t uS)) t*)])
-              `(,(purify-S uS init-C)
-                ,(map au-helper S* D* F*)))))))))
+      (let ([au (anti-unify t*)])
+        (let ([auS (unify qs au init-S)])
+          (let ([S* (map (lambda (t) (prefix-unify au t auS))
+                         t*)])
+            `(,(purify-S auS init-C)
+              ,(map au-helper S* D* F*))))))))
 
 (define prefix-unify
   (lambda (t1 t2 S) (prefix-S (unify t1 t2 S) S)))
@@ -314,32 +332,36 @@
       `(,S ,D ,F))))
 
 (define purify-S
-  (lambda (S locked)
-    (filter (lambda (s) (<= (var->bd (lhs s)) locked))
+  (lambda (S date)
+    (filter (lambda (s) (<= (var->bd (lhs s)) date))
             S)))
 
 (define anti-unify
-  ;; Returns the anti-unification and an inverse substitution
-  (lambda t*
-    (let anti-unify ([t* t*] [iS '()])
-      (cond
-       [;; rule 7: eq? deal with variables as well
-        ;; hence, it wouldn't introduce useless new vars
-        (for-all (eqp? (car t*)) (cdr t*))
-        (values (car t*) iS)]
-       [;; rule 8
-        (for-all pair? t*)
-        (let-values ([(aua iS+) (anti-unify (map car t*) iS)])
-          (let-values ([(aud iS++) (anti-unify (map cdr t*) iS+)])
-            (values `(,aua . ,aud) iS++)))]
-       [;; rule 9
-        (find (lambda (s) (teq? (lhs s) t*)) iS)
-        =>
-        (lambda (s) (values (rhs s) iS))]
-       [;; rule 10
-        else
-        (let ([new-var (var (au-name (length iS)) AU-BD)])
-          (values new-var (extend iS t* new-var)))]))))
+  (lambda (t*)
+    (let-values
+        ([(res _iS)
+          (let au ([t* t*] [iS '()])
+            (cond
+             [;; rule 7: eq? deal with variables as well
+              ;; hence, it would not introduce useless new vars
+              (for-all (eqp? (car t*)) (cdr t*))
+              (values (car t*) iS)]
+             [;; rule 8
+              (for-all pair? t*)
+              (let-values ([(a iS+) (au (map car t*) iS)])
+                (let-values ([(d iS++)
+                              (au (map cdr t*) iS+)])
+                  (values `(,a . ,d) iS++)))]
+             [;; rule 9
+              (find (lambda (s) (teq? (lhs s) t*)) iS)
+              =>
+              (lambda (s) (values (rhs s) iS))]
+             [;; rule 10
+              else
+              (let ([new-var
+                     (var (au-name (length iS)) AU-BD)])
+                (values new-var (extend iS t* new-var)))]))])
+      res)))
 (define eqp? (lambda (u) (lambda (v) (eq? u v))))
 
 (define AU-BD (+ init-C 0.5))
