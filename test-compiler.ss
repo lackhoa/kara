@@ -11,17 +11,11 @@
     (lambda (bound?)
       (conde
        [(== '() env)
-        (== bound? #f) (== t 'unbound)]
+        (== #f bound?) (== t 'unbound)]
        [(fresh (y b rest)
-          (== `((,y . ,b) . ,rest) env)
+          (== `((,y ,b) . ,rest) env)
           (condo
-           [(==t x y)
-            (== bound? #t)
-            (conde
-             [(== `(val . ,t) b)]
-             [(fresh (lam-expr)
-                (== `(rec . ,lam-expr) b)
-                (== `(closure ,lam-expr ,env) t))])]
+           [(==t y x) (== #t bound?) (== b t)]
            [else
             (fake `((lookupt ,x ,rest ,t) ,bound?))]))]))))
 (define typet
@@ -172,11 +166,11 @@
 (pp "run*au test: x is (z u z): u could be y or not\n")
 (pp
  (run*au (x y z)
-         (fresh (u v)
-           (== `(,z ,u ,v) x)
-           (conde
-            [(== u y) (== z v)]
-            [(=/= u y) (== z v)]))))
+   (fresh (u v)
+     (== `(,z ,u ,v) x)
+     (conde
+      [(== u y) (== z v)]
+      [(=/= u y) (== z v)]))))
 (newline)
 
 (pp "run*au on lookupo\n")
@@ -199,6 +193,10 @@
 (pp (run*au (x ees) (membero x ees)))
 (newline)
 
+(pp "run*su on not-in-envo\n")
+(pp
+ (run*su (x env) ((lookupt x env 'unbound) #f)))
+(newline)
 
 #!eof
 

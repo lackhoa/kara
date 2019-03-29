@@ -1,7 +1,5 @@
-(define truet
-  (lambda (?) (== #t ?)))
-(define falset
-  (lambda (?) (== #f ?)))
+(define truet (lambda () (lambda (?) (== #t ?))))
+(define falset (lambda () (lambda (?) (== #f ?))))
 
 (define ==t
   (lambda (x y)
@@ -10,6 +8,9 @@
        [(== #t ?) (== x y)]
        [(== #f ?) (=/= x y)]))))
 
+(define =/=t
+  (lambda (x y) (negt (==t x y))))
+
 (define negt
   (lambda (g)
     (lambda (?)
@@ -17,13 +18,10 @@
        [(== #t ?) (g #f)]
        [(== #f ?) (g #t)]))))
 
-(define =/=t
-  (lambda (x y) (negt (==t x y))))
-
 (define-syntax conjt
   ;; A conjunction test
   (syntax-rules ()
-    [(_) truet]
+    [(_) (truet)]
     [(_ g) g]
     [(_ g1 g2 gs ...)
      (lambda (?)
@@ -34,7 +32,7 @@
 (define-syntax disjt
   ;; A disjunction test
   (syntax-rules ()
-    [(_) falset]
+    [(_) (falset)]
     [(_ g) g]
     [(_ g1 g2 gs ...)
      (lambda (?)

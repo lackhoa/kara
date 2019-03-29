@@ -1,92 +1,71 @@
-([(#(t1 q) #(t2 q) #(S+ q) #(S+ q))
-  ()
-  ((walko #(t2 q) #(S+ q) #(0 r))
-   (walko #(t1 q) #(S+ q) #(0 r)))]
+(replace-string "f" "f")
 
- [(#(t1 q) #(t2 q) #(S q) #(S+ q))
-  (((#(0 r) #(1 r))))
-  ((ext-S-checko #(0 r) #(1 r) #(S q) #(S+ q))
-   (vector?o #(0 r) #t)
-   (walko #(t2 q) #(S q) #(1 r))
-   (walko #(t1 q) #(S q) #(0 r)))]
+(define lookup
+  (lambda (x env)
+    (let ([a (car env)])
+      (cond
+       [(eq? x (lhs a)) (rhs a)]
+       [else (lookup x (cdr env))]))))
 
- [(#(t1 q) #(t2 q) #(S q) #(S+ q))
-  (((#(1 r) #(0 r))))
-  ((ext-S-checko #(0 r) #(1 r) #(S q) #(S+ q))
-   (vector?o #(0 r) #t)
-   (vector?o #(1 r) #f)
-   (walko #(t2 q) #(S q) #(0 r))
-   (walko #(t1 q) #(S q) #(1 r)))]
+(define lookupo
+  (lambda (x env t)
+    (fresh (y b)
+      (== `((,y ,b) . ,rest) env)
+      (conde
+       [(== y x) (== b t)]
+       [(=/= y x) (lookupo x rest t)]))))
 
- [(#(t1 q) #(t2 q) #(S q) #(S+ q))
-  ((((#(3 r) . #(0 r)) (#(4 r) . #(1 r))))
-   ((#(2 r) #f)))
-  ((unifyo #(0 r) #(1 r) #(2 r) #(S+ q))
-   (unifyo #(3 r) #(4 r) #(S q) #(2 r))
-   (pair?o (#(4 r) . #(1 r)) #t)
-   (pair?o (#(3 r) . #(0 r)) #t)
-   (vector?o (#(4 r) . #(1 r)) #f)
-   (vector?o (#(3 r) . #(0 r)) #f)
-   (walko #(t2 q) #(S q) (#(4 r) . #(1 r)))
-   (walko #(t1 q) #(S q) (#(3 r) . #(0 r))))]
+(define lookup
+  (lambda (x env)
+    (cond
+     [(null? env) #f]
+     [else
+      (let ([a (car env)])
+        (cond
+         [(eq? x (lhs a)) a]
+         [else (lookup x (cdr env))]))])))
 
- [(#(t1 q) #(t2 q) #(S q) #f)
-  (((#(1 r) #(0 r))))
-  ((pair?o #(0 r) #f)
-   (pair?o #(1 r) #t)
-   (vector?o #(0 r) #f)
-   (vector?o #(1 r) #f)
-   (walko #(t2 q) #(S q) #(0 r))
-   (walko #(t1 q) #(S q) #(1 r)))]
+(define lookupo
+  (lambda (x env t bound?)
+    (conde
+     [(== '() env) (== #f bound?)]
+     [(fresh (y b)
+        (== `((,y ,b) . ,rest) env)
+        (conde
+         [(== y x) (== #t bound?) (== b t)]
+         [(=/= y x) (lookupo x rest t bound?)]))])))
 
- [(#(t1 q) #(t2 q) #(S q) #f)
-  (((#(0 r) #(1 r))))
-  ((pair?o #(0 r) #f)
-   (vector?o #(1 r) #f)
-   (vector?o #(0 r) #f)
-   (walko #(t2 q) #(S q) #(1 r))
-   (walko #(t1 q) #(S q) #(0 r)))])
+(define case1
+  (lambda (x env)
+    (cond
+     [(lookup x env) => rhs]
+     [else 'Fail])))
 
+(define case1o
+  (lambda (x env out)
+    (conde
+     [(lookup x env out #t)]
+     [(lookup x env 'unbound #f)
+      (== 'Fail out)])))
 
-(()
- ([((#(S q) #(S+ q)))
-   ()
-   ((walko #(t2 q) #(S+ q) #(0 r))
-    (walko #(t1 q) #(S+ q) #(0 r)))]
-  [()
-   (((#(0 r) #(1 r))))
-   ((ext-S-checko #(0 r) #(1 r) #(S q) #(S+ q))
-    (vector?o #(0 r) #t)
-    (walko #(t2 q) #(S q) #(1 r))
-    (walko #(t1 q) #(S q) #(0 r)))]
-  [()
-   (((#(1 r) #(0 r))))
-   ((ext-S-checko #(0 r) #(1 r) #(S q) #(S+ q))
-    (vector?o #(0 r) #t)
-    (vector?o #(1 r) #f)
-    (walko #(t2 q) #(S q) #(0 r))
-    (walko #(t1 q) #(S q) #(1 r)))]
-  [()
-   ((((#(3 r) . #(0 r)) (#(4 r) . #(1 r)))) ((#(2 r) #f)))
-   ((unifyo #(0 r) #(1 r) #(2 r) #(S+ q)) (unifyo #(3 r) #(4 r) #(S q) #(2 r))
-    (pair?o (#(4 r) . #(1 r)) #t) (pair?o (#(3 r) . #(0 r)) #t)
-    (vector?o (#(4 r) . #(1 r)) #f)
-    (vector?o (#(3 r) . #(0 r)) #f)
-    (walko #(t2 q) #(S q) (#(4 r) . #(1 r)))
-    (walko #(t1 q) #(S q) (#(3 r) . #(0 r))))]
-  [((#(S+ q) #f))
-   (((#(1 r) #(0 r))))
-   ((pair?o #(0 r) #f) (pair?o #(1 r) #t) (vector?o #(0 r) #f)
-    (vector?o #(1 r) #f) (walko #(t2 q) #(S q) #(0 r))
-    (walko #(t1 q) #(S q) #(1 r)))]
-  [((#(S+ q) #f))
-   (((#(0 r) #(1 r))))
-   ((pair?o #(0 r) #f)
-    (vector?o #(1 r) #f)
-    (vector?o #(0 r) #f)
-    (walko #(t2 q) #(S q) #(1 r))
-    (walko #(t1 q) #(S q) #(0 r)))]))
+(define case2
+  (lambda (x y env)
+    (cond
+     [(lookup x env) => rhs]
+     [(lookup y env) => rhs]
+     [else 'Fail])))
 
-(unifier
- #<procedure unify at ak.ss:1415>
- (((foo (nom-tag "a") (nom-tag "a")) foo (nom-tag "b") (nom-tag "b"))))
+(define case2o
+  (lambda (x y env out)
+    (conde
+     [(lookup x env out #t)]
+     [(lookup x env '? #f) (lookup y env out #t)]
+     [(lookup x env '? #f) (lookup y env '? #f)
+      (== 'Fail out)])))
+
+;; From relation
+(define conso (lambda (a d ls) (== `(,a . ,d) ls)))
+;; To pseudo-function 1
+(define cart (lambda (ls) (lambda (a) (fresh (d) (conso a d ls)))))
+;; To pseudo-function 2
+(define cdrt (lambda (ls) (lambda (d) (fresh (a) (conso a d ls)))))
