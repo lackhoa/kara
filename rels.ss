@@ -52,22 +52,24 @@
 
 (define appendo
   (lambda (l1 l2 l)
-    (conde [(nullo l1)  (== l l2)]
-           [(fresh (l1a l1d ld)
-              (cro l1 l1a l1d)
-              (cro l l1a ld)
-              (appendo l1d l2 ld))])))
+    (conde
+     [(== '() l1) (== l l2)]
+     [(fresh (l1a l1d ld)
+        (== `(,l1a . ,l1d)l1)
+        (== `(,l1a . ,ld) l)
+        (appendo l1d l2 ld))])))
 
-(define appendo*
+(define append*o
   (lambda (l* l)
-    (conde [(nullo l*)  (nullo l)]
-           [(fresh (x)
-              (== l* (list x))
-              (== l x))]
-           [(fresh (l*a l*b l*d l*bd)
-              (== l* `[,l*a ,l*b . ,l*d])
-              (appendo l*a l*bd l)
-              (appendo* (cons l*b l*d) l*bd))])))
+    (conde
+     [(== '() l*) (== '() l)]
+     [(fresh (x)
+        (== l* `(,x))
+        (== l x))]
+     [(fresh (l*a l*b l*d l*bd)
+        (== `(,l*a ,l*b . ,l*d) l*)
+        (appendo l*a l*bd l)
+        (append*o `(,l*b . ,l*d) l*bd))])))
 
 
 (define list-splito-core

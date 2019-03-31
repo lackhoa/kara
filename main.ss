@@ -10,11 +10,11 @@
     [(_ i e)
      (repeat-func i (lambda () e))]))
 
-(define reflect
+(define-syntax reflect
   ;; Goal for debugging
-  (lambda (x)
-    (project (x)
-      (begin (display x) (newline) succeed))))
+  (syntax-rules ()
+    [(_ msg x)
+     (project (x) (begin (pp msg) (pp x) succeed))]))
 
 ;;; miniKanren
 ;; (load "faster-miniKanren/mk-vicare.scm")
@@ -35,29 +35,11 @@
 ;; (load "test-reif.ss")
 ;; (load "test-full-interp.ss")
 ;; (load "compiler.ss") (load "reif.ss") (load "test-compiler.ss")
-;; (load "net.ss") (load "test-net.ss")
-(load "coq.ss")
+(load "test-net.ss")
+;; (load "coq.ss")
 ;; (load "lambda.ss")
 ;; (load "lambda2.ss")
 
-(pp
- (run 1 (q)
-   (fresh (base step)
-     (indo base step plus0r)
-     ;; goal: base; step
-     (fresh (X) (subo X 0 plus0 base))
-     ;; goal: step
-     (fresh (ih ig P P^ P^^)
-       (== `(-> ,ih ,ig) step)
-       ;; assumption: ih; goal: ig
-       (mpo S-eq ih P)
-       ;; assumption: ih, P; goal: ig
-       (fresh (plus-Sr)
-         (mpo (copy =sym) plus-S plus-Sr)
-         (mpo eql plus-Sr P^))
-       ;; assumption: ih, P, P^; goal: ig
-       (mpo P^ P P^^)
-       ;; assumption: ih, P, P^, P^^; goal: ig
-       (mpo (copy =sym) P^^ ig)))))
+
 
 #!eof
