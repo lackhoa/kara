@@ -69,3 +69,32 @@
 (define cart (lambda (ls) (lambda (a) (fresh (d) (conso a d ls)))))
 ;; To pseudo-function 2
 (define cdrt (lambda (ls) (lambda (d) (fresh (a) (conso a d ls)))))
+
+(define membert
+  (lambda (x ls)
+    (lambda (?)
+      (conde
+       [(== '() ls) (== #f ?)]
+       [(fresh (a d)
+          (== `(,a . ,d) ls)
+          (condo
+           [(==t a x) (== #t ?)]
+           [else ((membert x d) ?)]))]))))
+
+(define subo
+  (lambda (x v f g)
+    (fresh ()
+      (symbolo x)
+      ((membert x func-syms) #f)
+      (let subo ([f f] [g g])
+        (conde
+         [(== x f) (== v g)]
+         [(=/= x f)
+          (conde
+           [(conde [(== `() f)] [(numbero f)] [(symbolo f)])
+            (== f g)]
+           [(fresh (fa fd ga gd)
+              (== `(,fa . ,fd) f)
+              (== `(,ga . ,gd) g)
+              (subo fa ga)
+              (subo fd gd))])])))))
