@@ -46,10 +46,8 @@
            [(conde [(== `() f)] [(numbero f)] [(symbolo f)])
             (== f g)]
            [(fresh (fa fd ga gd)
-              (== `(,fa . ,fd) f)
-              (== `(,ga . ,gd) g)
-              (subo fa ga)
-              (subo fd gd))])])))))
+              (== `(,fa . ,fd) f) (== `(,ga . ,gd) g)
+              (subo fa ga)       (subo fd gd))])])))))
 
 (define indo
   (lambda (base step P)
@@ -60,18 +58,20 @@
         (subo X m P Pm)
         (subo X `(S ,m) P Psm)))))
 
-(define mpo (lambda (imp ante conse) (== `(-> ,ante ,conse) imp)))
+(define ->
+  (lambda (imp ante conse)
+    (== `(-> ,ante ,conse) imp)))
 
 
-;;; Axioms
+;;; Axioms and Schemas
 (define refl (letv (X) `(= ,X ,X)))
 
-(define eql
+(define rwl
   (letv (L L* R)
     `(-> (= ,L ,R)
         (-> (= ,L ,L*) (= ,L* ,R)))))
 
-(define eqr
+(define rwr
   (letv (L R R*)
     `(-> (= ,L ,R)
         (-> (= ,R ,R*) (= ,L ,R*)))))
@@ -86,6 +86,32 @@
   (letv (X X*)
     `(-> (= ,X ,X*)
         (= (S ,X) (S ,X*)))))
+
+(define arity-table '([S 1] [+ 2]))
+
+(define inj
+  (lambda (func-sym)
+    (let ([arity (my-rhs (assq arity-table func-sym))])
+      (let ([Xs (gen-vars "X" arity)]
+            [Ys (gen-vars "Y" arity)])
+        (let loop ([i arity] [X* Xs] [Y* Ys])
+          (cond
+           [(= i 0) `(= (,func-sym . ,Xs)
+                        (,func-sym . ,Ys))]
+           [else
+            `(-> (= ,(car X*) ,(car Y*))
+                ,(loop (- i 1)
+                       (cdr X*)
+                       (cdr Y*)))]))))))
+
+(define gen-vars
+  ;; base-name is string
+  (lambda (base-name n)
+    (let gen-vars ([i n])
+      (if (= i 0) '()
+          `(,(var (string-append base-name (number->string i)))
+            .
+            ,(gen-vars (- i 1)))))))
 
 (define plus0 (letv (X) `(= (+ 0 ,X) ,X)))
 

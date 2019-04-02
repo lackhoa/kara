@@ -27,16 +27,16 @@
 ;;; Other "libraries"
 (load "reif.ss")
 (load "pmatch.scm")
-(load "test-fw.ss")
 
 ;;; The main program
 ;; (load "faster-miniKanren/full-interp.scm")
 ;; (load "full-interp.ss")
 ;; (load "test-reif.ss")
 ;; (load "test-full-interp.ss")
-;; (load "compiler.ss") (load "reif.ss") (load "test-compiler.ss")
-(load "test-net.ss")
-;; (load "coq.ss")
+;; (load "test-compiler.ss")
+;; (load "test-net.ss")
+(load "test-coq.ss")
+;; (load "test-fw.ss")
 ;; (load "lambda.ss")
 ;; (load "lambda2.ss")
 

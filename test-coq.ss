@@ -1,14 +1,7 @@
-(pp '(-> a (-> b a)))
-(pp
- (run* (q) (typeo init-ctx '(lambda x (lambda y x)) q)))
+(load "coq.ss")
 
-(pp "Fails")
-(pp
- (run* (q) (typeo init-ctx '(lambda x (x x)) q)))
-
-(pp "Expressions typed int -> int")
-(pp
- (run 5 (q) (typeo init-ctx q '(-> int int))))
+(pp (inj '+))
+#!eof
 
 (pp
  (run 1 (q)
@@ -20,12 +13,12 @@
      (fresh (ih ig P P^ P^^)
        (== `(-> ,ih ,ig) step)
        ;; assumption: ih; goal: ig
-       (mpo S-eq ih P)
+       (-> S-eq ih P)
        ;; assumption: ih, P; goal: ig
        (fresh (plus-Sr)
-         (mpo (copy =sym) plus-S plus-Sr)
-         (mpo eql plus-Sr P^))
+         (-> (copy =sym) plus-S plus-Sr)
+         (-> rwl plus-Sr P^))
        ;; assumption: ih, P, P^; goal: ig
-       (mpo P^ P P^^)
+       (-> P^ P P^^)
        ;; assumption: ih, P, P^, P^^; goal: ig
-       (mpo (copy =sym) P^^ ig)))))
+       (-> (copy =sym) P^^ ig)))))

@@ -1,3 +1,6 @@
+(load "compiler.ss")
+(load "reif.ss")
+
 ;;; Functions
 (define membero
   (lambda (x ees)
