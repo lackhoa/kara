@@ -58,10 +58,18 @@
         (subo X m P Pm)
         (subo X `(S ,m) P Psm)))))
 
-(define ->
+(define ->2
   (lambda (imp ante conse)
     (== `(-> ,ante ,conse) imp)))
 
+(define-syntax ->
+  (syntax-rules ()
+    [(_ imp conse)
+     (== imp conse)]
+    [(_ imp ante ante* ... conse)
+     (fresh (imp+)
+       (== `(-> ,ante ,imp+) imp)
+       (-> imp+ ante* ... conse))]))
 
 ;;; Axioms and Schemas
 (define refl (letv (X) `(= ,X ,X)))
@@ -76,22 +84,11 @@
     `(-> (= ,L ,R)
         (-> (= ,R ,R*) (= ,L ,R*)))))
 
-(define plus-eq
-  (letv (X X* Y Y*)
-    `(-> (= X X*)
-        (-> (= ,Y ,Y*)
-           (= (+ ,X ,Y) (+ ,X* ,Y*))))))
-
-(define S-eq
-  (letv (X X*)
-    `(-> (= ,X ,X*)
-        (= (S ,X) (S ,X*)))))
-
 (define arity-table '([S 1] [+ 2]))
 
 (define inj
   (lambda (func-sym)
-    (let ([arity (my-rhs (assq arity-table func-sym))])
+    (let ([arity (my-rhs (assq func-sym arity-table))])
       (let ([Xs (gen-vars "X" arity)]
             [Ys (gen-vars "Y" arity)])
         (let loop ([i arity] [X* Xs] [Y* Ys])
@@ -109,7 +106,7 @@
   (lambda (base-name n)
     (let gen-vars ([i n])
       (if (= i 0) '()
-          `(,(var (string-append base-name (number->string i)))
+          `(,(var (string->symbol (string-append base-name (number->string i))))
             .
             ,(gen-vars (- i 1)))))))
 
