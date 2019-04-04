@@ -81,20 +81,24 @@
            [(==t a x) (== #t ?)]
            [else ((membert x d) ?)]))]))))
 
-(define subo
-  (lambda (x v f g)
-    (fresh ()
-      (symbolo x)
-      ((membert x func-syms) #f)
-      (let subo ([f f] [g g])
-        (conde
-         [(== x f) (== v g)]
-         [(=/= x f)
-          (conde
-           [(conde [(== `() f)] [(numbero f)] [(symbolo f)])
-            (== f g)]
-           [(fresh (fa fd ga gd)
-              (== `(,fa . ,fd) f)
-              (== `(,ga . ,gd) g)
-              (subo fa ga)
-              (subo fd gd))])])))))
+(define copy
+  (lambda (t)
+    (let-values
+        ([(res _met)
+          (let copy ([t t] [met '()])
+            (cond
+             [(var? t)
+              (cond
+               [(assq t met)
+                => (lambda (asso) (values (my-rhs asso) met))]
+               [else
+                (let ([v (var (vector-ref t 0))])
+                  (values v `((,t ,v) . ,met)))])]
+
+             [(pair? t)
+              (let-values ([(a met+) (copy (car t) met)])
+                (let-values ([(d met++) (copy (cdr t) met+)])
+                  (values `(,a . ,d) met++)))]
+
+             [else (values t met)]))])
+      res)))
