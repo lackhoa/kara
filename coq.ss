@@ -6,6 +6,7 @@ Context is like environment: each implication subgoal can add its own assumption
 ;; Works with the canonical mk version
 
 ;;; Macros & helpers
+(define-record context (S ))
 (define my-rhs cadr)
 
 ;; Inference rules
@@ -17,8 +18,8 @@ Context is like environment: each implication subgoal can add its own assumption
               )
              (;; Prove these
               (inst P x 0)
-              (new (m) (-> ,(inst P x m)
-                          ,(inst P `(S ,m)))))))))
+              (letv (m) (-> ,(inst P x m)
+                           ,(inst P `(S ,m)))))))))
 
 (define-syntax ->
   (syntax-rules ()
@@ -51,14 +52,18 @@ Context is like environment: each implication subgoal can add its own assumption
                    ,(loop (- i 1) `(,X . ,Xs) `(,Y . ,Ys))))])))))
 
 (define arity-table '([S 1] [+ 2]))
-(define refl (new (X) `(= ,X ,X)))
-(define rwl (new (L L* R) `(-> (= ,L ,R) (-> (= ,L ,L*) (= ,L* ,R)))))
-(define rwr (new (L R R*) `(-> (= ,L ,R) (-> (= ,R ,R*) (= ,L ,R*)))))
-(define =sym (new (X Y) (-> (= X Y) (= Y X))))
+(define refl (letv (X) `(= ,X ,X)))
+(define rwl (letv (L L* R) `(-> (= ,L ,R) (-> (= ,L ,L*) (= ,L* ,R)))))
+(define rwr (letv (L R R*) `(-> (= ,L ,R) (-> (= ,R ,R*) (= ,L ,R*)))))
+(define =sym (letv (X Y) `(-> (= ,X ,Y) (= ,Y ,X))))
+
+
+
+
 
 #!eof
 ;; Arithmetic
-(define plus0 (= (+ 0 X) X))
+(define plus0 (letv (X) `(= (+ 0 ,X) X)))
 
 (define plus-S (= (+ (S X) Y)
                   (S (+ X Y))))
