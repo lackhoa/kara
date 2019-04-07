@@ -1,17 +1,10 @@
-#| Rules & Notes & Conventions & Stuffs
-Context: Assets x Goal
-Assets: [Formula]
-Goal: Formula
-State: [Context]
-Local context: The first context in the state
-Action: State -> State
-:- c a ... adds (-> c a ...) itself to the local asset (the symbol change is to distinguish consequent from implication)
+#|Notes
 |#
 
 ;;; Macros & helpers
 (define for
   (lambda (f)
-    (let ([vs (remove-duplicates (all-vars f))])
+    (let ([vs (dedup (all-vars f))])
       (let loop ([vs vs])
         (cond
          [(null? vs) f]
@@ -25,25 +18,19 @@ Action: State -> State
                         (all-vars (cdr f)))]
      [else '()])))
 
-(define remove-duplicates
-  (lambda (ls)
-    (cond
-     [(null? ls) '()]
-     [(let ([a (car ls)]
-            [d (cdr ls)])
-        (cond
-         [(memq a d) (remove-duplicates d)]
-         [else `(,a . ,(remove-duplicates d))]))])))
-
 ;;; Definitions
 (define-record ctx (a g))
 
 (define var?
   (lambda (t)
     (and (symbol? t)
-         (char-upper-case? (string-ref (symbol->string t) 0)))))
+         (char-upper-case? (string-ref (sy->str t) 0)))))
 
-(define init-env (lambda (g) `(,(make-ctx '() g))))
+(define init-env  (lambda (g) `(,(make-ctx '() g))))
+(define local-ctx (lambda (env) (car env)))
+(define current-a (lambda (env) (ctx-a (local-ctx env))))
+(define current-g (lambda (env) (ctx-g (local-ctx env))))
+(define ref (lambda (i env) (list-ref (current-a env) i)))
 
 (define-syntax go
   (syntax-rules ()
@@ -52,8 +39,17 @@ Action: State -> State
                     ((go f* ...) (f x)))]))
 
 (define-syntax prove
-  (lambda (g . steps)
-    ((go steps) (init-env g))))
+  (syntax-rules ()
+    [(_ g steps ...)
+     (print-env ((go steps ...)
+                 (init-env g)))]))
+
+(define print-env (lambda (env) (print-ctx (local-ctx env))))
+
+(define print-ctx
+  (lambda (ctx)
+    `((Assets: . ,(ctx-a ctx))
+      (Goal:     ,(ctx-g ctx)))))
 
 ;;; Inference rules (actions)
 (define mp
@@ -70,15 +66,36 @@ Action: State -> State
           [g (current-g env)])
       (pmatch f
         [(forall ,X ,f)
-         (fresh (Y) (gain (subst X Y f) env))]
+         (let ([Y (freshen X env)])
+           (gain (subst X Y f) env))]
         [(-> ,ante ,conse)
-         `(,(make-ctx a conse) . ,(cdr env))]))))
+         `(,(make-ctx `(,ante . ,a) conse)
+           .
+           ,(cdr env))]))))
+
+(define freshen
+  (lambda (name env)
+    (let ([t `(,(current-g env) . ,(current-a env))])
+      (let ([vs (all-vars t)])
+        (let loop ([name name])
+          (cond
+           [(memq name vs)
+            (loop (str->sy (str-app (sy->str name) "*")))]
+           [else name]))))))
 
 (define gain
+  ;; Just gain a new formula
   (lambda (f env)
     (let ([a (current-a env)]
           [g (current-g env)])
       `(,(make-ctx `(,f . ,a) g) . ,(cdr env)))))
+
+(define assert
+  ;; Prove it, then thou shall get it
+  (lambda (f env)
+    (let ([a (current-a env)]
+          [g (current-g env)])
+      `(,(make-ctx a f) . ,(gain f env)))))
 
 ;;; Axioms
 (define ind

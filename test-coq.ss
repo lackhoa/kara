@@ -1,3 +1,4 @@
 (load "coq.ss")
 
-(pp (init-env plus0r))
+(pp (prove plus0r))
+(pp (freshen 'X `(,(make-ctx '() '(= X X*)))))
