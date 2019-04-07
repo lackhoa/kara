@@ -40,26 +40,27 @@
              [(disjt (==t a 'prim) (==t a 'closure))
               (== 'funval T)]
              [else (== 'pair T)]))])))))
-(define vart (lambda (t) (lambda (?) (fake `(vector?o ,t ,?)))))
-(define pairt (lambda (t) (lambda (?) (fake `(pair?o ,t ,?)))))
+(define var?t (lambda (t) (lambda (?) (fake `(vector?o ,t ,?)))))
+(define pair?t (lambda (t) (lambda (?) (fake `(pair?o ,t ,?)))))
+(define eq?t (lambda (t1 t2) (lambda (?) (fake `(eq?o ,t1 ,t2 ,?)))))
 (define fake-unify
   (lambda (t1 t2 S S+)
     (fresh (t1+ t2+)
       (fake `(walko ,t1 ,S ,t1+))
       (fake `(walko ,t2 ,S ,t2+))
       (condo
-       [(==t t1+ t2+) (== S S+)]
-       [(vart t1+) (fake `(ext-S-checko ,t1+ ,t2+ ,S ,S+))]
-       [(vart t2+) (fake `(ext-S-checko ,t2+ ,t1+ ,S ,S+))]
-       [(conjt (pairt t1+) (pairt t2+))
+       [(eq?t t1+ t2+) (== S S+)]
+       [(var?t t1+) (fake `(ext-S-checko ,t1+ ,t2+ ,S ,S+))]
+       [(var?t t2+) (fake `(ext-S-checko ,t2+ ,t1+ ,S ,S+))]
+       [(conjt (pair?t t1+) (pair?t t2+))
         (fresh (a1 a2 d1 d2 S^)
           (== `(,a1 . ,d1) t1+)
           (== `(,a2 . ,d2) t2+)
           (fake `(unifyo ,a1 ,a2 ,S ,S^))
-          (condo [(=/=t S^ #f)
-                  (fake `(unifyo ,d1 ,d2 ,S^ ,S+))]))]
-       [(==t t1+ t2+) (== S+ S)]
-       [else (== S+ #f)]))))
+          (condo
+           [(==t #f S^) (== #f S+)]
+           [else (fake `(unifyo ,d1 ,d2 ,S^ ,S+))]))]
+       [else (== #f S+)]))))
 
 ;;; Tests
 (pp "run*su => q = p = r")
@@ -201,7 +202,10 @@
  (run*su (x env) ((lookupt x env 'unbound) #f)))
 (newline)
 
-#!eof
+;; (pp "Failed unification")
+;; (pp (run* (t1 t2 S) (fake-unify t1 t2 S #f)))
 
-(pp "Time for it to work on itself!")
-(pp (run* (t1 t2 S S+) (fake-unify t1 t2 S S+)))
+(pp "Successful unification")
+(pp (run* (t1 t2 S) (fresh (S+) (=/= #f S+) (fake-unify t1 t2 S S+))))
+
+#!eof

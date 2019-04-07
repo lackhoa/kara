@@ -1,71 +1,106 @@
-;; Rules & Notes & Conventions & Stuffs
-#|
-Context is like environment: each implication subgoal can add its own assumptions to the context
+#| Rules & Notes & Conventions & Stuffs
+Context: Assets x Goal
+Assets: [Formula]
+Goal: Formula
+State: [Context]
+Local context: The first context in the state
+Action: State -> State
+:- c a ... adds (-> c a ...) itself to the local asset (the symbol change is to distinguish consequent from implication)
 |#
 
-;; Works with the canonical mk version
-
 ;;; Macros & helpers
-(define-record context (S ))
-(define my-rhs cadr)
-
-;; Inference rules
-(define ind
-  (lambda (x)
-    (lambda (P)
-      ;; P is current goal
-      (spawn (;; No assumptions
-              )
-             (;; Prove these
-              (inst P x 0)
-              (letv (m) (-> ,(inst P x m)
-                           ,(inst P `(S ,m)))))))))
-
-(define-syntax ->
-  (syntax-rules ()
-    [(_ imp ante)
-     (->2 imp ante)]
-    [(_ imp ante0 ante1 ante* ... conse)
-     (act
-      (->2 imp ante0)
-      (-> ante1 ante* ... conse))]))
-
-(define ->2
-  (lambda (imp ante)
-    (pmatch imp
-      [(-> ,ante^ ,conse)
-       (guard (equal? ante ante^))
-       (derive conse)]
-      [else (error '->2 "Can't apply" imp ante)])))
-
-;;; Axioms and Schemas
-(define inj
-  (lambda (func-sym)
-    (let ([arity (my-rhs (assq func-sym arity-table))])
-      (let loop ([i arity] [Xs '()] [Ys '()])
+(define for
+  (lambda (f)
+    (let ([vs (remove-duplicates (all-vars f))])
+      (let loop ([vs vs])
         (cond
-         [(= i 0) `(= (,func-sym . ,Xs)
-                      (,func-sym . ,Ys))]
-         [else
-          (new (X Y)
-               `(-> (= ,X ,Y)
-                   ,(loop (- i 1) `(,X . ,Xs) `(,Y . ,Ys))))])))))
+         [(null? vs) f]
+         [else `(forall ,(car vs) ,(loop (cdr vs)))])))))
+
+(define all-vars
+  (lambda (f)
+    (cond
+     [(var? f) `(,f)]
+     [(pair? f) (append (all-vars (car f))
+                        (all-vars (cdr f)))]
+     [else '()])))
+
+(define remove-duplicates
+  (lambda (ls)
+    (cond
+     [(null? ls) '()]
+     [(let ([a (car ls)]
+            [d (cdr ls)])
+        (cond
+         [(memq a d) (remove-duplicates d)]
+         [else `(,a . ,(remove-duplicates d))]))])))
+
+;;; Definitions
+(define-record ctx (a g))
+
+(define var?
+  (lambda (t)
+    (and (symbol? t)
+         (char-upper-case? (string-ref (symbol->string t) 0)))))
+
+(define init-env (lambda (g) `(,(make-ctx '() g))))
+
+(define-syntax go
+  (syntax-rules ()
+    [(_) (lambda (x) x)]
+    [(_ f f* ...) (lambda (x)
+                    ((go f* ...) (f x)))]))
+
+(define-syntax prove
+  (lambda (g . steps)
+    ((go steps) (init-env g))))
+
+;;; Inference rules (actions)
+(define mp
+  (lambda (imp ante)
+    (lambda (env)
+      (pmatch imp
+        [(-> ,ante^ ,conse)
+         (guard (equal? ante ante^))
+         (gain conse env)]))))
+
+(define intro
+  (lambda (env)
+    (let ([a (current-a env)]
+          [g (current-g env)])
+      (pmatch f
+        [(forall ,X ,f)
+         (fresh (Y) (gain (subst X Y f) env))]
+        [(-> ,ante ,conse)
+         `(,(make-ctx a conse) . ,(cdr env))]))))
+
+(define gain
+  (lambda (f env)
+    (let ([a (current-a env)]
+          [g (current-g env)])
+      `(,(make-ctx `(,f . ,a) g) . ,(cdr env)))))
+
+;;; Axioms
+(define ind
+  ;; schema: state -> formulae
+  (lambda (v P)
+    (-> (inst P v 0)
+       (-> `(forall M (-> ,(inst P v 'M)
+                   ,(inst P v '(s M))))
+          P))))
 
 (define arity-table '([S 1] [+ 2]))
-(define refl (letv (X) `(= ,X ,X)))
-(define rwl (letv (L L* R) `(-> (= ,L ,R) (-> (= ,L ,L*) (= ,L* ,R)))))
-(define rwr (letv (L R R*) `(-> (= ,L ,R) (-> (= ,R ,R*) (= ,L ,R*)))))
-(define =sym (letv (X Y) `(-> (= ,X ,Y) (= ,Y ,X))))
 
+;; Equality
+(define refl (for '(= X X)))
+(define rwl  (for '(-> (= L R) (-> (= L L*) (= L* R)))))
+(define rwr  (for '(-> (= L R) (-> (= R R*) (= L R*)))))
+(define =sym (for '(-> (= X Y) (= Y X))))
 
-
+;; Arithmetic
+(define plus0  (for '(= (+ 0 X) X)))
+(define plus-S (for '(= (+ (s X) Y) (s (+ X Y)))))
+(define plus0r (for '(= (+ X 0) X)))
 
 
 #!eof
-;; Arithmetic
-(define plus0 (letv (X) `(= (+ 0 ,X) X)))
-
-(define plus-S (= (+ (S X) Y)
-                  (S (+ X Y))))
-
-(define plus0r (= (+ X 0) X))

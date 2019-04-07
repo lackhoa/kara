@@ -114,7 +114,7 @@
        [(and (pair? t1) (pair? t2))
         (let ([S+ (unify (car t1) (car t2) S)])
           (and S+ (unify (cdr t1) (cdr t2) S+)))]
-       [(equal? t1 t2) S]
+       ;; [(equal? t1 t2) S]
        [else #f]))))
 
 (define ==
