@@ -4,19 +4,25 @@
 ;;; Macros & helpers
 (define for
   (lambda (f)
-    (let ([vs (dedup (all-vars f))])
+    (let ([vs (dedup (free-vars f))])
       (let loop ([vs vs])
         (cond
          [(null? vs) f]
          [else `(forall ,(car vs) ,(loop (cdr vs)))])))))
 
-(define all-vars
+(define free-vars
   (lambda (f)
-    (cond
-     [(var? f) `(,f)]
-     [(pair? f) (append (all-vars (car f))
-                        (all-vars (cdr f)))]
-     [else '()])))
+    (let free-vars ([f f] [bound '()])
+      (pmatch f
+        [,v
+         (guard (var? v))
+         (if (memq v bound) `(,v) '())]
+        [(forall ,v ,f)
+         (free-vars f `(,v . ,bound))]
+        [(,a . ,d)
+         (append (free-vars a bound)
+                 (free-vars d bound))]
+        [else '()]))))
 
 ;;; Definitions
 (define-record ctx (a g))
@@ -77,37 +83,43 @@
     (let ([a (current-a env)]
           [g (current-g env)])
       (pmatch f
-        [(forall ,X ,f)
-         (let ([Y (freshen X env)])
-           (gain (subst X Y f) env))]
+        [(forall ,v ,f)
+         (let ([u (freshen v (free-vars a))])
+           (gain (subst v u f) env))]
         [(-> ,ante ,conse)
          `(,(make-ctx `(,ante . ,a) conse)
            .
            ,(cdr env))]))))
 
 (define subst
-  (lambda (v s f)
+  (lambda (x s f)
     (pmatch f
-      [,u
-       (guard (var? u))
-       (if (eq? v f) s f)]
+      [,y
+       (guard (var? y))
+       (if (eq? x y) s f)]
 
-      [(forall ,u ,g)
+      [(forall ,y ,g)
        (cond
-        [(eq? u v) f]
-        [(memq u (free-vars s) )])]
+        [(eq? x y) f]
+        [(memq y (free-vars s))
+         (let ([z (freshen y `(,x ,@(free-vars s) ,@(free-vars g)))])
+           (let ([g (subst y z g)])
+             (let ([g (subst x s g)])
+               `(forall ,z ,g))))]
+        [else `(forall ,y ,(subst x s g))])]
 
-      [])))
+      [(,a . ,d)
+       `(,(subst x s a) . ,(subst x s d))]
+
+      [else f])))
 
 (define freshen
-  (lambda (name env)
-    (let ([t `(,(current-g env) . ,(current-a env))])
-      (let ([vs (all-vars t)])
-        (let loop ([name name])
-          (cond
-           [(memq name vs)
-            (loop (str->sy (str-app (sy->str name) "*")))]
-           [else name]))))))
+  (lambda (name used)
+    (let freshen ([name name])
+      (cond
+       [(memq name vs)
+        (freshen (str->sy (str-app (sy->str name) "*")))]
+       [else name]))))
 
 (define gain
   ;; Just gain a new formula
@@ -135,9 +147,9 @@
     (let ([g (current-g env)])
       ((go
         (assert (inst g 0))
-        (assert (let ([M (freshen 'M g)])
-                  `(forall ,M (-> ,(inst g M)
-                            ,(inst g `(s ,M)))))))
+        (assert (let ([v (freshen 'M (free-vars g))])
+                  `(forall ,v (-> ,(inst g v)
+                            ,(inst g `(s ,v)))))))
        env))))
 
 (define arity-table '([S 1] [+ 2]))

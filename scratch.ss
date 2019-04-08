@@ -199,3 +199,11 @@
          #f)
    (walko #(t2 0) #(S 0) (#(a2 3) . #(d2 3)))
    (walko #(t1 0) #(S 0) (#(a1 3) . #(d1 3))))))
+
+(define E
+  (lambda (n)
+    (let loop ([k n])
+      (if (= k 1) 1
+          (+ (* (/ n (+ n (- k) 1))
+                (loop (- k 1)))
+             1)))))
