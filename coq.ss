@@ -27,10 +27,11 @@
          (char-upper-case? (string-ref (sy->str t) 0)))))
 
 (define init-env  (lambda (g) `(,(make-ctx '() g))))
+(define done cdr) ;; Dismiss local context
 (define local-ctx (lambda (env) (car env)))
 (define current-a (lambda (env) (ctx-a (local-ctx env))))
 (define current-g (lambda (env) (ctx-g (local-ctx env))))
-(define ref (lambda (i env) (list-ref (current-a env) i)))
+(define ref       (lambda (i env) (list-ref (current-a env) i)))
 
 (define-syntax go
   (syntax-rules ()
@@ -52,13 +53,24 @@
       (Goal:     ,(ctx-g ctx)))))
 
 ;;; Inference rules (actions)
+(define clean
+  (lambda (env)
+    (let ([a (current-a env)]
+          [g (current-g env)])
+      (if (member g a) (cdr env) env))))
+
 (define mp
-  (lambda (imp ante)
+  (lambda (imp)
     (lambda (env)
-      (pmatch imp
-        [(-> ,ante^ ,conse)
-         (guard (equal? ante ante^))
-         (gain conse env)]))))
+      (let ([c (get-conse imp)]
+            [g (current-g env)])
+        (cond
+         [(equal? c g)
+          ((go (assert (get-conse imp))
+               (gain imp))
+           env)]
+         [else
+          (error) 'mp1 "Can\'t have that, love!"])))))
 
 (define intro
   (lambda (env)
@@ -73,6 +85,20 @@
            .
            ,(cdr env))]))))
 
+(define subst
+  (lambda (v s f)
+    (pmatch f
+      [,u
+       (guard (var? u))
+       (if (eq? v f) s f)]
+
+      [(forall ,u ,g)
+       (cond
+        [(eq? u v) f]
+        [(memq u (free-vars s) )])]
+
+      [])))
+
 (define freshen
   (lambda (name env)
     (let ([t `(,(current-g env) . ,(current-a env))])
@@ -85,34 +111,78 @@
 
 (define gain
   ;; Just gain a new formula
-  (lambda (f env)
-    (let ([a (current-a env)]
-          [g (current-g env)])
-      `(,(make-ctx `(,f . ,a) g) . ,(cdr env)))))
+  (lambda (f)
+    (lambda (env)
+      (let ([a (current-a env)]
+            [g (current-g env)])
+        `(,(make-ctx `(,f . ,a) g)
+          .
+          ,(cdr env))))))
 
 (define assert
-  ;; Prove it, then thou shall get it
-  (lambda (f env)
-    (let ([a (current-a env)]
-          [g (current-g env)])
-      `(,(make-ctx a f) . ,(gain f env)))))
+  ;; Prove it and thou shall get it
+  (lambda (f)
+    (lambda (env)
+      (let ([a (current-a env)])
+        (let ([env (gain f env)])
+          (append env `(,(make-ctx a f))))))))
+
+;; Capture-avoiding substitution!
 
 ;;; Axioms
 (define ind
-  ;; schema: state -> formulae
-  (lambda (v P)
-    (-> (inst P v 0)
-       (-> `(forall M (-> ,(inst P v 'M)
-                   ,(inst P v '(s M))))
-          P))))
+  (lambda (env)
+    (let ([g (current-g env)])
+      ((go
+        (assert (inst g 0))
+        (assert (let ([M (freshen 'M g)])
+                  `(forall ,M (-> ,(inst g M)
+                            ,(inst g `(s ,M)))))))
+       env))))
 
 (define arity-table '([S 1] [+ 2]))
 
+(define rwr
+  (lambda (r*)
+    (lambda (env)
+      (let ([g (current-g env)])
+        (pmatch g
+          [(= ,l ,r)
+           ((go (gain `(= ,l ,r))
+                (assert `(= ,r ,r*))
+                (assert `(= ,l ,r*)))
+            env)]
+          [else (error 'rwr "Not an equality" g)])))))
+
+(define rwl
+  (lambda (l*)
+    (lambda (env)
+      (let ([g (current-g env)])
+        (pmatch g
+          [(= ,l ,r)
+           ((go (gain `(= ,l ,r))
+                (assert `(= ,l ,l*))
+                (assert `(= ,l* ,r)))
+            env)]
+          [else (error 'rwl "Not an equality" g)])))))
+
+(define refl
+  (lambda (env)
+    (let ([g (current-g env)])
+      (pmatch g
+        [(= ,f ,f) (done env)]
+        [else (error 'refl "Not reflable" g)]))))
+
+(define sym
+  (lambda (env)
+    (let ([g (current-g env)])
+      (pmatch g
+        [(= ,f ,h)
+         ((go done (assert `(= ,h ,f)))
+          env)]
+        [else (error 'sym "Not an equality" g)]))))
+
 ;; Equality
-(define refl (for '(= X X)))
-(define rwl  (for '(-> (= L R) (-> (= L L*) (= L* R)))))
-(define rwr  (for '(-> (= L R) (-> (= R R*) (= L R*)))))
-(define =sym (for '(-> (= X Y) (= Y X))))
 
 ;; Arithmetic
 (define plus0  (for '(= (+ 0 X) X)))
