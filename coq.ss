@@ -43,9 +43,10 @@ Term structure
          (cond
           [(eq? x y) f]
           [(memq y (free-vars s))
-           (let ([y* (freshen y `(,x
-                                  ,@(free-vars s)
-                                  ,@(free-vars g)))])
+           (let ([y* (freshen (sy->str y)
+                              `(,x
+                                ,@(free-vars s)
+                                ,@(free-vars g)))])
              (let ([g (substitute y y* g)])
                (let ([g (substitute x s g)])
                  `(forall ,y* ,g))))]
@@ -59,7 +60,7 @@ Term structure
   (lambda (x f)
     (pmatch f
       [(forall ,y ,g) (substitute y x g)]
-      [else (error 'inst "Not a universally quantified formula" f)])))
+      [else (error 'inst "Not a forall formula" f)])))
 
 ;;; Definitions
 (define-record ctx (a g))
@@ -78,25 +79,28 @@ Term structure
 
 (define-syntax go
   (syntax-rules ()
-    [(_) (lambda (x) x)]
-    [(_ f f* ...) (lambda (x)
-                    ((go f* ...) (f x)))]))
+          [(_) (lambda (x) x)]
+          [(_ f f* ...) (lambda (x)
+                          ((go f* ...) (f x)))]))
 
 (define-syntax prove
   (syntax-rules ()
-    [(_ g steps ...)
-     (print-env ((go steps ...)
-                 (init-env g)))]))
+          [(_ g steps ...)
+           (print-env ((go steps ...)
+                       (init-env g)))]))
 
 (define print-env
   (lambda (env)
     (if (null? env) "All done!"
-        (print-ctx (local-ctx env)))))
-
-(define print-ctx
-  (lambda (ctx)
-    `((Assets: ,@(ctx-a ctx))
-      (Goal:   ,(ctx-g ctx)))))
+        (begin
+          (let ([a (local-a env)]
+                [g (local-g env)])
+            (pp "Assets:" )
+            (for-each (lambda (a) (pp a)) a)
+            (pp "Goal:" g))
+          (let ([pg (lambda (ctx) (pp (ctx-g ctx)))])
+            (pp "Other goals:")
+            (for-each pg (cdr env)))))))
 
 ;;; Inference rules (actions)
 (define clean
@@ -119,7 +123,7 @@ Term structure
          [else
           (error 'mp "From _ we cannot derive _" imp g)])))))
 
-(define free-vars-a (lambda (a) (apply append free-vars a)))
+(define free-vars-a (lambda (a) (apply append (map free-vars a))))
 
 (define intro
   (lambda (env)
@@ -127,7 +131,8 @@ Term structure
           [g (local-g env)])
       (pmatch g
         [(forall ,v ,f)
-         (let ([v* (freshen v (free-vars-a a))])
+         (let ([v* (freshen (sy->str v)
+                            (free-vars-a a))])
            `(,(make-ctx a (substitute v v* f))
              .
              ,(cdr env)))]
@@ -161,32 +166,35 @@ Term structure
 
 (define freshen
   (lambda (name used)
+    ;; Str -> [Var] -> Var
     (let freshen ([name name])
       (cond
-       [(memq name used)
-        (freshen (str->sy (str-app (sy->str name) "*")))]
-       [else name]))))
+       [(memq (str->sy name) used)
+        (freshen (str-app name "*"))]
+       [else (str->sy name)]))))
 
 (define gain
-  ;; Just gain a new formula (also clean)
+  ;; Gain a new formula for free (also clean)
   (lambda (f)
     (lambda (env)
       (let ([a (local-a env)]
             [g (local-g env)])
         (clean
          `(,(make-ctx `(,f ,@a) g)
-           .
-           ,(cdr env)))))))
+           ,@(cdr env)))))))
+
+(define argue
+  ;; Prove something for no reason
+  (lambda (f)
+    (lambda (env)
+      (cond
+       [(null? env) `(,(make-ctx '() f))]
+       [else (let ([a (local-a env)])
+               `(,@env ,(make-ctx a f)))]))))
 
 (define assert
   ;; Prove it and thou shall get it
-  (lambda (f)
-    (lambda (env)
-      (let ([a (local-a env)])
-        (let ([env ((gain f) env)])
-          (append env `(,(make-ctx a f))))))))
-
-;; Capture-avoiding substitution!
+  (lambda (f) (go (argue f) (gain f))))
 
 ;;; Axioms
 (define ind
@@ -194,10 +202,11 @@ Term structure
     (let ([a (local-a env)]
           [g (local-g env)])
       ((go
-        (assert (inst g 0))
-        (let ([x (freshen 'N (free-vars-a a))])
-          (assert `(forall ,x (-> ,(inst g x)
-                            ,(inst g `(s ,x)))))))
+        (argue (inst 0 g))
+        (let ([x (freshen "N" (free-vars-a a))])
+          (argue `(forall ,x (-> ,(inst x g)
+                           ,(inst `(s ,x) g)))))
+        done)
        env))))
 
 (define arity-table '([s 1] [+ 2]))
@@ -208,9 +217,9 @@ Term structure
       (let ([g (local-g env)])
         (pmatch g
           [(= ,l ,r)
-           ((go (gain `(= ,l ,r))
-                (assert `(= ,r ,r*))
-                (assert `(= ,l ,r*)))
+           ((go (assert `(= ,r ,r*))
+                (assert `(= ,l ,r*))
+                (gain   `(= ,l ,r)))
             env)]
           [else (error 'rwr "Not an equality" g)])))))
 
@@ -220,9 +229,9 @@ Term structure
       (let ([g (local-g env)])
         (pmatch g
           [(= ,l ,r)
-           ((go (gain `(= ,l ,r))
-                (assert `(= ,l ,l*))
-                (assert `(= ,l* ,r)))
+           ((go (assert `(= ,l ,l*))
+                (assert `(= ,l* ,r))
+                (gain `(= ,l ,r)))
             env)]
           [else (error 'rwl "Not an equality" g)])))))
 

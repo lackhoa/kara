@@ -1,7 +1,10 @@
 (load "coq.ss")
 
+(prove plus0r ind)
+
+#!eof
 (test "Freshen"
-      (freshen 'X '(= X X*))
+      (freshen "X" '(X X*))
       'X**)
 
 (test "Substitution"
@@ -19,9 +22,3 @@
 (test "alpha-equiv? 2"
       (alpha-equiv? '(forall X (s X)) '(forall Y (s X)))
       #f)
-
-(test "Proof"
-      (prove plus0r
-        (assert '(= X X))
-        intro)
-      "No idea")

@@ -69,9 +69,7 @@
                        'tested-expression expected produced)))))]))
 
 ;; My stuffs
-(define pp
-  (lambda things
-    (pretty-print things)))
+(define pp (lambda things (for-each pretty-print things)))
 
 (define repeat-func
   (lambda (i f)
