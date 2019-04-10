@@ -1,8 +1,8 @@
 #|Notes
-Term structure
+Expressions:
 + Variables: uppcase symbols
 + Quantified formulae: 3-list whose first element is a forall
-+ Functions: list whose first element is not a forall
++ Functions & Other formulae: other lists
 + Constants: Any not-uppercase symbol, number, null
 |#
 
@@ -57,7 +57,7 @@ Term structure
         [else f])])))
 
 (define inst
-  (lambda (x f)
+  (lambda (f x)
     (pmatch f
       [(forall ,y ,g) (substitute y x g)]
       [else (error 'inst "Not a forall formula" f)])))
@@ -99,7 +99,7 @@ Term structure
             (for-each (lambda (a) (pp a)) a)
             (pp "Goal:" g))
           (let ([pg (lambda (ctx) (pp (ctx-g ctx)))])
-            (pp "Other goals:")
+            (pp "Queue:")
             (for-each pg (cdr env)))))))
 
 ;;; Inference rules (actions)
@@ -141,6 +141,14 @@ Term structure
            .
            ,(cdr env))]))))
 
+(define intro*
+  (lambda (env)
+    (let ([g (local-g env)])
+      (pmatch g
+        [(forall ? ?) (intro* (intro env))]
+        [(-> ? ?) (intro* (intro env))]
+        [else env]))))
+
 (define alpha-equiv?
   (lambda (e1 e2)
     (let alpha ([e1 e1] [e2 e2]
@@ -174,14 +182,13 @@ Term structure
        [else (str->sy name)]))))
 
 (define gain
-  ;; Gain a new formula for free (also clean)
+  ;; Gain a new formula for free
   (lambda (f)
     (lambda (env)
       (let ([a (local-a env)]
             [g (local-g env)])
-        (clean
-         `(,(make-ctx `(,f ,@a) g)
-           ,@(cdr env)))))))
+        `(,(make-ctx `(,f ,@a) g)
+          ,@(cdr env))))))
 
 (define argue
   ;; Prove something for no reason
@@ -202,26 +209,25 @@ Term structure
     (let ([a (local-a env)]
           [g (local-g env)])
       ((go
-        (argue (inst 0 g))
+        (argue (inst g 0))
         (let ([x (freshen "N" (free-vars-a a))])
-          (argue `(forall ,x (-> ,(inst x g)
-                           ,(inst `(s ,x) g)))))
+          (argue `(forall ,x (-> ,(inst g x)
+                           ,(inst g `(s ,x))))))
         done)
        env))))
 
-(define arity-table '([s 1] [+ 2]))
-
-(define rwr
-  (lambda (r*)
-    (lambda (env)
-      (let ([g (local-g env)])
-        (pmatch g
-          [(= ,l ,r)
-           ((go (assert `(= ,r ,r*))
-                (assert `(= ,l ,r*))
-                (gain   `(= ,l ,r)))
-            env)]
-          [else (error 'rwr "Not an equality" g)])))))
+(define inj
+  (lambda (env)
+    (let ([g (local-g env)])
+      (pmatch g
+        [(= (,fun . ,args1) (,fun . ,args2))
+         (let loop ([args1 args1] [args2 args2])
+           (cond
+            [(null? args1) (done env)]
+            [else
+             ((assert `(= ,(car args1) ,(car args2)))
+              (loop (cdr args1) (cdr args2)))]))]
+        [else (error 'inj "Tactic does not apply" g)]))))
 
 (define rwl
   (lambda (l*)
@@ -229,11 +235,21 @@ Term structure
       (let ([g (local-g env)])
         (pmatch g
           [(= ,l ,r)
-           ((go (assert `(= ,l ,l*))
-                (assert `(= ,l* ,r))
-                (gain `(= ,l ,r)))
+           ((go (assert `(= ,l* ,r))
+                done)
             env)]
           [else (error 'rwl "Not an equality" g)])))))
+
+(define rwr
+  (lambda (r*)
+    (lambda (env)
+      (let ([g (local-g env)])
+        (pmatch g
+          [(= ,l ,r)
+           ((go (assert `(= ,l ,r*))
+                done)
+            env)]
+          [else (error 'rwr "Not an equality" g)])))))
 
 (define refl
   (lambda (env)
@@ -242,21 +258,78 @@ Term structure
         [(= ,f ,f) (done env)]
         [else (error 'refl "Not reflable" g)]))))
 
-(define sym
+(define symm
   (lambda (env)
     (let ([g (local-g env)])
       (pmatch g
         [(= ,f ,h)
          ((go done (assert `(= ,h ,f)))
           env)]
-        [else (error 'sym "Not an equality" g)]))))
+        [else (error 'symm "Not an equality" g)]))))
 
-;; Equality
+;; Rewriting
+(define pat-match
+  (lambda (pat term)
+    (let pat-match ([pat pat] [term term] [S '()])
+      (cond
+       [(var? pat)
+        (pmatch (assq pat S)
+          [(,pat ,t) (and (equal? term t) S)]
+          [#f `((,pat ,term) . ,S)])]
+       [(and (pair? pat) (pair? term))
+        (let ([S (pat-match (car pat) (car term) S)])
+          (and S (pat-match (cdr pat) (cdr term) S)))]
+       [(eq? pat term) S]
+       [else #f]))))
+
+(define fill
+  (lambda (pat S)
+    (let fill ([pat pat])
+      (cond
+       [(var? pat)
+        (pmatch (assq pat S)
+          [(,pat ,res) res]
+          [else (error 'fill "A weird situation!" pat S)])]
+       [(pair? pat)
+        `(,(fill (car pat)) ,@(fill (cdr pat)))]
+       [else pat]))))
+
+(define rewrite-outer
+  (lambda (rule g)
+    (pmatch rule
+      [(= ,l ,r)
+       (let ([S (pat-match l g)])
+         (if S (fill r S) g))]
+      [else (error 'rewrite-outer "Not a rewrite rule" rule)])))
+
+(define rewrite-core
+  (lambda (f g)
+    (let ([rule (rip f)])
+      (pmatch rule
+        [(= ,l ,r)
+         (let rewrite-core ([g g])
+           (let ([g (rewrite-outer rule g)])
+             (cond
+              [(pair? g) `(,(rewrite-core (car g))
+                           ,@(rewrite-core (cdr g)))]
+              [else g])))]
+        [else (error 'rewrite "Not a rewrite rule" rule)]))))
+
+(define rewrite
+  (lambda (f)
+    (lambda (env)
+      (let ([g (local-g env)])
+        ((go (assert (rewrite-core f g))
+             done)
+         env)))))
+
+(define rip (lambda (f) (pmatch f [(forall ,? ,g) (rip g)] [else f])))
 
 ;; Arithmetic
-(define plus0  (for '(= (+ 0 X) X)))
-(define plus-S (for '(= (+ (s X) Y) (s (+ X Y)))))
-(define plus0r (for '(= (+ X 0) X)))
+(define plus0  (for '(= (+ 0 N) N)))
+(define plus-s (for '(= (+ (s N) M) (s (+ N M)))))
+(define plus0r (for '(= (+ N 0) N)))
+(define plus-comm (for '(= (+ N M) (+ M N))))
 
 
 #!eof

@@ -1,6 +1,16 @@
 (load "coq.ss")
 
-(prove plus0r ind)
+(test "pat-match"
+      (pat-match '(+ 0 N) '(+ 0 0))
+      '([N 0]))
+
+(test "fill"
+      (fill '(+ 0 N) '([N 0]))
+      '(+ 0 0))
+
+(test "rewrite-outer"
+      (rewrite-outer '(= (+ 0 N) N) '(+ 0 0))
+      0)
 
 #!eof
 (test "Freshen"

@@ -57,6 +57,8 @@
 
 (define-syntax test
   (syntax-rules ()
+    [(_ title tested-expression)
+     (test title tested-expression '???)]
     [(_ title tested-expression expected-result)
      (begin
        (printf "Testing ~s\n" title)
