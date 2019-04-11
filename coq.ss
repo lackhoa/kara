@@ -1,9 +1,11 @@
 #|Notes
-Expressions (in printed form):
-+ Variables: upper-case symbols
-+ Quantified formulae: 3-list whose first element is a forall
-+ Functions & Other formulae: other lists
-+ Constants: Non-uppercase symbols, numbers, null
+Expressions:
+* Compound formula:
+++ Quantification: `(,forall ,Sym ,Formula)
+++ Implication: `(-> ,Formula ,Formula)
+* Atomic formula: [Sym . [Term]]
+* Compound term: [Sym . [Term]]
+* Var: Sym
 |#
 
 ;;; Macros & helpers
@@ -19,42 +21,45 @@ Expressions (in printed form):
     (dedup
      (let free-vars ([f f] [bound '()])
        (pmatch f
-         [,v
-          (guard (var? v))
-          (if (memq v bound) '() `(,v))]
          [(forall ,v ,f)
           (free-vars f `(,v ,@bound))]
-         [(? . ,a*)
-          (apply append
-            (map (lambda (a) (free-vars a bound)) a*))]
-         [else '()])))))
+         [(-> ,f ,g)
+          (,@(free-vars f bound)
+           ,@(free-vars g bound))]
+         [(? ,@args)
+          (let ([free-vars
+                 (lambda (t)
+                   (pmatch t
+                     [(,fun ,@args)
+                      (apply append
+                        (map (lambda (arg) (free-vars arg bound)) args))]
+                     [,x
+                      (if (memq x bound) `(,x) '())]))])
+            (apply append
+              (map (lambda (arg) (free-vars arg)) args)))])))))
 
 (define substitute
   (lambda (x s f)
-    (cond
-     [(not (var? x))
-      (error 'substitute "Substituting non-var" x)]
-     [else
-      (pmatch f
-        [,y
-         (guard (var? y))
-         (if (eq? x y) s f)]
-        [(forall ,y ,g)
-         (cond
-          [(eq? x y) f]
-          [(memq y (free-vars s))
-           (let ([y* (freshen (sy->str y)
-                              `(,x
-                                ,@(free-vars s)
-                                ,@(free-vars g)))])
-             (let ([g (substitute y y* g)])
-               (let ([g (substitute x s g)])
-                 `(forall ,y* ,g))))]
-          [else `(forall ,y ,(substitute x s g))])]
-        [(,fun . ,args)
-         (let ([sub (lambda (arg) (substitute x s arg))])
-           `(,fun ,@(map sub args)))]
-        [else f])])))
+    (pmatch f
+      [(forall ,y ,g)
+       (cond
+        [(eq? x y) f]
+        [(memq y (free-vars s))
+         (let ([y* (freshen (sy->str y)
+                            `(,x
+                              ,@(free-vars s)
+                              ,@(free-vars g)))])
+           (let ([g (substitute y y* g)])
+             (let ([g (substitute x s g)])
+               `(forall ,y* ,g))))]
+        [else `(forall ,y ,(substitute x s g))])]
+      [,y
+       (guard (var? y))
+       (if (eq? x y) s f)]
+      [(,fun . ,args)
+       (let ([sub (lambda (arg) (substitute x s arg))])
+         `(,fun ,@(map sub args)))]
+      [else f])))
 
 (define inst
   (lambda (f x)
@@ -63,18 +68,19 @@ Expressions (in printed form):
       [else (error 'inst "Not a forall formula" f)])))
 
 ;;; Definitions
-(define-record ctx (a g))
+(define-record ctx (v a g q))
 
-(define var?
-  (lambda (t)
-    (and (symbol? t)
-         (char-upper-case? (string-ref (sy->str t) 0)))))
-
-(define init-env  (lambda (g) `(,(make-ctx '() g))))
-(define local-ctx (lambda (env) (car env)))
-(define done      (lambda (env) (cdr env)))
+(define init-env  (lambda (g) (make-ctx '() '() g '())))
+(define done
+  (lambda (ctx)
+    (let ([q (ctx-q ctx)])
+      (pmatch q
+        [() #f]
+        [((,v ,a ,g) . ,rest)
+         (make-ctx v a g rest)]))))
 (define local-a   (lambda (env) (ctx-a (local-ctx env))))
 (define local-g   (lambda (env) (ctx-g (local-ctx env))))
+(define local-v   (lambda (env) (ctx-g (local-ctx env))))
 (define ref       (lambda (i env) (list-ref (local-a env) i)))
 
 (define-syntax go
@@ -102,7 +108,7 @@ Expressions (in printed form):
             (pp "Queue:")
             (for-each pg (cdr env)))))))
 
-;;; Inference rules (actions)
+;;; Tactics (inference rules)
 (define clean
   (lambda (env)
     (let ([a (local-a env)]
