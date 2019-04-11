@@ -1,9 +1,9 @@
 #|Notes
-Expressions:
-+ Variables: uppcase symbols
+Expressions (in printed form):
++ Variables: upper-case symbols
 + Quantified formulae: 3-list whose first element is a forall
 + Functions & Other formulae: other lists
-+ Constants: Any not-uppercase symbol, number, null
++ Constants: Non-uppercase symbols, numbers, null
 |#
 
 ;;; Macros & helpers
