@@ -1,34 +1,35 @@
 (load "coq.ss")
 
-(test "pat-match"
-      (pat-match '(+ 0 N) '(+ 0 0))
-      '([N 0]))
+;; (test "Freshen"
+;;       (freshen "x" '(x x*))
+;;       'x**)
 
-(test "fill"
-      (fill '(+ 0 N) '([N 0]))
-      '(+ 0 0))
+;; (test "Substitution"
+;;       (sub 'y* '(+ y (1)) '(forall y (= y* y)))
+;;       '(forall y** (= (+ y (1)) y**)))
 
-(test "rewrite-outer"
-      (rewrite-outer '(= (+ 0 N) N) '(+ 0 0))
-      0)
+;; (test "Instantiation"
+;;       (inst '(forall y (and (= y* y) (forall y (= y y)))) '(+ x (1)))
+;;       '(and (= y* (+ x (1))) (forall y (= y y))))
 
-#!eof
-(test "Freshen"
-      (freshen "X" '(X X*))
-      'X**)
+;; (test "Introduce variable"
+;;       (intro (init-env '(forall x (= x x))))
+;;       '((x) () (= x x) ()))
 
-(test "Substitution"
-      (substitute 'Y* '(+ Y 1) '(forall Y (= Y* Y)))
-      '(forall Y** (= (+ Y 1) Y**)))
+;; (test "plus-comm test"
+;;       ((go
+;;         ind done intro intro ind done intro intro
+;;         (rwl '(s (+ n* (s n))))
+;;         (rwr '(s (+ n (s n*))))
+;;         inj
+;;         (rwl '(s (+ n n*)))
+;;         (rwr '(s (+ n* n)))
+;;         inj done)
+;;        (init-env plus-comm))
+;;       terminal-env)
 
-(test "Instantiation"
-      (inst '(+ X 1) '(forall Y (and (= Y* Y) (forall Y (= Y Y)))))
-      '(and (= Y* (+ X 1)) (forall Y (= Y Y))))
-
-(test "alpha-equiv? 1"
-      (alpha-equiv? '(forall X (s X)) '(forall Y (s Y)))
-      #t)
-
-(test "alpha-equiv? 2"
-      (alpha-equiv? '(forall X (s X)) '(forall Y (s X)))
-      #f)
+(test "Short-hand"
+      (inst
+       '(forall f (exists g (and (1 (c g f))
+                       (1 (c f g)))))
+       'g))

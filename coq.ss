@@ -1,187 +1,162 @@
 #|Notes
 Expressions:
 * Compound formula:
-++ Quantification: `(,forall ,Sym ,Formula)
-++ Implication: `(-> ,Formula ,Formula)
+** Binder
+** Binary Connectives
 * Atomic formula: [Sym . [Term]]
 * Compound term: [Sym . [Term]]
 * Var: Sym
+
+Suspicious patterns:
+* Every tactics work on the goal
 |#
 
 ;;; Macros & helpers
 (define for
   (lambda (f)
-    (let loop ([vs (free-vars f)])
+    (let loop ([vs (free-vars f '())])
       (cond
        [(null? vs) f]
        [else `(forall ,(car vs) ,(loop (cdr vs)))]))))
 
 (define free-vars
-  (lambda (f)
+  (lambda (f bound)
     (dedup
-     (let free-vars ([f f] [bound '()])
-       (pmatch f
-         [(forall ,v ,f)
-          (free-vars f `(,v ,@bound))]
-         [(-> ,f ,g)
-          (,@(free-vars f bound)
-           ,@(free-vars g bound))]
-         [(? ,@args)
-          (let ([free-vars
-                 (lambda (t)
-                   (pmatch t
-                     [(,fun ,@args)
-                      (apply append
-                        (map (lambda (arg) (free-vars arg bound)) args))]
-                     [,x
-                      (if (memq x bound) `(,x) '())]))])
-            (apply append
-              (map (lambda (arg) (free-vars arg)) args)))])))))
+     (pmatch f
+       "free-vars"
+       [(,bi ,v ,f)
+        (guard (binder? bi))
+        (free-vars f `(,v ,@bound))]
+       [(,bc ,f ,g)
+        (guard (bc? binary-connectors))
+        `(,@(free-vars f bound)
+          ,@(free-vars g bound))]
+       [(? . ,args)
+        (apply append
+          (map (lambda (t) (free-vars-term t bound)) args))]))))
 
-(define substitute
+(define free-vars-term
+  (lambda (t bound)
+    (let free-vars-term ([t t])
+      (pmatch t
+        "free-vars-term"
+        [(,fun . ,args)
+         (apply append
+           (map free-vars-term args))]
+        [,x
+         (guard (var? x))
+         (if (memq x bound) '() `(,x))]))))
+
+(define sub
   (lambda (x s f)
     (pmatch f
-      [(forall ,y ,g)
+      [(,bi ,y ,g)
+       (guard (binder? bi))
        (cond
         [(eq? x y) f]
-        [(memq y (free-vars s))
-         (let ([y* (freshen (sy->str y)
+        [(memq y (free-vars-term s '()))
+         (let ([y* (freshen y
                             `(,x
-                              ,@(free-vars s)
-                              ,@(free-vars g)))])
-           (let ([g (substitute y y* g)])
-             (let ([g (substitute x s g)])
-               `(forall ,y* ,g))))]
-        [else `(forall ,y ,(substitute x s g))])]
-      [,y
-       (guard (var? y))
-       (if (eq? x y) s f)]
+                              ,@(free-vars-term s '())
+                              ,@(free-vars g '())))])
+           (let ([g (sub y y* g)])
+             (let ([g (sub x s g)])
+               `(,bi ,y* ,g))))]
+        [else
+         `(,bi ,y ,(sub x s g))])]
+      [(,bc ,f ,g)
+       (guard (bc? bc))
+       `(and ,(sub x s f) ,(sub x s g))]
+      [(,pred . ,args)
+       `(,pred ,@(map (lambda (t) (sub-term x s t)) args))]
+      [else (error 'sub "Not a legal formula" f)])))
+
+(define sub-term
+  (lambda (x s t)
+    (pmatch t
       [(,fun . ,args)
-       (let ([sub (lambda (arg) (substitute x s arg))])
+       (let ([sub (lambda (arg) (sub-term x s arg))])
          `(,fun ,@(map sub args)))]
-      [else f])))
+      [,y
+       (guard (var? x))
+       (if (eq? x y) s y)]
+      [else (error 'sub-term "Not a legal term" t)])))
 
 (define inst
   (lambda (f x)
     (pmatch f
-      [(forall ,y ,g) (substitute y x g)]
-      [else (error 'inst "Not a forall formula" f)])))
+      [(,bi ,y ,g)
+       (guard (binder? bi))
+       (sub y x g)]
+      [else (error 'inst "Not a binding formula" f)])))
 
 ;;; Definitions
-(define-record ctx (v a g q))
-
-(define init-env  (lambda (g) (make-ctx '() '() g '())))
+(define binary-connectors '(-> and or <->))
+(define bc? (lambda (s) (member s binary-connectors)))
+(define binders '(forall exists))
+(define binder? (lambda (s) (member s binders)))
+(define var? symbol?)
+(define make-env (lambda (v a g q) `(,v ,a ,g ,q)))
+(define init-env (lambda (g) (make env '() '() g '())))
+(define terminal-env (make env '() '() #t '()))
 (define done
-  (lambda (ctx)
-    (let ([q (ctx-q ctx)])
+  (lambda (env)
+    (let ([q (env-g env)])
       (pmatch q
-        [() #f]
+        [() terminal-env]
         [((,v ,a ,g) . ,rest)
-         (make-ctx v a g rest)]))))
-(define local-a   (lambda (env) (ctx-a (local-ctx env))))
-(define local-g   (lambda (env) (ctx-g (local-ctx env))))
-(define local-v   (lambda (env) (ctx-g (local-ctx env))))
-(define ref       (lambda (i env) (list-ref (local-a env) i)))
+         (make env v a g rest)]))))
 
 (define-syntax go
   (syntax-rules ()
-          [(_) (lambda (x) x)]
-          [(_ f f* ...) (lambda (x)
-                          ((go f* ...) (f x)))]))
+    [(_) (lambda (x) x)]
+    [(_ f f* ...) (lambda (x) ((go f* ...) (f x)))]))
 
 (define-syntax prove
   (syntax-rules ()
-          [(_ g steps ...)
-           (print-env ((go steps ...)
-                       (init-env g)))]))
+    [(_ g steps ...)
+     (print-env ((go steps ...)
+                 (init-env g)))]))
 
 (define print-env
   (lambda (env)
-    (if (null? env) "All done!"
-        (begin
-          (let ([a (local-a env)]
-                [g (local-g env)])
-            (pp "Assets:" )
-            (for-each (lambda (a) (pp a)) a)
-            (pp "Goal:" g))
-          (let ([pg (lambda (ctx) (pp (ctx-g ctx)))])
-            (pp "Queue:")
-            (for-each pg (cdr env)))))))
+    (cond
+     [(eq? terminal-env env) (pp "All done!")]
+     [else
+      (pmatch env
+        [(,v ,a ,g ,q)
+         (begin
+           (display "Vars: ") (for-each (lambda (v) (printf "~a, " v)) v)
+           (newline) (newline)
+           (pp "Assets:") (for-each pp a)
+           (newline)
+           (pp (format "Goal (~a left):" (length q))
+               g))])])))
+
+(define add-var
+  (lambda (x)
+    (lambda (env)
+      (pmatch env
+        [(,v ,a ,g ,q)
+         ((,x ,@v) ,a ,g ,q)]))))
 
 ;;; Tactics (inference rules)
-(define clean
-  (lambda (env)
-    (let ([a (local-a env)]
-          [g (local-g env)])
-      (let ([test (lambda (f) (alpha-equiv? g f))])
-        (if (exists test a) (done env) env)))))
-
-(define mp
-  (lambda (imp)
-    (lambda (env)
-      (let ([c (get-conse imp)]
-            [g (local-g env)])
-        (cond
-         [(equal? c g)
-          ((go (assert (get-conse imp))
-               (gain imp))
-           env)]
-         [else
-          (error 'mp "From _ we cannot derive _" imp g)])))))
-
-(define free-vars-a (lambda (a) (apply append (map free-vars a))))
-
 (define intro
   (lambda (env)
-    (let ([a (local-a env)]
-          [g (local-g env)])
-      (pmatch g
-        [(forall ,v ,f)
-         (let ([v* (freshen (sy->str v)
-                            (free-vars-a a))])
-           `(,(make-ctx a (substitute v v* f))
-             .
-             ,(cdr env)))]
-        [(-> ,ante ,conse)
-         `(,(make-ctx `(,ante ,@a) conse)
-           .
-           ,(cdr env))]))))
-
-(define intro*
-  (lambda (env)
-    (let ([g (local-g env)])
-      (pmatch g
-        [(forall ? ?) (intro* (intro env))]
-        [(-> ? ?) (intro* (intro env))]
-        [else env]))))
-
-(define alpha-equiv?
-  (lambda (e1 e2)
-    (let alpha ([e1 e1] [e2 e2]
-            [xs '()] [ys '()])
-      (pmatch `(,e1 ,e2)
-        [(,x ,y)
-         (guard (var? x) (var? y))
-         (pmatch `(,(assq x xs) ,(assq y ys))
-           [(#f #f)           (eq? x y)]
-           [((? ,b1) (? ,b2)) (eq? b1 b2)]
-           [(? ?)             #f])]
-        [((forall ,x ,b1) (forall ,y ,b2))
-         (let ([fresh (gensym)])
-           (let ([xs `((,x ,fresh) ,@xs)]
-                 [ys `((,y ,fresh) ,@ys)])
-             (alpha b1 b2 xs ys)))]
-        [((,fun1 . ,args1) (,fun2 . ,args2))
-         (and (eq? fun1 fun2)
-              (= (length args1) (length args2))
-              (let ([alpha (lambda (arg1 arg2) (alpha arg1 arg2 xs ys))])
-                (andmap alpha args1 args2)))]
-        [(,c1 ,c2) (eq? c1 c2)]))))
+    (pmatch g
+      [(forall ,x ,f)
+       (let ([x* (freshen-env x env)])
+         (let ([g (sub x x* f)])
+           ((go (add-var x*) (assert g) done)
+            env)))]
+      [(-> ,ante ,conse)
+       (make env v `(,ante ,@a) conse q)]
+      [else (error 'intro "Expected a forall or a ->" g)])))
 
 (define freshen
+  ;; Str -> [Var] -> Var
   (lambda (name used)
-    ;; Str -> [Var] -> Var
-    (let freshen ([name name])
+    (let freshen ([name (sy->str name)])
       (cond
        [(memq (str->sy name) used)
         (freshen (str-app name "*"))]
@@ -191,151 +166,70 @@ Expressions:
   ;; Gain a new formula for free
   (lambda (f)
     (lambda (env)
-      (let ([a (local-a env)]
-            [g (local-g env)])
-        `(,(make-ctx `(,f ,@a) g)
-          ,@(cdr env))))))
+      (pmatch env
+        [(,v ,a ,g ,q)
+         (make-env v `(,f ,@a) g q)]))))
 
 (define argue
   ;; Prove something for no reason
   (lambda (f)
     (lambda (env)
-      (cond
-       [(null? env) `(,(make-ctx '() f))]
-       [else (let ([a (local-a env)])
-               `(,@env ,(make-ctx a f)))]))))
+      (pmatch env
+        [(,v ,a ,g ,q)
+         (make-env v a g `((,v ,a ,f) ,@q))]))))
 
 (define assert
   ;; Prove it and thou shall get it
   (lambda (f) (go (argue f) (gain f))))
 
-;;; Axioms
+(define <->-intro
+  (gtr
+   [(<-> ,f ,g)
+    `(and (-> ,f ,g) (-> ,g ,f))]))
+
 (define ind
   (lambda (env)
-    (let ([a (local-a env)]
-          [g (local-g env)])
-      ((go
-        (argue (inst g 0))
-        (let ([x (freshen "N" (free-vars-a a))])
-          (argue `(forall ,x (-> ,(inst g x)
-                           ,(inst g `(s ,x))))))
-        done)
-       env))))
+    (pmatch env
+      [(,v ,a ,g ,q)
+       ((go
+         (argue (inst g '(0)))
+         (let ([n (freshen "n" (free-vars g))])
+           (argue `(forall ,n
+                      (-> ,(inst g n)
+                         ,(inst g `(s ,n))))))
+         done)
+        env)])))
 
 (define inj
-  (lambda (env)
-    (let ([g (local-g env)])
-      (pmatch g
-        [(= (,fun . ,args1) (,fun . ,args2))
-         (let loop ([args1 args1] [args2 args2])
-           (cond
-            [(null? args1) (done env)]
-            [else
-             ((assert `(= ,(car args1) ,(car args2)))
-              (loop (cdr args1) (cdr args2)))]))]
-        [else (error 'inj "Tactic does not apply" g)]))))
+  (gtr
+   [(= (,fun . ,args1) (,fun . ,args2))
+    (let loop ([args1 args1]
+               [args2 args2])
+      (pmatch `(,args1 ,args2)
+        [(() ()) '()]
+        [((,a1 . ,d1) (,a2 . ,d2))
+         `(,(= ,a1 ,a2) ,@(loop d1 d2))]
+        [else (error 'inj "Arity mismatch" g)]))]
+   [else (error 'inj "Tactic does not apply" g)]))
 
 (define rwl
   (lambda (l*)
-    (lambda (env)
-      (let ([g (local-g env)])
-        (pmatch g
-          [(= ,l ,r)
-           ((go (assert `(= ,l* ,r))
-                done)
-            env)]
-          [else (error 'rwl "Not an equality" g)])))))
+    (gtr
+     [(= ,l ,r) `((= ,l* ,r))]
+     [else (error 'rwr "Not an equality" g)])))
 
 (define rwr
   (lambda (r*)
-    (lambda (env)
-      (let ([g (local-g env)])
-        (pmatch g
-          [(= ,l ,r)
-           ((go (assert `(= ,l ,r*))
-                done)
-            env)]
-          [else (error 'rwr "Not an equality" g)])))))
+    (gtr
+     [(= ,l ,r) `((= ,l ,r*))]
+     [else (error 'rwr "Not an equality" g)])))
 
-(define refl
-  (lambda (env)
-    (let ([g (local-g env)])
-      (pmatch g
-        [(= ,f ,f) (done env)]
-        [else (error 'refl "Not reflable" g)]))))
-
-(define symm
-  (lambda (env)
-    (let ([g (local-g env)])
-      (pmatch g
-        [(= ,f ,h)
-         ((go done (assert `(= ,h ,f)))
-          env)]
-        [else (error 'symm "Not an equality" g)]))))
-
-;; Rewriting
-(define pat-match
-  (lambda (pat term)
-    (let pat-match ([pat pat] [term term] [S '()])
-      (cond
-       [(var? pat)
-        (pmatch (assq pat S)
-          [(,pat ,t) (and (equal? term t) S)]
-          [#f `((,pat ,term) . ,S)])]
-       [(and (pair? pat) (pair? term))
-        (let ([S (pat-match (car pat) (car term) S)])
-          (and S (pat-match (cdr pat) (cdr term) S)))]
-       [(eq? pat term) S]
-       [else #f]))))
-
-(define fill
-  (lambda (pat S)
-    (let fill ([pat pat])
-      (cond
-       [(var? pat)
-        (pmatch (assq pat S)
-          [(,pat ,res) res]
-          [else (error 'fill "A weird situation!" pat S)])]
-       [(pair? pat)
-        `(,(fill (car pat)) ,@(fill (cdr pat)))]
-       [else pat]))))
-
-(define rewrite-outer
-  (lambda (rule g)
-    (pmatch rule
-      [(= ,l ,r)
-       (let ([S (pat-match l g)])
-         (if S (fill r S) g))]
-      [else (error 'rewrite-outer "Not a rewrite rule" rule)])))
-
-(define rewrite-core
-  (lambda (f g)
-    (let ([rule (rip f)])
-      (pmatch rule
-        [(= ,l ,r)
-         (let rewrite-core ([g g])
-           (let ([g (rewrite-outer rule g)])
-             (cond
-              [(pair? g) `(,(rewrite-core (car g))
-                           ,@(rewrite-core (cdr g)))]
-              [else g])))]
-        [else (error 'rewrite "Not a rewrite rule" rule)]))))
-
-(define rewrite
-  (lambda (f)
-    (lambda (env)
-      (let ([g (local-g env)])
-        ((go (assert (rewrite-core f g))
-             done)
-         env)))))
-
-(define rip (lambda (f) (pmatch f [(forall ,? ,g) (rip g)] [else f])))
-
+;;; Axioms
 ;; Arithmetic
-(define plus0  (for '(= (+ 0 N) N)))
-(define plus-s (for '(= (+ (s N) M) (s (+ N M)))))
-(define plus0r (for '(= (+ N 0) N)))
-(define plus-comm (for '(= (+ N M) (+ M N))))
+(define plus0  (for '(= (+ (0) n) m)))
+(define plus-s (for '(= (+ (s n) m) (s (+ n m)))))
+(define plus0r (for '(= (+ n (0)) n)))
+(define plus-comm (for '(= (+ n m) (+ m n))))
 
 
 #!eof

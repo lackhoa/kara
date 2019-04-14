@@ -232,12 +232,15 @@
 (define-syntax run*
   (syntax-rules ()
     [(_ (q q* ...) g g* ...)
-     ((fresh (q q* ...) g g* ... (finalize `(,q ,q* ...)))
+     ((fresh (q q* ...)
+        g g* ...
+        (finalize `(,q ,q* ...)))
       init-c)]))
 
 (define finalize
   (lambda (qs)
-    (lambdag@ (final-c) (unit (reify final-c qs)))))
+    (lambdag@ (final-c)
+      (unit (reify final-c qs)))))
 
 (define reify
   ;; This will return a c with clausal S
@@ -293,9 +296,10 @@
 
 (define su
   (lambda (c qs)
-    `(,(unify (car c) qs init-S)
-      .
-      ,(cdr c))))
+    (let ([t (car c)])
+      `(,(unify t qs init-S)
+        .
+        ,(cdr c)))))
 
 ;;; Anti-unification
 (define-syntax run*au
@@ -317,7 +321,8 @@
         (let ([auS (unify qs au init-S)])
           (let ([S* (map (lambda (t) (prefix-unify au t auS))
                          t*)])
-            `(,(purify-S auS init-C)
+            `(;; (purify-S auS init-C)
+              ,auS
               ,(map au-helper S* D* F*))))))))
 
 (define prefix-unify
@@ -325,7 +330,7 @@
 
 (define au-helper
   (lambda (S D F)
-    (let ([S (purify-S S AU-BD)]
+    (let ([S S]
           [D (walk* D S)]
           [F (walk* F S)])
       `(,S ,D ,F))))
