@@ -5,10 +5,10 @@
 ;; (begin
 ;;   (load "faster-miniKanren/mk-vicare.scm")
 ;;   (load "faster-miniKanren/mk.scm"))
-;; (load "miniKanren/mk.scm")
+(load "miniKanren/mk.scm")
 
 ;;; The main program
 ;; (load "test-compiler.ss")
-(load "test-coq.ss")
+;; (load "test-coq.ss")
 
 #!eof

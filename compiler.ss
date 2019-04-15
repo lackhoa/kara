@@ -42,23 +42,23 @@
 (define var->name (lambda (var) (vector-ref var 0)))
 (define var->bd (lambda (var) (vector-ref var 1)))
 (define var? vector?)
-(define var<?
+(define var>?
   ;; v1 is prioritized over v2
   (lambda (v1 v2)
     (let ([n1 (symbol->string (var->name v1))] [bd1 (var->bd v1)]
           [n2 (symbol->string (var->name v2))] [bd2 (var->bd v2)])
       (or (< bd1 bd2)
-         (and (= bd1 bd2) (string<? n1 n2))))))
+          (and (= bd1 bd2) (string<? n1 n2))))))
 
 ;;; Associations and Environments
 (define make-s (lambda (u v) `(,u ,v)))
 (define lhs car)
 (define rhs cadr)
-(define extend (lambda (env l r) `(,(make-s l r) . ,env)))
+(define extend (lambda (l r S) `(,(make-s l r) . ,S)))
 (define extend-check
   (lambda (v t S)
     (and (not (occurs? v t S))
-       (extend S v t))))
+         (extend v t S))))
 
 ;;; Constraints
 (define all-constraints '(S C D F))
@@ -106,14 +106,15 @@
       (cond
        [(eq? t1 t2) S]
        [(and (var? t1) (var? t2))
-        (or (and (var<? t2 t1)
-                 (extend S t1 t2))
-            (extend S t2 t1))]
+        (cond
+         [(var>? t2 t1) (extend t1 t2 S)]
+         [else (extend t2 t1 S)])]
        [(var? t1) (extend-check t1 t2 S)]
        [(var? t2) (extend-check t2 t1 S)]
        [(and (pair? t1) (pair? t2))
         (let ([S+ (unify (car t1) (car t2) S)])
           (and S+ (unify (cdr t1) (cdr t2) S+)))]
+       [(equal? t1 t2) S]
        [else #f]))))
 
 (define ==
@@ -232,15 +233,12 @@
 (define-syntax run*
   (syntax-rules ()
     [(_ (q q* ...) g g* ...)
-     ((fresh (q q* ...)
-        g g* ...
-        (finalize `(,q ,q* ...)))
+     ((fresh (q q* ...) g g* ... (finalize `(,q ,q* ...)))
       init-c)]))
 
 (define finalize
   (lambda (qs)
-    (lambdag@ (final-c)
-      (unit (reify final-c qs)))))
+    (lambdag@ (final-c) (unit (reify final-c qs)))))
 
 (define reify
   ;; This will return a c with clausal S
@@ -296,10 +294,9 @@
 
 (define su
   (lambda (c qs)
-    (let ([t (car c)])
-      `(,(unify t qs init-S)
-        .
-        ,(cdr c)))))
+    `(,(unify (car c) qs init-S)
+      .
+      ,(cdr c))))
 
 ;;; Anti-unification
 (define-syntax run*au
@@ -321,8 +318,7 @@
         (let ([auS (unify qs au init-S)])
           (let ([S* (map (lambda (t) (prefix-unify au t auS))
                          t*)])
-            `(;; (purify-S auS init-C)
-              ,auS
+            `(,(purify-S auS init-C)
               ,(map au-helper S* D* F*))))))))
 
 (define prefix-unify
@@ -330,7 +326,7 @@
 
 (define au-helper
   (lambda (S D F)
-    (let ([S S]
+    (let ([S (purify-S S AU-BD)]
           [D (walk* D S)]
           [F (walk* F S)])
       `(,S ,D ,F))))
@@ -364,7 +360,7 @@
               else
               (let ([new-var
                      (var (au-name (length iS)) AU-BD)])
-                (values new-var (extend iS t* new-var)))]))])
+                (values new-var (extend t* new-var iS)))]))])
       res)))
 (define eqp? (lambda (u) (lambda (v) (eq? u v))))
 
