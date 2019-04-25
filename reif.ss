@@ -56,7 +56,9 @@
     [(_ [else g1 g2 g* ...])
      (fresh () g1 g2 g* ...)]
     [(_ [test g* ...] c* ...)
-     (conde
-      [(test #t) g* ...]
-      [(test #f) (condo c* ...)])]
+     (fresh (?)
+       (test ?)
+       (conde
+        [(== #t ?) g* ...]
+        [(== #f ?) (condo c* ...)]))]
     [(_) fail]))
